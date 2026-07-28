@@ -35,7 +35,7 @@ export default function Directory() {
     }
     try {
       const data = await api.get(`/workers?${params.toString()}`);
-      setWorkers(data);
+      setWorkers(Array.isArray(data) ? data : []);
       setApiDown(false);
     } catch {
       // Sin backend disponible (p. ej. demo estática): mostramos aviso.

@@ -17,6 +17,12 @@ async function request(method, path, body) {
     headers,
     body: body ? JSON.stringify(body) : undefined
   });
+  // Si no hay backend (p. ej. demo estática en Vercel), la respuesta es HTML,
+  // no JSON. Fallamos limpio en vez de devolver un objeto inesperado.
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("Backend no disponible");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Error de servidor");
   return data;
