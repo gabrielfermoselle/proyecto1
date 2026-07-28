@@ -16,6 +16,7 @@ export default function Directory() {
   const [me, setMe] = useState(null); // { lat, lng }
   const [loading, setLoading] = useState(false);
   const [geoMsg, setGeoMsg] = useState("");
+  const [apiDown, setApiDown] = useState(false);
 
   useEffect(() => {
     api.get("/workers/oficios").then(setOficios).catch(() => {});
@@ -35,6 +36,11 @@ export default function Directory() {
     try {
       const data = await api.get(`/workers?${params.toString()}`);
       setWorkers(data);
+      setApiDown(false);
+    } catch {
+      // Sin backend disponible (p. ej. demo estática): mostramos aviso.
+      setApiDown(true);
+      setWorkers([]);
     } finally {
       setLoading(false);
     }
@@ -94,6 +100,13 @@ export default function Directory() {
           <span className="badge">💬 Chat interno para presupuestar</span>
         </div>
       </div>
+
+      {apiDown && (
+        <div className="alert info" style={{ marginBottom: 20 }}>
+          Demo visual sin servidor: el backend (directorio, login y chat) no está conectado en este
+          entorno. Para la experiencia completa, ejecutá el proyecto localmente con <b>npm run dev</b>.
+        </div>
+      )}
 
       <div className="grid dir-layout">
         <div className="card">
