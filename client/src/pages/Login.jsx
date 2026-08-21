@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.js";
+import AuthLayout from "../components/AuthLayout.jsx";
+import { MailIcon, LockIcon, EyeIcon, EyeOffIcon } from "../components/Icons.jsx";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -9,6 +11,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,41 +40,74 @@ export default function Login() {
     }
   }
 
+  function fillDemo(demoEmail) {
+    setEmail(demoEmail);
+    setPassword("123456");
+    setFieldErrors({});
+  }
+
   return (
-    <div className="center-narrow">
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Ingresar</h2>
-        {error && <div className="alert error">{error}</div>}
-        <form onSubmit={submit} noValidate>
-          <div className="field">
-            <label>Email</label>
+    <AuthLayout title="Bienvenido de nuevo" subtitle="Ingresá para gestionar tus contrataciones o tu perfil profesional.">
+      {error && <div className="alert error">{error}</div>}
+      <form onSubmit={submit} noValidate>
+        <div className="field">
+          <label>Email</label>
+          <div className={`input-wrap ${fieldErrors.email ? "has-error" : ""}`}>
+            <span className="input-icon"><MailIcon /></span>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
+              placeholder="tu@email.com"
+              autoComplete="email"
             />
-            {fieldErrors.email && <div className="alert error" style={{ marginTop: 6 }}>{fieldErrors.email}</div>}
           </div>
-          <div className="field">
-            <label>Contraseña</label>
+          {fieldErrors.email && <div className="field-error">{fieldErrors.email}</div>}
+        </div>
+        <div className="field">
+          <label>Contraseña</label>
+          <div className={`input-wrap ${fieldErrors.password ? "has-error" : ""}`}>
+            <span className="input-icon"><LockIcon /></span>
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              type="password"
+              type={showPassword ? "text" : "password"}
+              className="with-toggle"
+              placeholder="••••••••"
+              autoComplete="current-password"
             />
-            {fieldErrors.password && <div className="alert error" style={{ marginTop: 6 }}>{fieldErrors.password}</div>}
+            <button
+              type="button"
+              className="input-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
           </div>
-          <button className="btn block" disabled={busy}>
-            {busy ? "Ingresando…" : "Ingresar"}
-          </button>
-        </form>
-        <p className="muted" style={{ marginTop: 14 }}>
-          ¿No tenés cuenta? <Link className="link" to="/registro">Registrate</Link>
-        </p>
-        <div className="alert info" style={{ marginTop: 6 }}>
-          Demo: <b>ana@demo.com</b> (cliente) o <b>carlos@demo.com</b> (trabajador) · clave <b>123456</b>
+          {fieldErrors.password && <div className="field-error">{fieldErrors.password}</div>}
         </div>
+        <button className="btn block" disabled={busy}>
+          {busy ? "Ingresando…" : "Ingresar"}
+        </button>
+      </form>
+
+      <p className="auth-switch">
+        ¿No tenés cuenta? <Link className="link" to="/registro">Registrate</Link>
+      </p>
+
+      <div className="demo-box">
+        <div className="demo-box-title">Cuentas de demo</div>
+        <div className="demo-chips">
+          <button type="button" className="demo-chip" onClick={() => fillDemo("ana@demo.com")}>
+            👤 Cliente · ana@demo.com
+          </button>
+          <button type="button" className="demo-chip" onClick={() => fillDemo("carlos@demo.com")}>
+            🔧 Trabajador · carlos@demo.com
+          </button>
+        </div>
+        <div className="muted" style={{ marginTop: 8 }}>Clave para ambas: <b>123456</b></div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }
