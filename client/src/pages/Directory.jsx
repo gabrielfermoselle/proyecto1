@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api.js";
+import { api } from "../services/api.js";
 import MapView from "../components/MapView.jsx";
 import { StarsDisplay } from "../components/Stars.jsx";
 

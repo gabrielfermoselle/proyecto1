@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api.js";
-import { useAuth } from "../state/AuthContext.jsx";
+import { api } from "../services/api.js";
+import { useAuth } from "../hooks/useAuth.js";
 import MapView from "../components/MapView.jsx";
 
 const DEFAULT_CENTER = [-34.9011, -56.1645];
