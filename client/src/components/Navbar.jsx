@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../state/AuthContext.jsx";
+import { useAuth } from "../hooks/useAuth.js";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -17,7 +17,7 @@ export default function Navbar() {
           <span className="dot" /> Oficios Validados
         </NavLink>
         <div className="nav-links">
-          <NavLink to="/" end>
+          <NavLink to="/directorio">
             Directorio
           </NavLink>
           {user && <NavLink to="/panel">Mis contrataciones</NavLink>}
