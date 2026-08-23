@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { nanoid } from "nanoid";
 import { db, saveDB } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authMiddleware, checkRole } from "../auth.js";
 
 const router = Router();
 
@@ -34,10 +34,7 @@ function participants(job) {
 }
 
 // Cliente solicita una contratación a un trabajador.
-router.post("/", authRequired, (req, res) => {
-  if (req.user.role !== "client") {
-    return res.status(403).json({ error: "Solo los clientes pueden contratar" });
-  }
+router.post("/", authMiddleware, checkRole("client"), (req, res) => {
   const { workerId, title, description } = req.body || {};
   const worker = db.workers.find((w) => w.id === workerId);
   if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
@@ -60,7 +57,7 @@ router.post("/", authRequired, (req, res) => {
 });
 
 // Lista de contrataciones del usuario autenticado (según su rol).
-router.get("/", authRequired, (req, res) => {
+router.get("/", authMiddleware, (req, res) => {
   let list;
   if (req.user.role === "client") {
     list = db.jobs.filter((j) => j.clientId === req.user.id);
@@ -74,7 +71,7 @@ router.get("/", authRequired, (req, res) => {
   res.json(list);
 });
 
-router.get("/:id", authRequired, (req, res) => {
+router.get("/:id", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
   const { clientId, workerUserId } = participants(job);
@@ -85,7 +82,7 @@ router.get("/:id", authRequired, (req, res) => {
 });
 
 // Cambiar el estado del trabajo (aceptar, completar, cancelar).
-router.patch("/:id/status", authRequired, (req, res) => {
+router.patch("/:id/status", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
   const { clientId, workerUserId } = participants(job);
@@ -107,7 +104,7 @@ router.patch("/:id/status", authRequired, (req, res) => {
 });
 
 // Trabajador fija/actualiza el presupuesto acordado.
-router.patch("/:id/price", authRequired, (req, res) => {
+router.patch("/:id/price", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
   const { workerUserId } = participants(job);
