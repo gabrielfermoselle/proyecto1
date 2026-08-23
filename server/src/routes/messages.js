@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authMiddleware } from "../auth.js";
 
 const router = Router();
 
 // Historial del chat de un trabajo (solo los participantes).
-router.get("/:jobId", authRequired, (req, res) => {
+router.get("/:jobId", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.jobId);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
   const worker = db.workers.find((w) => w.id === job.workerId);

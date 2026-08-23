@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, saveDB } from "../db.js";
-import { authRequired } from "../auth.js";
+import { authMiddleware, checkRole } from "../auth.js";
 import { haversineKm } from "../geo.js";
 import { workerCard, workerStats } from "../helpers.js";
 
@@ -86,10 +86,7 @@ router.get("/:id", (req, res) => {
 });
 
 // Actualizar mi propio perfil de oficio (solo trabajadores).
-router.put("/me/profile", authRequired, (req, res) => {
-  if (req.user.role !== "worker") {
-    return res.status(403).json({ error: "Solo para trabajadores" });
-  }
+router.put("/me/profile", authMiddleware, checkRole("worker"), (req, res) => {
   const worker = db.workers.find((w) => w.userId === req.user.id);
   if (!worker) return res.status(404).json({ error: "Perfil no encontrado" });
 

@@ -67,7 +67,7 @@ export default function MapView({
               <Circle
                 center={[me.lat, me.lng]}
                 radius={pickCoverageKm * 1000}
-                pathOptions={{ color: "#2563eb", fillColor: "#2563eb", fillOpacity: 0.1 }}
+                pathOptions={{ color: "#d9a52c", fillColor: "#d9a52c", fillOpacity: 0.12 }}
               />
             )}
           </>

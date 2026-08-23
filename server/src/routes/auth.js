@@ -1,8 +1,20 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import { db, saveDB } from "../db.js";
-import { signToken, authRequired } from "../auth.js";
+import {
+  signToken,
+  authMiddleware,
+  generateResetToken,
+  verifyResetToken
+} from "../auth.js";
+import {
+  ROLES,
+  findByEmail,
+  createUser,
+  verifyPassword,
+  setPassword,
+  toPublic
+} from "../models/User.js";
 
 const router = Router();
 
@@ -11,24 +23,14 @@ router.post("/register", (req, res) => {
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
-  if (!["client", "worker"].includes(role)) {
+  if (!ROLES.includes(role)) {
     return res.status(400).json({ error: "Rol inválido" });
   }
-  const exists = db.users.find(
-    (u) => u.email.toLowerCase() === String(email).toLowerCase()
-  );
-  if (exists) return res.status(409).json({ error: "El email ya está registrado" });
+  if (findByEmail(email)) {
+    return res.status(409).json({ error: "El email ya está registrado" });
+  }
 
-  const user = {
-    id: nanoid(10),
-    role,
-    name: String(name).trim(),
-    email: String(email).trim().toLowerCase(),
-    passwordHash: bcrypt.hashSync(password, 10),
-    phone: phone || "",
-    createdAt: new Date().toISOString()
-  };
-  db.users.push(user);
+  const user = createUser({ name, email, password, role, phone });
 
   // Si es trabajador, creamos un perfil de oficio vacío por defecto.
   if (role === "worker") {
@@ -45,33 +47,63 @@ router.post("/register", (req, res) => {
       photoUrl: "",
       portfolio: []
     });
+    saveDB();
   }
-  saveDB();
 
   const token = signToken(user);
-  res.json({ token, user: { id: user.id, name: user.name, role: user.role } });
+  res.json({ token, user: toPublic(user) });
 });
 
 router.post("/login", (req, res) => {
   const { email, password } = req.body || {};
-  const user = db.users.find(
-    (u) => u.email === String(email || "").trim().toLowerCase()
-  );
-  if (!user || !bcrypt.compareSync(password || "", user.passwordHash)) {
+  const user = findByEmail(email);
+  if (!user || !verifyPassword(user, password)) {
     return res.status(401).json({ error: "Credenciales incorrectas" });
   }
   const token = signToken(user);
-  res.json({ token, user: { id: user.id, name: user.name, role: user.role } });
+  res.json({ token, user: toPublic(user) });
 });
 
-router.get("/me", authRequired, (req, res) => {
+router.get("/me", authMiddleware, (req, res) => {
   const user = db.users.find((u) => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
   const worker = db.workers.find((w) => w.userId === user.id) || null;
-  res.json({
-    user: { id: user.id, name: user.name, role: user.role, email: user.email },
-    workerId: worker ? worker.id : null
-  });
+  res.json({ user: toPublic(user), workerId: worker ? worker.id : null });
+});
+
+// Genera un token de reset de un solo uso. Por no tener un servicio de email
+// configurado, el token se devuelve en la respuesta (modo dev) en vez de enviarse.
+router.post("/forgot-password", (req, res) => {
+  const { email } = req.body || {};
+  const user = findByEmail(email);
+  // Respuesta genérica: no revelamos si el email existe o no.
+  if (!user) return res.json({ ok: true });
+
+  const { token, tokenHash, expiresAt } = generateResetToken();
+  user.resetTokenHash = tokenHash;
+  user.resetTokenExpiresAt = expiresAt;
+  saveDB();
+
+  console.log(`[reset-password] token para ${user.email}: ${token}`);
+  res.json({ ok: true, devResetToken: token });
+});
+
+router.post("/reset-password", (req, res) => {
+  const { email, token, password } = req.body || {};
+  if (!email || !token || !password) {
+    return res.status(400).json({ error: "Faltan campos obligatorios" });
+  }
+  const user = findByEmail(email);
+  if (!user || !verifyResetToken(user, token)) {
+    return res.status(400).json({ error: "Token inválido o expirado" });
+  }
+
+  setPassword(user, password);
+  delete user.resetTokenHash;
+  delete user.resetTokenExpiresAt;
+  saveDB();
+
+  res.json({ ok: true });
 });
 
 export default router;
