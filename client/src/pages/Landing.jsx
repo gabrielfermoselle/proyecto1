@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useAuth } from "../state/AuthContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const OFICIOS = [
   { name: "Plomería", desc: "Canillas, caños, calefones y todo lo que gotea o no debería." },
