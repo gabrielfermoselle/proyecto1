@@ -8,7 +8,7 @@ import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import JobDetail from "./pages/JobDetail.jsx";
 import EditProfile from "./pages/EditProfile.jsx";
-import { useAuth } from "./state/AuthContext.jsx";
+import { useAuth } from "./hooks/useAuth.js";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api } from "../api.js";
-import { useAuth } from "../state/AuthContext.jsx";
+import { api } from "../services/api.js";
+import { useAuth } from "../hooks/useAuth.js";
 import { StarsDisplay } from "../components/Stars.jsx";
 import MapView from "../components/MapView.jsx";
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
-import { api, getToken } from "../api.js";
-import { useAuth } from "../state/AuthContext.jsx";
+import { api } from "../services/api.js";
+import { getToken } from "../utils/storage.js";
+import { useAuth } from "../hooks/useAuth.js";
 import { StarsInput } from "../components/Stars.jsx";
 
 const STATUS_LABEL = {

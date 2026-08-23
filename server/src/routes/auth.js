@@ -19,12 +19,15 @@ import {
 const router = Router();
 
 router.post("/register", (req, res) => {
-  const { name, email, password, role, phone } = req.body || {};
+  const { name, email, password, role, phone, specialty, coverageKm } = req.body || {};
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
   if (!ROLES.includes(role)) {
     return res.status(400).json({ error: "Rol inválido" });
+  }
+  if (role === "worker" && !String(specialty || "").trim()) {
+    return res.status(400).json({ error: "La especialidad es obligatoria para trabajadores" });
   }
   if (findByEmail(email)) {
     return res.status(409).json({ error: "El email ya está registrado" });
@@ -34,16 +37,17 @@ router.post("/register", (req, res) => {
 
   // Si es trabajador, creamos un perfil de oficio vacío por defecto.
   if (role === "worker") {
+    const parsedRadius = Number(coverageKm);
     db.workers.push({
       id: nanoid(10),
       userId: user.id,
-      oficios: [],
+      oficios: [String(specialty).trim()],
       bio: "",
       hourlyRate: 0,
       lat: null,
       lng: null,
       address: "",
-      coverageKm: 10,
+      coverageKm: Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 10,
       photoUrl: "",
       portfolio: []
     });
