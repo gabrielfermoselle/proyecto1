@@ -7,10 +7,10 @@ export function publicUser(user) {
 }
 
 // Estadísticas de reputación calculadas a partir de reseñas reales.
-export function workerStats(workerId) {
-  const reviews = db.reviews.filter((r) => r.workerId === workerId);
+export function plumberStats(plumberId) {
+  const reviews = db.reviews.filter((r) => r.plumberId === plumberId);
   const completedJobs = db.jobs.filter(
-    (j) => j.workerId === workerId && j.status === "completed"
+    (j) => j.plumberId === plumberId && j.status === "completed"
   ).length;
   const avg =
     reviews.length > 0
@@ -23,33 +23,34 @@ export function workerStats(workerId) {
   };
 }
 
-// Vista pública de un trabajador (perfil del oficio) con datos del usuario dueño.
-export function workerCard(worker) {
-  const user = db.users.find((u) => u.id === worker.userId);
+// Vista pública de un plomero con datos del usuario dueño.
+export function plumberCard(plumber) {
+  const user = db.users.find((u) => u.id === plumber.userId);
   return {
-    id: worker.id,
-    userId: worker.userId,
+    id: plumber.id,
+    userId: plumber.userId,
     name: user ? user.name : "Desconocido",
-    oficios: worker.oficios,
-    bio: worker.bio,
-    hourlyRate: worker.hourlyRate,
-    address: worker.address,
-    lat: worker.lat,
-    lng: worker.lng,
-    coverageKm: worker.coverageKm,
-    photoUrl: worker.photoUrl,
-    portfolio: worker.portfolio || [],
-    ...workerStats(worker.id)
+    especialidad: plumber.especialidad,
+    descripcion: plumber.descripcion,
+    hourlyRate: plumber.hourlyRate,
+    address: plumber.address,
+    latitud: plumber.latitud,
+    longitud: plumber.longitud,
+    radioTrabajoKm: plumber.radioTrabajoKm,
+    fotoUrl: plumber.fotoUrl,
+    portfolio: plumber.portfolio || [],
+    disponible: plumber.disponible,
+    ...plumberStats(plumber.id)
   };
 }
 
-// ¿Puede este cliente reseñar a este trabajador?
+// ¿Puede este cliente reseñar a este plomero?
 // Solo si existe un trabajo COMPLETADO entre ambos que aún no fue reseñado.
-export function reviewableJob(clientId, workerId) {
+export function reviewableJob(clientId, plumberId) {
   return db.jobs.find(
     (j) =>
       j.clientId === clientId &&
-      j.workerId === workerId &&
+      j.plumberId === plumberId &&
       j.status === "completed" &&
       !db.reviews.some((r) => r.jobId === j.id)
   );

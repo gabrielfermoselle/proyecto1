@@ -33,7 +33,7 @@ router.post("/", authMiddleware, (req, res) => {
   const review = {
     id: nanoid(10),
     jobId: job.id,
-    workerId: job.workerId,
+    plumberId: job.plumberId,
     clientId: req.user.id,
     rating: value,
     comment: String(comment || "").trim(),

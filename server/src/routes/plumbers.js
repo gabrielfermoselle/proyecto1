@@ -1,5 +1,8 @@
 import { Router } from "express";
+import { db, saveDB } from "../db.js";
 import { authMiddleware, checkRole } from "../auth.js";
+import { haversineKm } from "../geo.js";
+import { plumberCard, plumberStats } from "../helpers.js";
 import {
   findById,
   findByUserId,
@@ -11,29 +14,105 @@ import {
 
 const router = Router();
 
+// Directorio público con filtros: especialidad, texto, y geolocalización (distancia).
+router.get("/", (req, res) => {
+  const { especialidad, q, lat, lng, radius, sort } = req.query;
+  const userLat = lat != null ? parseFloat(lat) : null;
+  const userLng = lng != null ? parseFloat(lng) : null;
+  const maxRadius = radius != null ? parseFloat(radius) : null;
+
+  let list = db.plumbers
+    // Solo mostramos perfiles con al menos una especialidad publicada.
+    .filter((p) => (p.especialidad || []).length > 0)
+    .map((p) => {
+      const card = plumberCard(p);
+      if (userLat != null && userLng != null && p.latitud != null && p.longitud != null) {
+        card.distanceKm =
+          Math.round(haversineKm(userLat, userLng, p.latitud, p.longitud) * 10) / 10;
+        // Dentro de la zona de radio de trabajo del plomero?
+        card.inCoverage = card.distanceKm <= (p.radioTrabajoKm || 0);
+      } else {
+        card.distanceKm = null;
+        card.inCoverage = null;
+      }
+      return card;
+    });
+
+  if (especialidad) {
+    const e = String(especialidad).toLowerCase();
+    list = list.filter((c) => c.especialidad.some((x) => x.toLowerCase() === e));
+  }
+  if (q) {
+    const term = String(q).toLowerCase();
+    list = list.filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        c.descripcion.toLowerCase().includes(term) ||
+        c.especialidad.some((x) => x.toLowerCase().includes(term))
+    );
+  }
+  // Filtro por distancia máxima solicitada por el usuario.
+  if (maxRadius != null && userLat != null && userLng != null) {
+    list = list.filter((c) => c.distanceKm != null && c.distanceKm <= maxRadius);
+  }
+
+  if (sort === "distance" && userLat != null) {
+    list.sort((a, b) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9));
+  } else if (sort === "rating") {
+    list.sort((a, b) => b.avgRating - a.avgRating);
+  }
+
+  res.json(list);
+});
+
+// Lista de especialidades disponibles (para filtros).
+router.get("/especialidades", (_req, res) => {
+  const set = new Set();
+  db.plumbers.forEach((p) => (p.especialidad || []).forEach((e) => set.add(e)));
+  res.json([...set].sort());
+});
+
+// Perfil detallado de un plomero + sus reseñas.
+router.get("/:id", (req, res) => {
+  const plumber = findById(req.params.id);
+  if (!plumber) return res.status(404).json({ error: "Perfil no encontrado" });
+  const card = plumberCard(plumber);
+  const reviews = db.reviews
+    .filter((r) => r.plumberId === plumber.id)
+    .map((r) => {
+      const client = db.users.find((u) => u.id === r.clientId);
+      return {
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        clientName: client ? client.name : "Cliente",
+        createdAt: r.createdAt
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json({ ...card, reviews });
+});
+
 // Crear el propio perfil de plomero (solo usuarios con rol 'plomero', uno por usuario).
 router.post("/", authMiddleware, checkRole("plomero"), (req, res) => {
   if (findByUserId(req.user.id)) {
     return res.status(409).json({ error: "Ya tenés un perfil de plomero" });
   }
-  const { especialidad, descripcion, radioTrabajoKm, latitud, longitud, fotoUrl } = req.body || {};
+  const { especialidad, descripcion, hourlyRate, address, radioTrabajoKm, latitud, longitud, fotoUrl, portfolio } =
+    req.body || {};
   const plumber = createPlumber({
     userId: req.user.id,
     especialidad,
     descripcion,
+    hourlyRate,
+    address,
     radioTrabajoKm,
     latitud,
     longitud,
-    fotoUrl
+    fotoUrl,
+    portfolio
   });
   res.status(201).json(toPublic(plumber));
-});
-
-// Perfil público de un plomero.
-router.get("/:id", (req, res) => {
-  const plumber = findById(req.params.id);
-  if (!plumber) return res.status(404).json({ error: "Perfil no encontrado" });
-  res.json(toPublic(plumber));
 });
 
 // Editar el propio perfil (solo el dueño, con rol 'plomero').
@@ -44,7 +123,7 @@ router.put("/:id", authMiddleware, checkRole("plomero"), (req, res) => {
     return res.status(403).json({ error: "No podés editar el perfil de otro plomero" });
   }
   updatePlumber(plumber, req.body || {});
-  res.json(toPublic(plumber));
+  res.json({ ...toPublic(plumber), ...plumberStats(plumber.id) });
 });
 
 // Actualizar solo la disponibilidad (solo el dueño, con rol 'plomero').

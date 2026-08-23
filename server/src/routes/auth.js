@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { nanoid } from "nanoid";
 import { db, saveDB } from "../db.js";
 import {
   signToken,
@@ -15,6 +14,7 @@ import {
   setPassword,
   toPublic
 } from "../models/User.js";
+import { createPlumber } from "../models/Plumber.js";
 
 const router = Router();
 
@@ -26,8 +26,8 @@ router.post("/register", (req, res) => {
   if (!ROLES.includes(role)) {
     return res.status(400).json({ error: "Rol inválido" });
   }
-  if (role === "worker" && !String(specialty || "").trim()) {
-    return res.status(400).json({ error: "La especialidad es obligatoria para trabajadores" });
+  if (role === "plomero" && !String(specialty || "").trim()) {
+    return res.status(400).json({ error: "La especialidad es obligatoria para plomeros" });
   }
   if (findByEmail(email)) {
     return res.status(409).json({ error: "El email ya está registrado" });
@@ -35,23 +35,18 @@ router.post("/register", (req, res) => {
 
   const user = createUser({ name, email, password, role, phone });
 
-  // Si es trabajador, creamos un perfil de oficio vacío por defecto.
-  if (role === "worker") {
+  // Si es plomero, creamos su perfil de plomero vacío por defecto.
+  if (role === "plomero") {
     const parsedRadius = Number(coverageKm);
-    db.workers.push({
-      id: nanoid(10),
+    createPlumber({
       userId: user.id,
-      oficios: [String(specialty).trim()],
-      bio: "",
-      hourlyRate: 0,
-      lat: null,
-      lng: null,
-      address: "",
-      coverageKm: Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 10,
-      photoUrl: "",
-      portfolio: []
+      especialidad: String(specialty).trim(),
+      descripcion: "",
+      radioTrabajoKm: Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 10,
+      latitud: null,
+      longitud: null,
+      fotoUrl: ""
     });
-    saveDB();
   }
 
   const token = signToken(user);
@@ -71,8 +66,11 @@ router.post("/login", (req, res) => {
 router.get("/me", authMiddleware, (req, res) => {
   const user = db.users.find((u) => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
-  const worker = db.workers.find((w) => w.userId === user.id) || null;
-  res.json({ user: toPublic(user), workerId: worker ? worker.id : null });
+  const plumber = db.plumbers.find((p) => p.userId === user.id) || null;
+  res.json({
+    user: toPublic(user),
+    plumberId: plumber ? plumber.id : null
+  });
 });
 
 // Genera un token de reset de un solo uso. Por no tener un servicio de email

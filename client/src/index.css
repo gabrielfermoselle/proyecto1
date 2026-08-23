@@ -341,7 +341,7 @@ textarea { min-height: 90px; resize: vertical; }
 .btn.sm { padding: 6px 14px; font-size: 13px; }
 .btn.block { width: 100%; }
 
-/* Worker cards */
+/* Professional cards */
 .worker-list { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .worker { display: flex; flex-direction: column; gap: 10px; }
 .worker .top { display: flex; gap: 12px; align-items: center; }
@@ -350,6 +350,7 @@ textarea { min-height: 90px; resize: vertical; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { background: rgba(122, 31, 31, 0.08); color: var(--maroon); border: 1px solid rgba(122, 31, 31, 0.18); padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; font-family: var(--font-label); letter-spacing: 0.3px; }
 .chip.oficio { cursor: pointer; }
+.chip-off { background: var(--danger-bg); color: var(--danger); border-color: rgba(122, 31, 31, 0.18); }
 .muted { color: var(--muted); font-size: 13px; }
 .meta-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
 .stars { color: var(--gold); letter-spacing: 1px; }
@@ -464,6 +465,38 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
 .input-wrap .input-toggle:hover { color: var(--text); background: #f1f5f9; }
 .input-wrap.has-error input { border-color: var(--danger); }
 .field-error { color: var(--danger); font-size: 12.5px; margin-top: 6px; }
+
+/* Availability switch */
+.switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  flex: none;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 22, 16, 0.2);
+  background: var(--paper-soft, #eee);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.switch:disabled { opacity: 0.6; cursor: not-allowed; }
+.switch .switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+.switch.on { background: var(--success); border-color: var(--success); }
+.switch.on .switch-knob { transform: translateX(22px); }
+
+/* Photo upload */
+.photo-upload { display: flex; align-items: center; gap: 14px; }
+.photo-upload-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .role-select { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .role-option {

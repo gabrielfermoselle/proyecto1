@@ -8,9 +8,9 @@ const router = Router();
 router.get("/:jobId", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.jobId);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
-  const worker = db.workers.find((w) => w.id === job.workerId);
-  const workerUserId = worker ? worker.userId : null;
-  if (![job.clientId, workerUserId].includes(req.user.id)) {
+  const plumber = db.plumbers.find((p) => p.id === job.plumberId);
+  const plumberUserId = plumber ? plumber.userId : null;
+  if (![job.clientId, plumberUserId].includes(req.user.id)) {
     return res.status(403).json({ error: "Sin acceso a este chat" });
   }
   const list = db.messages

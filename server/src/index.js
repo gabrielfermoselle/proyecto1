@@ -7,7 +7,6 @@ import { nanoid } from "nanoid";
 import { db, saveDB } from "./db.js";
 import { verifyToken } from "./auth.js";
 import authRoutes from "./routes/auth.js";
-import workerRoutes from "./routes/workers.js";
 import plumberRoutes from "./routes/plumbers.js";
 import jobRoutes from "./routes/jobs.js";
 import reviewRoutes from "./routes/reviews.js";
@@ -17,11 +16,10 @@ const PORT = process.env.PORT || 4000;
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "6mb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
-app.use("/api/workers", workerRoutes);
 app.use("/api/plumbers", plumberRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/reviews", reviewRoutes);
@@ -43,9 +41,9 @@ io.use((socket, next) => {
 function canAccessJob(userId, jobId) {
   const job = db.jobs.find((j) => j.id === jobId);
   if (!job) return false;
-  const worker = db.workers.find((w) => w.id === job.workerId);
-  const workerUserId = worker ? worker.userId : null;
-  return [job.clientId, workerUserId].includes(userId);
+  const plumber = db.plumbers.find((p) => p.id === job.plumberId);
+  const plumberUserId = plumber ? plumber.userId : null;
+  return [job.clientId, plumberUserId].includes(userId);
 }
 
 io.on("connection", (socket) => {

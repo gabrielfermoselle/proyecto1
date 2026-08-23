@@ -5,18 +5,18 @@ import { useAuth } from "../hooks/useAuth.js";
 import { StarsDisplay } from "../components/Stars.jsx";
 import MapView from "../components/MapView.jsx";
 
-export default function WorkerProfile() {
+export default function PlumberProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [w, setW] = useState(null);
+  const [p, setP] = useState(null);
   const [error, setError] = useState("");
   const [showHire, setShowHire] = useState(false);
   const [form, setForm] = useState({ title: "", description: "" });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get(`/workers/${id}`).then(setW).catch((e) => setError(e.message));
+    api.get(`/plumbers/${id}`).then(setP).catch((e) => setError(e.message));
   }, [id]);
 
   async function hire(e) {
@@ -24,7 +24,7 @@ export default function WorkerProfile() {
     setBusy(true);
     setError("");
     try {
-      const job = await api.post("/jobs", { workerId: id, ...form });
+      const job = await api.post("/jobs", { plumberId: id, ...form });
       navigate(`/trabajo/${job.id}`);
     } catch (err) {
       setError(err.message);
@@ -34,7 +34,7 @@ export default function WorkerProfile() {
   }
 
   if (error) return <div className="alert error">{error}</div>;
-  if (!w) return <div>Cargando…</div>;
+  if (!p) return <div>Cargando…</div>;
 
   const canHire = !user || user.role === "client";
 
@@ -43,24 +43,27 @@ export default function WorkerProfile() {
       <div className="grid" style={{ gap: 20 }}>
         <div className="card">
           <div className="top" style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <img className="avatar" style={{ width: 80, height: 80 }} src={w.photoUrl || `https://i.pravatar.cc/150?u=${w.id}`} alt={w.name} />
+            <img className="avatar" style={{ width: 80, height: 80 }} src={p.fotoUrl || `https://i.pravatar.cc/150?u=${p.id}`} alt={p.name} />
             <div>
-              <h2 style={{ margin: "0 0 6px" }}>{w.name}</h2>
-              <StarsDisplay value={w.avgRating} count={w.reviewCount} />
+              <h2 style={{ margin: "0 0 6px" }}>{p.name}</h2>
+              <StarsDisplay value={p.avgRating} count={p.reviewCount} />
               <div className="chips" style={{ marginTop: 8 }}>
-                {w.oficios.map((o) => (
-                  <span className="chip" key={o}>{o}</span>
+                {p.especialidad.map((e) => (
+                  <span className="chip" key={e}>{e}</span>
                 ))}
+                <span className={`chip ${p.disponible ? "" : "chip-off"}`}>
+                  {p.disponible ? "Disponible" : "No disponible"}
+                </span>
               </div>
             </div>
           </div>
           <hr className="sep" />
-          <p>{w.bio || "Sin descripción."}</p>
+          <p>{p.descripcion || "Sin descripción."}</p>
           <div className="row">
-            <span className="chip">💵 ${w.hourlyRate}/h referencia</span>
-            <span className="chip">✅ {w.completedJobs} trabajos completados</span>
-            <span className="chip">📍 {w.address || "Zona no especificada"}</span>
-            <span className="chip">🛠️ Cubre {w.coverageKm} km a la redonda</span>
+            <span className="chip">💵 ${p.hourlyRate}/h referencia</span>
+            <span className="chip">✅ {p.completedJobs} trabajos completados</span>
+            <span className="chip">📍 {p.address || "Zona no especificada"}</span>
+            <span className="chip">🛠️ Cubre {p.radioTrabajoKm} km a la redonda</span>
           </div>
 
           {canHire && (
@@ -106,15 +109,15 @@ export default function WorkerProfile() {
           )}
         </div>
 
-        {w.portfolio.length > 0 && (
+        {p.portfolio.length > 0 && (
           <div className="card">
             <h3>Portafolio de trabajos</h3>
             <div className="portfolio-grid">
-              {w.portfolio.map((p, i) => (
+              {p.portfolio.map((item, i) => (
                 <div className="portfolio-item" key={i}>
-                  {p.imageUrl && <img src={p.imageUrl} alt={p.title} />}
-                  <div className="pt">{p.title}</div>
-                  <div className="muted">{p.description}</div>
+                  {item.imageUrl && <img src={item.imageUrl} alt={item.title} />}
+                  <div className="pt">{item.title}</div>
+                  <div className="muted">{item.description}</div>
                 </div>
               ))}
             </div>
@@ -123,25 +126,25 @@ export default function WorkerProfile() {
       </div>
 
       <div className="grid" style={{ gap: 20 }}>
-        {w.lat != null && (
+        {p.latitud != null && (
           <div className="card">
             <h3>Zona de cobertura</h3>
             <MapView
-              center={[w.lat, w.lng]}
+              center={[p.latitud, p.longitud]}
               zoom={12}
-              me={{ lat: w.lat, lng: w.lng, label: w.name }}
-              pickCoverageKm={w.coverageKm}
+              me={{ lat: p.latitud, lng: p.longitud, label: p.name }}
+              pickCoverageKm={p.radioTrabajoKm}
             />
           </div>
         )}
 
         <div className="card">
-          <h3>Reseñas verificadas ({w.reviewCount})</h3>
+          <h3>Reseñas verificadas ({p.reviewCount})</h3>
           <p className="muted" style={{ marginTop: -6 }}>
             Solo pueden reseñar clientes que completaron una contratación real.
           </p>
-          {w.reviews.length === 0 && <div className="empty">Todavía no hay reseñas.</div>}
-          {w.reviews.map((r) => (
+          {p.reviews.length === 0 && <div className="empty">Todavía no hay reseñas.</div>}
+          {p.reviews.map((r) => (
             <div key={r.id} style={{ padding: "12px 0", borderTop: "1px solid var(--border)" }}>
               <div className="spread">
                 <strong>{r.clientName}</strong>

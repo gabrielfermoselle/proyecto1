@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { db, saveDB } from "../db.js";
 
 // { id, role, name, email, passwordHash, phone, createdAt, resetTokenHash, resetTokenExpiresAt }
-export const ROLES = ["client", "worker", "plomero"];
+export const ROLES = ["client", "plomero"];
 
 export function findByEmail(email) {
   const normalized = String(email || "").trim().toLowerCase();

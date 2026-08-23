@@ -105,8 +105,8 @@ export default function JobDetail() {
   if (!job) return <div>Cargando…</div>;
 
   const isClient = user.id === job.clientId;
-  const isWorker = user.id === job.workerUserId;
-  const other = isClient ? job.workerName : job.clientName;
+  const isPlumber = user.id === job.plumberUserId;
+  const other = isClient ? job.plumberName : job.clientName;
 
   return (
     <div className="grid cols-2">
@@ -116,7 +116,7 @@ export default function JobDetail() {
             <h2 style={{ margin: 0 }}>{job.title}</h2>
             <span className={`status ${job.status}`}>{STATUS_LABEL[job.status]}</span>
           </div>
-          <p className="muted">{isClient ? `Con ${other} (trabajador)` : `Con ${other} (cliente)`}</p>
+          <p className="muted">{isClient ? `Con ${other} (plomero)` : `Con ${other} (cliente)`}</p>
           <p>{job.description || "Sin detalles."}</p>
           {job.agreedPrice != null && (
             <p className="tag-price" style={{ fontSize: 18 }}>Presupuesto acordado: ${job.agreedPrice}</p>
@@ -127,8 +127,8 @@ export default function JobDetail() {
 
           <hr className="sep" />
 
-          {/* Acciones del trabajador */}
-          {isWorker && (
+          {/* Acciones del plomero */}
+          {isPlumber && (
             <div className="grid" style={{ gap: 12 }}>
               {job.status === "requested" && (
                 <div className="row">

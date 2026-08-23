@@ -12,7 +12,7 @@ function around(dLat, dLng) {
 }
 
 const users = [];
-const workers = [];
+const plumbers = [];
 const jobs = [];
 const reviews = [];
 
@@ -30,87 +30,98 @@ function makeUser(role, name, email, phone) {
   return u;
 }
 
-function makeWorker(user, data) {
-  const w = {
+function makePlumber(user, data) {
+  const p = {
     id: nanoid(10),
     userId: user.id,
-    coverageKm: 10,
+    radioTrabajoKm: 10,
     portfolio: [],
-    photoUrl: "",
-    bio: "",
+    fotoUrl: "",
+    descripcion: "",
     hourlyRate: 0,
+    address: "",
+    disponible: true,
+    createdAt: new Date().toISOString(),
     ...data
   };
-  workers.push(w);
-  return w;
+  plumbers.push(p);
+  return p;
 }
 
 // --- Clientes ---
 const ana = makeUser("client", "Ana Pereyra", "ana@demo.com", "099111222");
 const luis = makeUser("client", "Luis Gómez", "luis@demo.com", "099333444");
 
-// --- Trabajadores ---
-const carlosU = makeUser("worker", "Carlos Rodríguez", "carlos@demo.com", "091000001");
-const carlos = makeWorker(carlosU, {
-  oficios: ["Plomería", "Gasista"],
-  bio: "Plomero matriculado con 12 años de experiencia. Destapaciones, calefones y fugas.",
+// --- Plomeros ---
+const carlosU = makeUser("plomero", "Carlos Rodríguez", "carlos@demo.com", "091000001");
+const { lat: carlosLat, lng: carlosLng } = around(0.004, 0.006);
+const carlos = makePlumber(carlosU, {
+  especialidad: ["Plomería", "Gasista"],
+  descripcion: "Plomero matriculado con 12 años de experiencia. Destapaciones, calefones y fugas.",
   hourlyRate: 850,
-  ...around(0.004, 0.006),
+  latitud: carlosLat,
+  longitud: carlosLng,
   address: "Cordón, Montevideo",
-  coverageKm: 12,
-  photoUrl: "https://i.pravatar.cc/300?img=12",
+  radioTrabajoKm: 12,
+  fotoUrl: "https://i.pravatar.cc/300?img=12",
   portfolio: [
     { title: "Instalación de calefón", imageUrl: "https://picsum.photos/seed/calefon/600/400", description: "Cambio de calefón a termotanque eléctrico." },
     { title: "Reparación de cañería", imageUrl: "https://picsum.photos/seed/caneria/600/400", description: "Fuga en cocina resuelta en el día." }
   ]
 });
 
-const martaU = makeUser("worker", "Marta Silva", "marta@demo.com", "091000002");
-const marta = makeWorker(martaU, {
-  oficios: ["Electricidad"],
-  bio: "Electricista UTE habilitada. Tableros, cortocircuitos e instalaciones nuevas.",
+const martaU = makeUser("plomero", "Marta Silva", "marta@demo.com", "091000002");
+const { lat: martaLat, lng: martaLng } = around(-0.008, 0.01);
+const marta = makePlumber(martaU, {
+  especialidad: ["Electricidad"],
+  descripcion: "Electricista UTE habilitada. Tableros, cortocircuitos e instalaciones nuevas.",
   hourlyRate: 900,
-  ...around(-0.008, 0.01),
+  latitud: martaLat,
+  longitud: martaLng,
   address: "Pocitos, Montevideo",
-  coverageKm: 8,
-  photoUrl: "https://i.pravatar.cc/300?img=45",
+  radioTrabajoKm: 8,
+  fotoUrl: "https://i.pravatar.cc/300?img=45",
   portfolio: [
     { title: "Tablero nuevo", imageUrl: "https://picsum.photos/seed/tablero/600/400", description: "Modernización de tablero con disyuntores." }
   ]
 });
 
-const joseU = makeUser("worker", "José Fernández", "jose@demo.com", "091000003");
-const jose = makeWorker(joseU, {
-  oficios: ["Carpintería"],
-  bio: "Carpintero de obra fina. Muebles a medida, placares y restauración.",
+const joseU = makeUser("plomero", "José Fernández", "jose@demo.com", "091000003");
+const { lat: joseLat, lng: joseLng } = around(0.02, -0.015);
+const jose = makePlumber(joseU, {
+  especialidad: ["Carpintería"],
+  descripcion: "Carpintero de obra fina. Muebles a medida, placares y restauración.",
   hourlyRate: 700,
-  ...around(0.02, -0.015),
+  latitud: joseLat,
+  longitud: joseLng,
   address: "La Blanqueada, Montevideo",
-  coverageKm: 15,
-  photoUrl: "https://i.pravatar.cc/300?img=33",
+  radioTrabajoKm: 15,
+  fotoUrl: "https://i.pravatar.cc/300?img=33",
   portfolio: [
     { title: "Placard a medida", imageUrl: "https://picsum.photos/seed/placard/600/400", description: "Placard de melamina 3m." }
   ]
 });
 
-const soledadU = makeUser("worker", "Soledad Castro", "sole@demo.com", "091000004");
-const soledad = makeWorker(soledadU, {
-  oficios: ["Pintura", "Albañilería"],
-  bio: "Pintora y albañil. Interiores, exteriores e impermeabilizaciones.",
+const soledadU = makeUser("plomero", "Soledad Castro", "sole@demo.com", "091000004");
+const { lat: soleLat, lng: soleLng } = around(-0.03, -0.02);
+const soledad = makePlumber(soledadU, {
+  especialidad: ["Pintura", "Albañilería"],
+  descripcion: "Pintora y albañil. Interiores, exteriores e impermeabilizaciones.",
   hourlyRate: 650,
-  ...around(-0.03, -0.02),
+  latitud: soleLat,
+  longitud: soleLng,
   address: "Malvín, Montevideo",
-  coverageKm: 20,
-  photoUrl: "https://i.pravatar.cc/300?img=20",
+  radioTrabajoKm: 20,
+  fotoUrl: "https://i.pravatar.cc/300?img=20",
   portfolio: []
 });
 
 // --- Trabajos completados (para que las reseñas sean válidas) ---
-function makeJob(client, worker, title, description, status, price, reviewed) {
+function makeJob(client, plumber, title, description, status, price) {
   const job = {
     id: nanoid(10),
     clientId: client.id,
-    workerId: worker.id,
+    plumberId: plumber.id,
     title,
     description,
     status,
@@ -126,7 +137,7 @@ const j1 = makeJob(ana, carlos, "Arreglo de canilla", "Pérdida en el baño", "c
 reviews.push({
   id: nanoid(10),
   jobId: j1.id,
-  workerId: carlos.id,
+  plumberId: carlos.id,
   clientId: ana.id,
   rating: 5,
   comment: "Excelente, puntual y prolijo. Súper recomendable.",
@@ -137,7 +148,7 @@ const j2 = makeJob(luis, carlos, "Destapación de cocina", "Cañería tapada", "
 reviews.push({
   id: nanoid(10),
   jobId: j2.id,
-  workerId: carlos.id,
+  plumberId: carlos.id,
   clientId: luis.id,
   rating: 4,
   comment: "Muy buen trabajo, resolvió rápido.",
@@ -148,7 +159,7 @@ const j3 = makeJob(ana, marta, "Cortocircuito en cocina", "Salta la térmica", "
 reviews.push({
   id: nanoid(10),
   jobId: j3.id,
-  workerId: marta.id,
+  plumberId: marta.id,
   clientId: ana.id,
   rating: 5,
   comment: "Detectó el problema enseguida. Muy profesional.",
@@ -158,15 +169,15 @@ reviews.push({
 // Un trabajo en curso (para probar chat y flujo).
 makeJob(luis, jose, "Placard para dormitorio", "Necesito presupuesto y medidas", "requested", null);
 
-resetDB({ users, workers, jobs, reviews, messages: [] });
+resetDB({ users, plumbers, jobs, reviews, messages: [] });
 loadDB();
 saveDB();
 
 console.log("Base de datos poblada con datos de demo.");
 console.log("Usuarios de prueba (contraseña: 123456):");
-console.log("  Cliente:     ana@demo.com");
-console.log("  Cliente:     luis@demo.com");
-console.log("  Trabajador:  carlos@demo.com (Plomería)");
-console.log("  Trabajador:  marta@demo.com (Electricidad)");
-console.log("  Trabajador:  jose@demo.com (Carpintería)");
-console.log("  Trabajador:  sole@demo.com (Pintura)");
+console.log("  Cliente:  ana@demo.com");
+console.log("  Cliente:  luis@demo.com");
+console.log("  Plomero:  carlos@demo.com (Plomería)");
+console.log("  Plomero:  marta@demo.com (Electricidad)");
+console.log("  Plomero:  jose@demo.com (Carpintería)");
+console.log("  Plomero:  sole@demo.com (Pintura)");
