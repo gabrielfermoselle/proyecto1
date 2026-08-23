@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Navbar from "./components/Navbar.jsx";
+import Landing from "./pages/Landing.jsx";
 import Directory from "./pages/Directory.jsx";
 import WorkerProfile from "./pages/WorkerProfile.jsx";
 import Login from "./pages/Login.jsx";
@@ -22,7 +23,8 @@ export default function App() {
       <Navbar />
       <div className="container">
         <Routes>
-          <Route path="/" element={<Directory />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/directorio" element={<Directory />} />
           <Route path="/trabajador/:id" element={<WorkerProfile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Register />} />

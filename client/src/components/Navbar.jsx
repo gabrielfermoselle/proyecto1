@@ -14,10 +14,10 @@ export default function Navbar() {
     <nav className="nav">
       <div className="nav-inner">
         <NavLink to="/" className="brand">
-          <span className="dot" /> Oficios Validados
+          <span className="dot">✓</span> Oficios Validados
         </NavLink>
         <div className="nav-links">
-          <NavLink to="/" end>
+          <NavLink to="/directorio">
             Directorio
           </NavLink>
           {user && <NavLink to="/panel">Mis contrataciones</NavLink>}

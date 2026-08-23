@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api.js";
 import MapView from "../components/MapView.jsx";
 import { StarsDisplay } from "../components/Stars.jsx";
@@ -7,9 +7,10 @@ import { StarsDisplay } from "../components/Stars.jsx";
 const DEFAULT_CENTER = [-34.9011, -56.1645]; // Montevideo
 
 export default function Directory() {
+  const [searchParams] = useSearchParams();
   const [workers, setWorkers] = useState([]);
   const [oficios, setOficios] = useState([]);
-  const [oficio, setOficio] = useState("");
+  const [oficio, setOficio] = useState(searchParams.get("oficio") || "");
   const [q, setQ] = useState("");
   const [radius, setRadius] = useState("");
   const [sort, setSort] = useState("rating");
@@ -88,18 +89,12 @@ export default function Directory() {
 
   return (
     <div>
-      <div className="hero">
-        <h1>Contratá oficios de confianza, con reputación comprobable</h1>
-        <p>
-          Encontrá plomeros, electricistas, carpinteros y más cerca tuyo. Cada reseña está
-          respaldada por un trabajo real: sin recomendaciones truchas ni valoraciones infladas.
-        </p>
-        <div className="badges">
-          <span className="badge">📍 Filtro por zona y distancia</span>
-          <span className="badge">⭐ Reseñas ancladas a trabajos reales</span>
-          <span className="badge">💬 Chat interno para presupuestar</span>
-        </div>
+      <div className="spread" style={{ margin: "24px 0 4px" }}>
+        <h1 className="section-title" style={{ margin: 0 }}>Directorio de oficiales</h1>
       </div>
+      <p className="muted" style={{ marginBottom: 20 }}>
+        Filtrá por rubro, zona y distancia. Cada reseña está anclada a un trabajo real y completado.
+      </p>
 
       {apiDown && (
         <div className="alert info" style={{ marginBottom: 20 }}>
