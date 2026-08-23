@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getStoredUser());
-  const [workerId, setWorkerId] = useState(null);
+  const [plumberId, setPlumberId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   function persistUser(nextUser) {
@@ -17,18 +17,18 @@ export function AuthProvider({ children }) {
   async function refresh() {
     if (!getToken()) {
       persistUser(null);
-      setWorkerId(null);
+      setPlumberId(null);
       setLoading(false);
       return;
     }
     try {
       const data = await api.get("/auth/me");
       persistUser(data.user);
-      setWorkerId(data.workerId);
+      setPlumberId(data.plumberId);
     } catch {
       setToken(null);
       persistUser(null);
-      setWorkerId(null);
+      setPlumberId(null);
     } finally {
       setLoading(false);
     }
@@ -57,13 +57,13 @@ export function AuthProvider({ children }) {
   function logout() {
     setToken(null);
     persistUser(null);
-    setWorkerId(null);
+    setPlumberId(null);
   }
 
   const value = {
     user,
     role: user?.role ?? null,
-    workerId,
+    plumberId,
     loading,
     login,
     register,

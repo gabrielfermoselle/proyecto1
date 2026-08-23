@@ -32,7 +32,7 @@ export default function Login() {
     setBusy(true);
     try {
       const user = await login(email.trim(), password);
-      navigate(user.role === "worker" ? "/mi-perfil" : "/panel");
+      navigate(user.role === "plomero" ? "/mi-perfil" : "/panel");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -103,7 +103,7 @@ export default function Login() {
             👤 Cliente · ana@demo.com
           </button>
           <button type="button" className="demo-chip" onClick={() => fillDemo("carlos@demo.com")}>
-            🔧 Trabajador · carlos@demo.com
+            🔧 Plomero · carlos@demo.com
           </button>
         </div>
         <div className="muted" style={{ marginTop: 8 }}>Clave para ambas: <b>123456</b></div>

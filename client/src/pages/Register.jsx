@@ -45,7 +45,7 @@ export default function Register() {
     if (!form.password) errs.password = "La contraseña es obligatoria.";
     else if (form.password.length < 6) errs.password = "Debe tener al menos 6 caracteres.";
     if (form.confirmPassword !== form.password) errs.confirmPassword = "Las contraseñas no coinciden.";
-    if (form.role === "worker") {
+    if (form.role === "plomero") {
       if (!form.specialty.trim()) errs.specialty = "Indicá tu especialidad (ej. Plomería).";
       const radius = Number(form.coverageKm);
       if (!form.coverageKm || Number.isNaN(radius) || radius <= 0) {
@@ -69,12 +69,12 @@ export default function Register() {
         phone: form.phone.trim(),
         role: form.role
       };
-      if (form.role === "worker") {
+      if (form.role === "plomero") {
         payload.specialty = form.specialty.trim();
         payload.coverageKm = Number(form.coverageKm);
       }
       const user = await register(payload);
-      navigate(user.role === "worker" ? "/mi-perfil" : "/panel");
+      navigate(user.role === "plomero" ? "/mi-perfil" : "/panel");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -83,7 +83,7 @@ export default function Register() {
   }
 
   return (
-    <AuthLayout title="Creá tu cuenta" subtitle="Sumate como cliente para contratar, o como trabajador para ofrecer tu oficio.">
+    <AuthLayout title="Creá tu cuenta" subtitle="Sumate como cliente para contratar, o como plomero para ofrecer tus servicios.">
       {error && <div className="alert error">{error}</div>}
       <form onSubmit={submit} noValidate>
         <div className="field">
@@ -100,12 +100,12 @@ export default function Register() {
             </button>
             <button
               type="button"
-              className={`role-option ${form.role === "worker" ? "active" : ""}`}
-              onClick={() => setRole("worker")}
+              className={`role-option ${form.role === "plomero" ? "active" : ""}`}
+              onClick={() => setRole("plomero")}
             >
               <WrenchIcon />
-              <div className="title">Trabajador</div>
-              <div className="desc">Ofrezco mi oficio</div>
+              <div className="title">Plomero</div>
+              <div className="desc">Ofrezco servicios de plomería</div>
             </button>
           </div>
         </div>
@@ -175,7 +175,7 @@ export default function Register() {
           </div>
         </div>
 
-        {form.role === "worker" && (
+        {form.role === "plomero" && (
           <div className="worker-fields">
             <div className="worker-fields-title"><WrenchIcon /> Datos de tu oficio</div>
             <div className="grid cols-2" style={{ gap: 14 }}>

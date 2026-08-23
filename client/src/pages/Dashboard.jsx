@@ -42,7 +42,7 @@ export default function Dashboard() {
             <div>
               <div style={{ fontWeight: 700 }}>{j.title}</div>
               <div className="muted">
-                {isClient ? `Trabajador: ${j.workerName}` : `Cliente: ${j.clientName}`}
+                {isClient ? `Plomero: ${j.plumberName}` : `Cliente: ${j.clientName}`}
                 {" · "}
                 {new Date(j.createdAt).toLocaleDateString()}
               </div>

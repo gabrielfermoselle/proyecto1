@@ -15,35 +15,35 @@ const FLOW = {
 
 function jobView(job) {
   const client = db.users.find((u) => u.id === job.clientId);
-  const worker = db.workers.find((w) => w.id === job.workerId);
-  const workerUser = worker ? db.users.find((u) => u.id === worker.userId) : null;
+  const plumber = db.plumbers.find((p) => p.id === job.plumberId);
+  const plumberUser = plumber ? db.users.find((u) => u.id === plumber.userId) : null;
   const hasReview = db.reviews.some((r) => r.jobId === job.id);
   return {
     ...job,
     clientName: client ? client.name : "Cliente",
-    workerName: workerUser ? workerUser.name : "Trabajador",
-    workerUserId: workerUser ? workerUser.id : null,
+    plumberName: plumberUser ? plumberUser.name : "Plomero",
+    plumberUserId: plumberUser ? plumberUser.id : null,
     reviewed: hasReview
   };
 }
 
-// Verifica que el usuario forme parte del trabajo (cliente o trabajador dueño).
+// Verifica que el usuario forme parte del trabajo (cliente o plomero dueño).
 function participants(job) {
-  const worker = db.workers.find((w) => w.id === job.workerId);
-  return { clientId: job.clientId, workerUserId: worker ? worker.userId : null };
+  const plumber = db.plumbers.find((p) => p.id === job.plumberId);
+  return { clientId: job.clientId, plumberUserId: plumber ? plumber.userId : null };
 }
 
-// Cliente solicita una contratación a un trabajador.
+// Cliente solicita una contratación a un plomero.
 router.post("/", authMiddleware, checkRole("client"), (req, res) => {
-  const { workerId, title, description } = req.body || {};
-  const worker = db.workers.find((w) => w.id === workerId);
-  if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
+  const { plumberId, title, description } = req.body || {};
+  const plumber = db.plumbers.find((p) => p.id === plumberId);
+  if (!plumber) return res.status(404).json({ error: "Plomero no encontrado" });
   if (!title) return res.status(400).json({ error: "Falta el título del trabajo" });
 
   const job = {
     id: nanoid(10),
     clientId: req.user.id,
-    workerId,
+    plumberId,
     title: String(title).trim(),
     description: String(description || "").trim(),
     status: "requested",
@@ -62,8 +62,8 @@ router.get("/", authMiddleware, (req, res) => {
   if (req.user.role === "client") {
     list = db.jobs.filter((j) => j.clientId === req.user.id);
   } else {
-    const worker = db.workers.find((w) => w.userId === req.user.id);
-    list = worker ? db.jobs.filter((j) => j.workerId === worker.id) : [];
+    const plumber = db.plumbers.find((p) => p.userId === req.user.id);
+    list = plumber ? db.jobs.filter((j) => j.plumberId === plumber.id) : [];
   }
   list = list
     .map(jobView)
@@ -74,8 +74,8 @@ router.get("/", authMiddleware, (req, res) => {
 router.get("/:id", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
-  const { clientId, workerUserId } = participants(job);
-  if (![clientId, workerUserId].includes(req.user.id)) {
+  const { clientId, plumberUserId } = participants(job);
+  if (![clientId, plumberUserId].includes(req.user.id)) {
     return res.status(403).json({ error: "Sin acceso a este trabajo" });
   }
   res.json(jobView(job));
@@ -85,17 +85,17 @@ router.get("/:id", authMiddleware, (req, res) => {
 router.patch("/:id/status", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
-  const { clientId, workerUserId } = participants(job);
-  if (![clientId, workerUserId].includes(req.user.id)) {
+  const { clientId, plumberUserId } = participants(job);
+  if (![clientId, plumberUserId].includes(req.user.id)) {
     return res.status(403).json({ error: "Sin acceso a este trabajo" });
   }
   const { status } = req.body || {};
   if (!FLOW[job.status] || !FLOW[job.status].includes(status)) {
     return res.status(400).json({ error: `Transición inválida desde '${job.status}'` });
   }
-  // Reglas: aceptar solo lo hace el trabajador; completar cualquiera de los dos.
-  if (status === "accepted" && req.user.id !== workerUserId) {
-    return res.status(403).json({ error: "Solo el trabajador puede aceptar" });
+  // Reglas: aceptar solo lo hace el plomero; completar cualquiera de los dos.
+  if (status === "accepted" && req.user.id !== plumberUserId) {
+    return res.status(403).json({ error: "Solo el plomero puede aceptar" });
   }
   job.status = status;
   if (status === "completed") job.completedAt = new Date().toISOString();
@@ -103,13 +103,13 @@ router.patch("/:id/status", authMiddleware, (req, res) => {
   res.json(jobView(job));
 });
 
-// Trabajador fija/actualiza el presupuesto acordado.
+// Plomero fija/actualiza el presupuesto acordado.
 router.patch("/:id/price", authMiddleware, (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
-  const { workerUserId } = participants(job);
-  if (req.user.id !== workerUserId) {
-    return res.status(403).json({ error: "Solo el trabajador fija el presupuesto" });
+  const { plumberUserId } = participants(job);
+  if (req.user.id !== plumberUserId) {
+    return res.status(403).json({ error: "Solo el plomero fija el presupuesto" });
   }
   const { agreedPrice } = req.body || {};
   job.agreedPrice = Number(agreedPrice) || 0;

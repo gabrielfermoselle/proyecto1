@@ -21,7 +21,7 @@ export default function Navbar() {
             Directorio
           </NavLink>
           {user && <NavLink to="/panel">Mis contrataciones</NavLink>}
-          {user && user.role === "worker" && (
+          {user && user.role === "plomero" && (
             <NavLink to="/mi-perfil">Mi perfil</NavLink>
           )}
           {!user && <NavLink to="/login">Ingresar</NavLink>}
