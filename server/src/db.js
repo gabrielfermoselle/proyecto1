@@ -9,6 +9,7 @@ const DB_FILE = path.join(DATA_DIR, "db.json");
 const EMPTY_DB = {
   users: [], // { id, role, name, email, passwordHash, phone, createdAt }
   workers: [], // { id, userId, oficios[], bio, hourlyRate, lat, lng, address, coverageKm, photoUrl, portfolio[] }
+  plumbers: [], // { id, userId, especialidad[], descripcion, radioTrabajoKm, latitud, longitud, fotoUrl, disponible, createdAt }
   jobs: [], // { id, clientId, workerId, title, description, status, agreedPrice, createdAt, completedAt }
   reviews: [], // { id, jobId, workerId, clientId, rating, comment, createdAt }
   messages: [] // { id, jobId, senderId, body, createdAt }
