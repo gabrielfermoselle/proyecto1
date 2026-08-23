@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api.js";
-import { useAuth } from "../state/AuthContext.jsx";
+import { api } from "../services/api.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 const STATUS_LABEL = {
   requested: "Solicitado",
@@ -25,7 +25,7 @@ export default function Dashboard() {
     <div>
       <div className="spread">
         <h2 className="section-title">Mis contrataciones</h2>
-        {isClient && <Link to="/" className="btn ghost">Buscar profesionales</Link>}
+        {isClient && <Link to="/directorio" className="btn ghost">Buscar profesionales</Link>}
       </div>
 
       <div className="card">
