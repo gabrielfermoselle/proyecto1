@@ -32,7 +32,7 @@ export default function Login() {
     setBusy(true);
     try {
       const user = await login(email.trim(), password);
-      navigate(user.role === "plomero" ? "/mi-perfil" : "/panel");
+      navigate(user.role === "plomero" ? "/mi-perfil-plomero" : "/panel");
     } catch (err) {
       setError(err.message);
     } finally {

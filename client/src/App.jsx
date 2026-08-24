@@ -1,5 +1,8 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Navbar from "./components/Navbar.jsx";
+import Modal from "./components/Modal.jsx";
+import ConfirmDialog from "./components/ConfirmDialog.jsx";
 import Landing from "./pages/Landing.jsx";
 import Directory from "./pages/Directory.jsx";
 import PlumberProfile from "./pages/PlumberProfile.jsx";
@@ -8,6 +11,7 @@ import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import JobDetail from "./pages/JobDetail.jsx";
 import EditPlumberProfile from "./pages/EditPlumberProfile.jsx";
+import MyPlumberProfile from "./pages/MyPlumberProfile.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 
 function Protected({ children }) {
@@ -17,12 +21,57 @@ function Protected({ children }) {
   return children;
 }
 
+function EditProfileModalRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const background = location.state?.background;
+  const [dirty, setDirty] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  function close() {
+    if (background) navigate(-1);
+    else navigate("/mi-perfil-plomero", { replace: true });
+  }
+
+  function requestClose() {
+    if (dirty) {
+      setConfirmOpen(true);
+      return false;
+    }
+    return true;
+  }
+
+  function handleCancel() {
+    if (dirty) setConfirmOpen(true);
+    else close();
+  }
+
+  function confirmExit() {
+    setConfirmOpen(false);
+    close();
+  }
+
+  return (
+    <>
+      <Modal onClose={close} onRequestClose={requestClose} eyebrow="Mi perfil" title="Editar perfil de plomero" wide>
+        <EditPlumberProfile onDone={handleCancel} onDirtyChange={setDirty} />
+      </Modal>
+      {confirmOpen && (
+        <ConfirmDialog onCancel={() => setConfirmOpen(false)} onConfirm={confirmExit} />
+      )}
+    </>
+  );
+}
+
 export default function App() {
+  const location = useLocation();
+  const background = location.state?.background;
+
   return (
     <>
       <Navbar />
       <div className="container">
-        <Routes>
+        <Routes location={background || location}>
           <Route path="/" element={<Landing />} />
           <Route path="/directorio" element={<Directory />} />
           <Route path="/plomero/:id" element={<PlumberProfile />} />
@@ -45,16 +94,36 @@ export default function App() {
             }
           />
           <Route
+            path="/mi-perfil-plomero"
+            element={
+              <Protected>
+                <MyPlumberProfile />
+              </Protected>
+            }
+          />
+          <Route
             path="/mi-perfil"
             element={
               <Protected>
-                <EditPlumberProfile />
+                <EditProfileModalRoute />
               </Protected>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
+      {background && (
+        <Routes>
+          <Route
+            path="/mi-perfil"
+            element={
+              <Protected>
+                <EditProfileModalRoute />
+              </Protected>
+            }
+          />
+        </Routes>
+      )}
     </>
   );
 }
