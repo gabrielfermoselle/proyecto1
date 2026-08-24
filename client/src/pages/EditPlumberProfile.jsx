@@ -3,29 +3,44 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../services/api.js";
 import { useAuth } from "../hooks/useAuth.js";
 import MapView from "../components/MapView.jsx";
+import { EditIcon, ImageIcon, MapPinIcon, PlusIcon, TrashIcon } from "../components/Icons.jsx";
 
 const DEFAULT_CENTER = [-34.9011, -56.1645];
 const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 
-export default function EditPlumberProfile() {
-  const { user, plumberId } = useAuth();
+const TABS = [
+  { id: "datos", label: "Datos y tarifa" },
+  { id: "ubicacion", label: "Ubicación" },
+  { id: "portafolio", label: "Portafolio" }
+];
+
+function splitName(fullName) {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  return { nombre: parts[0] || "", apellido: parts.slice(1).join(" ") };
+}
+
+export default function EditPlumberProfile({ onDone, onDirtyChange }) {
+  const { user, plumberId, refresh } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
+  const [tab, setTab] = useState("datos");
   const [photoError, setPhotoError] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dispBusy, setDispBusy] = useState(false);
   const fileInputRef = useRef(null);
+  const initialSnapshot = useRef(null);
 
   useEffect(() => {
-    if (user && user.role !== "plomero") navigate("/panel");
-  }, [user, navigate]);
+    if (user && user.role !== "plomero" && !onDone) navigate("/panel");
+  }, [user, navigate, onDone]);
 
   useEffect(() => {
     if (!plumberId) return;
     api.get(`/plumbers/${plumberId}`).then((p) => {
-      setForm({
+      const next = {
+        ...splitName(user.name),
         especialidad: (p.especialidad || []).join(", "),
         descripcion: p.descripcion || "",
         hourlyRate: p.hourlyRate || 0,
@@ -36,11 +51,26 @@ export default function EditPlumberProfile() {
         latitud: p.latitud,
         longitud: p.longitud,
         portfolio: p.portfolio || []
-      });
+      };
+      initialSnapshot.current = JSON.stringify(next);
+      setForm(next);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plumberId]);
 
-  if (!form) return <div>Cargando…</div>;
+  useEffect(() => {
+    if (!form || !initialSnapshot.current || !onDirtyChange) return;
+    onDirtyChange(JSON.stringify(form) !== initialSnapshot.current);
+  }, [form, onDirtyChange]);
+
+  if (!form) {
+    return (
+      <div className="modal-loading">
+        <span className="spinner" />
+        Cargando tu perfil…
+      </div>
+    );
+  }
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -89,17 +119,24 @@ export default function EditPlumberProfile() {
     setError("");
     setMsg("");
     try {
-      await api.put(`/plumbers/${plumberId}`, {
-        especialidad: form.especialidad.split(",").map((s) => s.trim()).filter(Boolean),
-        descripcion: form.descripcion,
-        hourlyRate: Number(form.hourlyRate),
-        address: form.address,
-        radioTrabajoKm: Number(form.radioTrabajoKm),
-        fotoUrl: form.fotoUrl,
-        latitud: form.latitud,
-        longitud: form.longitud,
-        portfolio: form.portfolio.filter((p) => p.title)
-      });
+      const fullName = `${form.nombre} ${form.apellido}`.trim();
+      await Promise.all([
+        api.put(`/plumbers/${plumberId}`, {
+          especialidad: form.especialidad.split(",").map((s) => s.trim()).filter(Boolean),
+          descripcion: form.descripcion,
+          hourlyRate: Number(form.hourlyRate),
+          address: form.address,
+          radioTrabajoKm: Number(form.radioTrabajoKm),
+          fotoUrl: form.fotoUrl,
+          latitud: form.latitud,
+          longitud: form.longitud,
+          portfolio: form.portfolio.filter((p) => p.title)
+        }),
+        api.put("/auth/me", { name: fullName })
+      ]);
+      await refresh();
+      initialSnapshot.current = JSON.stringify(form);
+      onDirtyChange?.(false);
       setMsg("Perfil guardado correctamente.");
     } catch (err) {
       setError(err.message);
@@ -125,17 +162,48 @@ export default function EditPlumberProfile() {
   const center = form.latitud != null ? [form.latitud, form.longitud] : DEFAULT_CENTER;
 
   return (
-    <div>
-      <h2 className="section-title">Mi perfil de plomero</h2>
-      {error && <div className="alert error">{error}</div>}
-      {msg && <div className="alert ok">{msg}</div>}
-
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="spread">
+    <form onSubmit={save} className="profile-editor">
+      <div className="profile-editor-top">
+        <div className="profile-avatar-block">
+          <div className="avatar-upload">
+            <img
+              className="avatar avatar-lg"
+              src={form.fotoUrl || `https://i.pravatar.cc/150?u=${plumberId}`}
+              alt="Vista previa de foto de perfil"
+            />
+            <button
+              type="button"
+              className="avatar-upload-hit"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Cambiar foto de perfil"
+            >
+              <EditIcon />
+              <span>Cambiar</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={onPhotoChange}
+              style={{ display: "none" }}
+            />
+          </div>
           <div>
-            <h3 style={{ margin: "0 0 4px" }}>Disponibilidad</h3>
+            <div className="profile-name">{`${form.nombre} ${form.apellido}`.trim() || user.name}</div>
+            {form.fotoUrl && (
+              <button type="button" className="link-danger" onClick={removePhoto}>
+                Quitar foto
+              </button>
+            )}
+            {photoError && <div className="field-error">{photoError}</div>}
+          </div>
+        </div>
+
+        <div className="avail-toggle">
+          <div>
+            <div className="avail-title">Disponibilidad</div>
             <p className="muted" style={{ margin: 0 }}>
-              {form.disponible ? "Estás visible como disponible para nuevos trabajos." : "Estás marcado como no disponible."}
+              {form.disponible ? "Visible para nuevos trabajos" : "No disponible"}
             </p>
           </div>
           <button
@@ -152,114 +220,126 @@ export default function EditPlumberProfile() {
         </div>
       </div>
 
-      <form onSubmit={save} className="grid cols-2">
-        <div className="card">
-          <div className="field">
-            <label>Especialidad (separada por coma)</label>
-            <input value={form.especialidad} onChange={set("especialidad")} placeholder="Plomería, Gasista" />
-          </div>
-          <div className="field">
-            <label>Descripción / experiencia</label>
-            <textarea value={form.descripcion} onChange={set("descripcion")} />
-          </div>
-          <div className="grid cols-2" style={{ gap: 12 }}>
-            <div className="field">
-              <label>Tarifa referencia ($/h)</label>
-              <input type="number" value={form.hourlyRate} onChange={set("hourlyRate")} />
-            </div>
-            <div className="field">
-              <label>Radio de trabajo (km)</label>
-              <input type="number" min="0" value={form.radioTrabajoKm} onChange={set("radioTrabajoKm")} />
-            </div>
-          </div>
-          <div className="field">
-            <label>Barrio / dirección de referencia</label>
-            <input value={form.address} onChange={set("address")} />
-          </div>
+      {error && <div className="alert error">{error}</div>}
+      {msg && <div className="alert ok">{msg}</div>}
 
-          <div className="field">
-            <label>Foto de perfil</label>
-            <div className="photo-upload">
-              <img
-                className="avatar"
-                style={{ width: 72, height: 72 }}
-                src={form.fotoUrl || `https://i.pravatar.cc/150?u=${plumberId}`}
-                alt="Vista previa de foto de perfil"
-              />
-              <div className="photo-upload-actions">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={onPhotoChange}
-                  style={{ display: "none" }}
-                  id="photo-input"
-                />
-                <button type="button" className="btn ghost sm" onClick={() => fileInputRef.current?.click()}>
-                  Subir foto
-                </button>
-                {form.fotoUrl && (
-                  <button type="button" className="btn danger sm" onClick={removePhoto}>
-                    Quitar
-                  </button>
-                )}
-              </div>
-            </div>
-            {photoError && <div className="field-error">{photoError}</div>}
-          </div>
+      <div className="modal-tabs" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`modal-tab ${tab === t.id ? "active" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-          <button className="btn" disabled={busy}>{busy ? "Guardando…" : "Guardar perfil"}</button>
+      <div className="modal-tab-panel" hidden={tab !== "datos"}>
+        <div className="grid cols-2" style={{ gap: 12 }}>
+          <div className="field">
+            <label>Nombre</label>
+            <input value={form.nombre} onChange={set("nombre")} placeholder="Tu nombre" required />
+          </div>
+          <div className="field">
+            <label>Apellido</label>
+            <input value={form.apellido} onChange={set("apellido")} placeholder="Tu apellido" />
+          </div>
         </div>
+        <div className="field">
+          <label>Especialidad (separada por coma)</label>
+          <input value={form.especialidad} onChange={set("especialidad")} placeholder="Plomería, Gasista" />
+        </div>
+        <div className="field">
+          <label>Descripción / experiencia</label>
+          <textarea value={form.descripcion} onChange={set("descripcion")} />
+        </div>
+        <div className="grid cols-2" style={{ gap: 12 }}>
+          <div className="field">
+            <label>Tarifa referencia ($/h)</label>
+            <input type="number" value={form.hourlyRate} onChange={set("hourlyRate")} />
+          </div>
+          <div className="field">
+            <label>Radio de trabajo (km)</label>
+            <input type="number" min="0" value={form.radioTrabajoKm} onChange={set("radioTrabajoKm")} />
+          </div>
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Barrio / dirección de referencia</label>
+          <input value={form.address} onChange={set("address")} />
+        </div>
+      </div>
 
-        <div className="card">
-          <h3>Ubicación base</h3>
-          <p className="muted" style={{ marginTop: -6 }}>
-            Hacé clic en el mapa para fijar tu zona. El círculo muestra tu radio de trabajo de {form.radioTrabajoKm} km.
+      <div className="modal-tab-panel" hidden={tab !== "ubicacion"}>
+        <p className="muted" style={{ marginTop: 0, display: "flex", gap: 6, alignItems: "center" }}>
+          <MapPinIcon /> Hacé clic en el mapa para fijar tu zona. El círculo muestra tu radio de {form.radioTrabajoKm} km.
+        </p>
+        <MapView
+          center={center}
+          zoom={12}
+          onPick={pick}
+          me={form.latitud != null ? { lat: form.latitud, lng: form.longitud, label: "Tu ubicación" } : null}
+          pickCoverageKm={Number(form.radioTrabajoKm) || null}
+        />
+        {form.latitud != null && (
+          <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+            Coordenadas: {form.latitud.toFixed(4)}, {form.longitud.toFixed(4)}
           </p>
-          <MapView
-            center={center}
-            zoom={12}
-            onPick={pick}
-            me={form.latitud != null ? { lat: form.latitud, lng: form.longitud, label: "Tu ubicación" } : null}
-            pickCoverageKm={Number(form.radioTrabajoKm) || null}
-          />
-          {form.latitud != null && (
-            <p className="muted" style={{ marginTop: 8 }}>
-              Coordenadas: {form.latitud.toFixed(4)}, {form.longitud.toFixed(4)}
-            </p>
-          )}
-        </div>
+        )}
+      </div>
 
-        <div className="card" style={{ gridColumn: "1 / -1" }}>
-          <div className="spread">
-            <h3 style={{ margin: 0 }}>Portafolio</h3>
-            <button type="button" className="btn ghost sm" onClick={addPortfolio}>+ Agregar trabajo</button>
+      <div className="modal-tab-panel" hidden={tab !== "portafolio"}>
+        <div className="spread" style={{ marginBottom: 4 }}>
+          <p className="muted" style={{ margin: 0 }}>Mostrá fotos de trabajos anteriores para generar confianza.</p>
+          <button type="button" className="btn ghost sm" onClick={addPortfolio}>
+            <PlusIcon /> Agregar
+          </button>
+        </div>
+        {form.portfolio.length === 0 && (
+          <div className="portfolio-empty">
+            <ImageIcon />
+            <span>Todavía no agregaste trabajos.</span>
           </div>
-          {form.portfolio.length === 0 && <p className="muted">Agregá fotos de trabajos anteriores.</p>}
+        )}
+        <div className="portfolio-edit-grid">
           {form.portfolio.map((p, i) => (
-            <div key={i} className="grid cols-2" style={{ gap: 12, alignItems: "start", marginTop: 12 }}>
-              <div>
-                <div className="field">
-                  <label>Título</label>
-                  <input value={p.title} onChange={(e) => updatePortfolio(i, "title", e.target.value)} />
-                </div>
-                <div className="field">
-                  <label>URL de imagen</label>
-                  <input value={p.imageUrl} onChange={(e) => updatePortfolio(i, "imageUrl", e.target.value)} />
-                </div>
-                <div className="field">
-                  <label>Descripción</label>
-                  <input value={p.description} onChange={(e) => updatePortfolio(i, "description", e.target.value)} />
-                </div>
-                <button type="button" className="btn danger sm" onClick={() => removePortfolio(i)}>Quitar</button>
+            <div key={i} className="portfolio-edit-item">
+              <div className="portfolio-edit-preview">
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} alt={p.title} />
+                ) : (
+                  <div className="portfolio-edit-placeholder"><ImageIcon /></div>
+                )}
+                <button type="button" className="portfolio-edit-remove" onClick={() => removePortfolio(i)} aria-label="Quitar trabajo">
+                  <TrashIcon />
+                </button>
               </div>
-              <div>
-                {p.imageUrl && <img src={p.imageUrl} alt={p.title} style={{ width: "100%", borderRadius: 10, maxHeight: 200, objectFit: "cover" }} />}
+              <div className="field">
+                <label>Título</label>
+                <input value={p.title} onChange={(e) => updatePortfolio(i, "title", e.target.value)} />
+              </div>
+              <div className="field">
+                <label>URL de imagen</label>
+                <input value={p.imageUrl} onChange={(e) => updatePortfolio(i, "imageUrl", e.target.value)} />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Descripción</label>
+                <input value={p.description} onChange={(e) => updatePortfolio(i, "description", e.target.value)} />
               </div>
             </div>
           ))}
         </div>
-      </form>
-    </div>
+      </div>
+
+      <div className="modal-footer">
+        <button type="button" className="btn ghost" onClick={() => (onDone ? onDone() : navigate("/panel"))}>
+          Cancelar
+        </button>
+        <button className="btn gold" disabled={busy}>{busy ? "Guardando…" : "Guardar perfil"}</button>
+      </div>
+    </form>
   );
 }

@@ -73,6 +73,18 @@ router.get("/me", authMiddleware, (req, res) => {
   });
 });
 
+router.put("/me", authMiddleware, (req, res) => {
+  const { name } = req.body || {};
+  if (!String(name || "").trim()) {
+    return res.status(400).json({ error: "El nombre es obligatorio" });
+  }
+  const user = db.users.find((u) => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+  user.name = String(name).trim();
+  saveDB();
+  res.json({ user: toPublic(user) });
+});
+
 // Genera un token de reset de un solo uso. Por no tener un servicio de email
 // configurado, el token se devuelve en la respuesta (modo dev) en vez de enviarse.
 router.post("/forgot-password", (req, res) => {

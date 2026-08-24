@@ -74,7 +74,7 @@ export default function Register() {
         payload.coverageKm = Number(form.coverageKm);
       }
       const user = await register(payload);
-      navigate(user.role === "plomero" ? "/mi-perfil" : "/panel");
+      navigate(user.role === "plomero" ? "/mi-perfil-plomero" : "/panel");
     } catch (err) {
       setError(err.message);
     } finally {
