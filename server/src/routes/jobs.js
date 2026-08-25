@@ -2,6 +2,7 @@ import { Router } from "express";
 import { nanoid } from "nanoid";
 import { db, saveDB } from "../db.js";
 import { authMiddleware, checkRole } from "../auth.js";
+import { asyncHandler } from "../helpers.js";
 
 const router = Router();
 
@@ -38,7 +39,7 @@ function participants(job) {
 }
 
 // Cliente solicita una contratación a un plomero.
-router.post("/", authMiddleware, checkRole("client"), (req, res) => {
+router.post("/", authMiddleware, checkRole("client"), asyncHandler(async (req, res) => {
   const { plumberId, title, description } = req.body || {};
   const plumber = db.plumbers.find((p) => p.id === plumberId);
   if (!plumber) return res.status(404).json({ error: "Plomero no encontrado" });
@@ -56,9 +57,9 @@ router.post("/", authMiddleware, checkRole("client"), (req, res) => {
     completedAt: null
   };
   db.jobs.push(job);
-  saveDB();
+  await saveDB();
   res.json(jobView(job));
-});
+}));
 
 // Lista de contrataciones del usuario autenticado (según su rol).
 router.get("/", authMiddleware, (req, res) => {
@@ -86,7 +87,7 @@ router.get("/:id", authMiddleware, (req, res) => {
 });
 
 // Cambiar el estado del trabajo (aceptar, completar, cancelar).
-router.patch("/:id/status", authMiddleware, (req, res) => {
+router.patch("/:id/status", authMiddleware, asyncHandler(async (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
   const { clientId, plumberUserId } = participants(job);
@@ -103,12 +104,12 @@ router.patch("/:id/status", authMiddleware, (req, res) => {
   }
   job.status = status;
   if (status === "completed") job.completedAt = new Date().toISOString();
-  saveDB();
+  await saveDB();
   res.json(jobView(job));
-});
+}));
 
 // Plomero fija/actualiza el presupuesto acordado.
-router.patch("/:id/price", authMiddleware, (req, res) => {
+router.patch("/:id/price", authMiddleware, asyncHandler(async (req, res) => {
   const job = db.jobs.find((j) => j.id === req.params.id);
   if (!job) return res.status(404).json({ error: "Trabajo no encontrado" });
   const { plumberUserId } = participants(job);
@@ -117,8 +118,8 @@ router.patch("/:id/price", authMiddleware, (req, res) => {
   }
   const { agreedPrice } = req.body || {};
   job.agreedPrice = Number(agreedPrice) || 0;
-  saveDB();
+  await saveDB();
   res.json(jobView(job));
-});
+}));
 
 export default router;

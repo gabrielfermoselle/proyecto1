@@ -2,12 +2,13 @@ import { Router } from "express";
 import { nanoid } from "nanoid";
 import { db, saveDB } from "../db.js";
 import { authMiddleware } from "../auth.js";
+import { asyncHandler } from "../helpers.js";
 
 const router = Router();
 
 // Reseña ANCLADA A UNA TRANSACCIÓN REAL:
 // solo el cliente de un trabajo COMPLETADO puede reseñar, y una única vez.
-router.post("/", authMiddleware, (req, res) => {
+router.post("/", authMiddleware, asyncHandler(async (req, res) => {
   if (req.user.role !== "client") {
     return res.status(403).json({ error: "Solo los clientes reseñan" });
   }
@@ -40,8 +41,8 @@ router.post("/", authMiddleware, (req, res) => {
     createdAt: new Date().toISOString()
   };
   db.reviews.push(review);
-  saveDB();
+  await saveDB();
   res.json(review);
-});
+}));
 
 export default router;

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db, saveDB } from "../db.js";
+import { asyncHandler } from "../helpers.js";
 import {
   signToken,
   authMiddleware,
@@ -18,7 +19,7 @@ import { createPlumber } from "../models/Plumber.js";
 
 const router = Router();
 
-router.post("/register", (req, res) => {
+router.post("/register", asyncHandler(async (req, res) => {
   const { name, email, password, role, phone, specialty, coverageKm } = req.body || {};
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
@@ -33,12 +34,12 @@ router.post("/register", (req, res) => {
     return res.status(409).json({ error: "El email ya está registrado" });
   }
 
-  const user = createUser({ name, email, password, role, phone });
+  const user = await createUser({ name, email, password, role, phone });
 
   // Si es plomero, creamos su perfil de plomero vacío por defecto.
   if (role === "plomero") {
     const parsedRadius = Number(coverageKm);
-    createPlumber({
+    await createPlumber({
       userId: user.id,
       especialidad: String(specialty).trim(),
       descripcion: "",
@@ -51,7 +52,7 @@ router.post("/register", (req, res) => {
 
   const token = signToken(user);
   res.json({ token, user: toPublic(user) });
-});
+}));
 
 router.post("/login", (req, res) => {
   const { email, password } = req.body || {};
@@ -73,7 +74,7 @@ router.get("/me", authMiddleware, (req, res) => {
   });
 });
 
-router.put("/me", authMiddleware, (req, res) => {
+router.put("/me", authMiddleware, asyncHandler(async (req, res) => {
   const { name } = req.body || {};
   if (!String(name || "").trim()) {
     return res.status(400).json({ error: "El nombre es obligatorio" });
@@ -81,13 +82,13 @@ router.put("/me", authMiddleware, (req, res) => {
   const user = db.users.find((u) => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
   user.name = String(name).trim();
-  saveDB();
+  await saveDB();
   res.json({ user: toPublic(user) });
-});
+}));
 
 // Genera un token de reset de un solo uso. Por no tener un servicio de email
 // configurado, el token se devuelve en la respuesta (modo dev) en vez de enviarse.
-router.post("/forgot-password", (req, res) => {
+router.post("/forgot-password", asyncHandler(async (req, res) => {
   const { email } = req.body || {};
   const user = findByEmail(email);
   // Respuesta genérica: no revelamos si el email existe o no.
@@ -96,13 +97,13 @@ router.post("/forgot-password", (req, res) => {
   const { token, tokenHash, expiresAt } = generateResetToken();
   user.resetTokenHash = tokenHash;
   user.resetTokenExpiresAt = expiresAt;
-  saveDB();
+  await saveDB();
 
   console.log(`[reset-password] token para ${user.email}: ${token}`);
   res.json({ ok: true, devResetToken: token });
-});
+}));
 
-router.post("/reset-password", (req, res) => {
+router.post("/reset-password", asyncHandler(async (req, res) => {
   const { email, token, password } = req.body || {};
   if (!email || !token || !password) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
@@ -112,12 +113,12 @@ router.post("/reset-password", (req, res) => {
     return res.status(400).json({ error: "Token inválido o expirado" });
   }
 
-  setPassword(user, password);
+  await setPassword(user, password);
   delete user.resetTokenHash;
   delete user.resetTokenExpiresAt;
-  saveDB();
+  await saveDB();
 
   res.json({ ok: true });
-});
+}));
 
 export default router;

@@ -1,5 +1,11 @@
 import { db } from "./db.js";
 
+export function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
 // Perfil público de un usuario: nunca exponemos email/teléfono/hash.
 export function publicUser(user) {
   if (!user) return null;

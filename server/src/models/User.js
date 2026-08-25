@@ -14,7 +14,7 @@ export function findById(id) {
   return db.users.find((u) => u.id === id) || null;
 }
 
-export function createUser({ name, email, password, role, phone }) {
+export async function createUser({ name, email, password, role, phone }) {
   const user = {
     id: nanoid(10),
     role,
@@ -25,7 +25,7 @@ export function createUser({ name, email, password, role, phone }) {
     createdAt: new Date().toISOString()
   };
   db.users.push(user);
-  saveDB();
+  await saveDB();
   return user;
 }
 
@@ -33,9 +33,9 @@ export function verifyPassword(user, password) {
   return bcrypt.compareSync(password || "", user.passwordHash);
 }
 
-export function setPassword(user, password) {
+export async function setPassword(user, password) {
   user.passwordHash = bcrypt.hashSync(password, 10);
-  saveDB();
+  await saveDB();
 }
 
 export function toPublic(user) {
