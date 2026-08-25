@@ -62,6 +62,21 @@ a { color: inherit; text-decoration: none; }
 
 .container { max-width: 1160px; margin: 0 auto; padding: 0 20px 60px; }
 
+/* Page transition — plays on every real route change (not on modal-over-background routes) */
+.route-transition { animation: route-in 0.15s ease-out both; }
+.route-transition.is-leaving { animation: route-out 0.15s ease-in both; }
+@keyframes route-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes route-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-transition, .route-transition.is-leaving { animation: none; }
+}
+
 /* ==========================================================================
    Nav — el toldo del local
    ========================================================================== */
@@ -788,7 +803,7 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
   backdrop-filter: blur(9px) saturate(115%);
   -webkit-backdrop-filter: blur(9px) saturate(115%);
   opacity: 0;
-  animation: veil-fade 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: veil-fade 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 .modal-bloom {
   position: fixed;
@@ -798,7 +813,7 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
     radial-gradient(46% 38% at 50% 8%, rgba(240, 194, 90, 0.24), transparent 70%),
     radial-gradient(30% 30% at 82% 78%, rgba(122, 31, 31, 0.18), transparent 70%);
   opacity: 0;
-  animation: bloom-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: bloom-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   animation-delay: 0.05s;
 }
 .modal-panel {
@@ -813,7 +828,7 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
   overflow: hidden;
   opacity: 0;
   transform: translateY(28px) scale(0.92);
-  animation: panel-in 0.5s cubic-bezier(0.2, 1.1, 0.32, 1) forwards;
+  animation: panel-in 0.6s cubic-bezier(0.2, 1.1, 0.32, 1) forwards;
   animation-delay: 0.04s;
 }
 .modal-panel.wide { max-width: 860px; }
@@ -830,9 +845,9 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
 @keyframes bloom-in { to { opacity: 1; } }
 @keyframes panel-in { to { opacity: 1; transform: translateY(0) scale(1); } }
 
-.modal-veil.is-closing .modal-panel { animation: panel-out 0.2s ease forwards; }
-.modal-veil.is-closing .modal-backdrop { animation: veil-fade-out 0.22s ease forwards; }
-.modal-veil.is-closing .modal-bloom { animation: veil-fade-out 0.18s ease forwards; }
+.modal-veil.is-closing .modal-panel { animation: panel-out 0.45s cubic-bezier(0.6, 0, 0.8, 0.2) forwards; }
+.modal-veil.is-closing .modal-backdrop { animation: veil-fade-out 0.45s ease forwards; }
+.modal-veil.is-closing .modal-bloom { animation: veil-fade-out 0.4s ease forwards; }
 @keyframes panel-out { to { opacity: 0; transform: translateY(12px) scale(0.97); } }
 @keyframes veil-fade-out { to { opacity: 0; } }
 
@@ -876,8 +891,10 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
 
 @media (max-width: 620px) {
   .modal-veil { padding: 0; align-items: stretch; }
-  .modal-panel { max-width: none; border-radius: 0; min-height: 100%; animation: panel-in-mobile 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .modal-panel { max-width: none; border-radius: 0; min-height: 100%; animation: panel-in-mobile 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   @keyframes panel-in-mobile { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+  .modal-veil.is-closing .modal-panel { animation: panel-out-mobile 0.4s cubic-bezier(0.6, 0, 0.8, 0.2) forwards; }
+  @keyframes panel-out-mobile { to { opacity: 0; transform: translateY(28px); } }
 }
 
 /* Profile editor (inside modal) */
@@ -969,7 +986,7 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   opacity: 0;
-  animation: veil-fade 0.2s ease forwards;
+  animation: veil-fade 0.35s ease forwards;
 }
 .confirm-panel {
   position: relative;
@@ -982,15 +999,18 @@ hr.sep { border: none; border-top: 1px solid var(--paper-line); margin: 16px 0; 
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateY(10px) scale(0.94);
-  animation: confirm-in 0.3s cubic-bezier(0.2, 1.1, 0.32, 1) forwards;
+  animation: confirm-in 0.4s cubic-bezier(0.2, 1.1, 0.32, 1) forwards;
   animation-delay: 0.03s;
 }
 @keyframes confirm-in { to { opacity: 1; transform: translateY(0) scale(1); } }
+.confirm-veil.is-closing { animation: veil-fade-out 0.35s ease forwards; }
+.confirm-veil.is-closing .confirm-panel { animation: confirm-out 0.35s cubic-bezier(0.6, 0, 0.8, 0.2) forwards; }
+@keyframes confirm-out { to { opacity: 0; transform: translateY(10px) scale(0.94); } }
 .confirm-title { font-family: var(--font-heading); font-weight: 800; font-size: 18px; margin: 0 0 8px; color: var(--ink); letter-spacing: -0.2px; }
 .confirm-message { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) {
-  .confirm-veil, .confirm-panel { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .confirm-veil, .confirm-panel, .confirm-veil.is-closing, .confirm-veil.is-closing .confirm-panel { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 /* Profile editor fields — subtle stagger on tab change */
