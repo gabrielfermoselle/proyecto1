@@ -8,10 +8,14 @@ const router = Router();
 // Estados válidos y transiciones permitidas.
 const FLOW = {
   requested: ["accepted", "cancelled"],
-  accepted: ["completed", "cancelled"],
+  accepted: ["started", "cancelled"],
+  started: ["completed", "cancelled"],
   completed: [],
   cancelled: []
 };
+
+// Estados que solo puede aplicar el plomero (aceptar, iniciar y finalizar el trabajo).
+const PLUMBER_ONLY_STATUS = ["accepted", "started", "completed"];
 
 function jobView(job) {
   const client = db.users.find((u) => u.id === job.clientId);
@@ -93,9 +97,9 @@ router.patch("/:id/status", authMiddleware, (req, res) => {
   if (!FLOW[job.status] || !FLOW[job.status].includes(status)) {
     return res.status(400).json({ error: `Transición inválida desde '${job.status}'` });
   }
-  // Reglas: aceptar solo lo hace el plomero; completar cualquiera de los dos.
-  if (status === "accepted" && req.user.id !== plumberUserId) {
-    return res.status(403).json({ error: "Solo el plomero puede aceptar" });
+  // Reglas: aceptar, iniciar y finalizar el trabajo son acciones exclusivas del plomero.
+  if (PLUMBER_ONLY_STATUS.includes(status) && req.user.id !== plumberUserId) {
+    return res.status(403).json({ error: "Solo el plomero puede realizar esta acción" });
   }
   job.status = status;
   if (status === "completed") job.completedAt = new Date().toISOString();

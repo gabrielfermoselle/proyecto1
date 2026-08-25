@@ -34,6 +34,8 @@
   --warn-bg: #f2e2c4;
   --danger: #7a1f1f;
   --danger-bg: #ecdad2;
+  --started: #7a5c12;
+  --started-bg: #f0e0ad;
 
   --shadow-card: 0 2px 0 rgba(28, 22, 16, 0.06), 0 10px 24px rgba(28, 22, 16, 0.1);
   --shadow-dark: 0 20px 50px rgba(0, 0, 0, 0.5);
@@ -565,6 +567,7 @@ textarea { min-height: 90px; resize: vertical; }
 .status { font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; text-transform: capitalize; font-family: var(--font-label); }
 .status.requested { background: var(--warn-bg); color: var(--warn); }
 .status.accepted { background: rgba(28, 61, 50, 0.12); color: var(--teal); }
+.status.started { background: var(--started-bg); color: var(--started); }
 .status.completed { background: var(--success-bg); color: var(--success); }
 .status.cancelled { background: var(--danger-bg); color: var(--danger); }
 
