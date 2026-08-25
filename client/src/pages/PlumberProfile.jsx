@@ -18,6 +18,18 @@ export default function PlumberProfile() {
     api.get(`/plumbers/${id}`).then(setP).catch((e) => setError(e.message));
   }, [id]);
 
+  // Si se publica una reseña nueva para este plomero (p.ej. desde el chat/detalle
+  // de un pedido abierto en otra pestaña de la app), refrescamos el perfil al toque.
+  useEffect(() => {
+    function onReviewCreated(e) {
+      if (e.detail?.plumberId === id) {
+        api.get(`/plumbers/${id}`).then(setP).catch(() => {});
+      }
+    }
+    window.addEventListener("review:created", onReviewCreated);
+    return () => window.removeEventListener("review:created", onReviewCreated);
+  }, [id]);
+
   function onOrderCreated(job) {
     setShowHire(false);
     navigate(`/trabajo/${job.id}`);

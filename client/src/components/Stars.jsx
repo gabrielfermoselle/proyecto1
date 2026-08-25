@@ -13,20 +13,3 @@ export function StarsDisplay({ value = 0, count }) {
     </span>
   );
 }
-
-export function StarsInput({ value, onChange }) {
-  return (
-    <div className="star-input">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <span
-          key={n}
-          className={n <= value ? "on" : ""}
-          onClick={() => onChange(n)}
-          role="button"
-        >
-          ★
-        </span>
-      ))}
-    </div>
-  );
-}

@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import { api } from "../services/api.js";
 import { getToken } from "../utils/storage.js";
 import { useAuth } from "../hooks/useAuth.js";
-import { StarsInput } from "../components/Stars.jsx";
+import ReviewForm from "../components/ReviewForm.jsx";
 import { ORDER_STATUS_LABEL } from "../utils/orderStatus.js";
 
 export default function JobDetail() {
@@ -20,8 +20,6 @@ export default function JobDetail() {
   const logRef = useRef(null);
 
   const [price, setPrice] = useState("");
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
 
   async function loadJob() {
     try {
@@ -78,18 +76,6 @@ export default function JobDetail() {
       const j = await api.patch(`/jobs/${id}/price`, { agreedPrice: price });
       setJob(j);
       setMsg("Presupuesto actualizado.");
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function submitReview(e) {
-    e.preventDefault();
-    setError("");
-    try {
-      await api.post("/reviews", { jobId: id, rating, comment });
-      setMsg("¡Gracias por tu reseña!");
-      await loadJob();
     } catch (e) {
       setError(e.message);
     }
@@ -176,17 +162,14 @@ export default function JobDetail() {
             {job.reviewed ? (
               <div className="alert ok">Ya reseñaste este trabajo. ¡Gracias!</div>
             ) : (
-              <form onSubmit={submitReview}>
-                <div className="field">
-                  <label>Calificación</label>
-                  <StarsInput value={rating} onChange={setRating} />
-                </div>
-                <div className="field">
-                  <label>Comentario</label>
-                  <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="¿Cómo fue tu experiencia?" />
-                </div>
-                <button className="btn">Publicar reseña</button>
-              </form>
+              <ReviewForm
+                jobId={id}
+                plumberId={job.plumberId}
+                onSubmitted={() => {
+                  setMsg("¡Gracias por tu reseña!");
+                  loadJob();
+                }}
+              />
             )}
           </div>
         )}

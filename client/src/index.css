@@ -581,10 +581,35 @@ textarea { min-height: 90px; resize: vertical; }
 .chat-input { display: flex; gap: 8px; margin-top: 12px; }
 .privacy-note { font-size: 12px; color: var(--teal); background: rgba(28, 61, 50, 0.08); border: 1px solid rgba(28, 61, 50, 0.2); padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; }
 
-/* Star input */
-.star-input { display: inline-flex; gap: 4px; font-size: 26px; cursor: pointer; }
-.star-input span { color: rgba(28, 22, 16, 0.25); }
-.star-input span.on { color: var(--gold); }
+/* Review form */
+.review-form .field:last-of-type { margin-bottom: 16px; }
+.review-star-picker { display: inline-flex; gap: 4px; }
+.review-star {
+  background: none; border: none; padding: 2px; margin: 0; width: auto;
+  font-size: 30px; line-height: 1; cursor: pointer; color: rgba(28, 22, 16, 0.22);
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), color 0.12s ease;
+}
+.review-star:hover, .review-star:focus-visible { transform: translateY(-2px) scale(1.08); }
+.review-star:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+.review-star.on { color: var(--gold); }
+.review-rating-hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; min-height: 16px; }
+.review-rating-hint.is-error { color: var(--danger); }
+.review-char-count { text-align: right; font-size: 11.5px; margin-top: 4px; }
+
+.review-done {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: var(--radius); background: var(--success-bg);
+  animation: review-done-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.review-done-badge {
+  flex: none; width: 32px; height: 32px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--success); color: var(--paper); font-weight: 800; font-size: 16px;
+}
+@keyframes review-done-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .review-star, .review-done { animation: none !important; transition: none !important; }
+}
 
 .alert { padding: 10px 14px; border-radius: 4px; font-size: 14px; margin-bottom: 12px; }
 .alert.error { background: var(--danger-bg); color: var(--danger); }
