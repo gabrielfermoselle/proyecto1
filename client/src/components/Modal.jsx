@@ -10,7 +10,7 @@ export default function Modal({ onClose, onRequestClose, title, eyebrow, childre
     if (closing) return;
     if (onRequestClose && !onRequestClose()) return;
     setClosing(true);
-    window.setTimeout(onClose, 220);
+    window.setTimeout(onClose, 450);
   }
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createPortal } from "react-dom";
 
 export default function ConfirmDialog({
@@ -8,8 +9,16 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel
 }) {
+  const [closing, setClosing] = useState(false);
+
+  function close(action) {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(action, 350);
+  }
+
   return createPortal(
-    <div className="confirm-veil" onClick={onCancel}>
+    <div className={`confirm-veil ${closing ? "is-closing" : ""}`} onClick={() => close(onCancel)}>
       <div
         className="confirm-panel"
         role="alertdialog"
@@ -20,10 +29,10 @@ export default function ConfirmDialog({
         <h3 className="confirm-title">{title}</h3>
         <p className="confirm-message">{message}</p>
         <div className="confirm-actions">
-          <button type="button" className="btn ghost" onClick={onCancel}>
+          <button type="button" className="btn ghost" onClick={() => close(onCancel)}>
             {cancelLabel}
           </button>
-          <button type="button" className="btn danger" onClick={onConfirm}>
+          <button type="button" className="btn danger" onClick={() => close(onConfirm)}>
             {confirmLabel}
           </button>
         </div>

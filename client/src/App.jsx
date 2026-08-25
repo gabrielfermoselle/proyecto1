@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Navbar from "./components/Navbar.jsx";
 import Modal from "./components/Modal.jsx";
@@ -13,6 +13,30 @@ import JobDetail from "./pages/JobDetail.jsx";
 import EditPlumberProfile from "./pages/EditPlumberProfile.jsx";
 import MyPlumberProfile from "./pages/MyPlumberProfile.jsx";
 import { useAuth } from "./hooks/useAuth.js";
+
+const ROUTE_EXIT_MS = 150;
+
+function usePageTransition(displayLocation) {
+  const [renderedLocation, setRenderedLocation] = useState(displayLocation);
+  const [leaving, setLeaving] = useState(false);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (displayLocation.pathname === renderedLocation.pathname) {
+      setRenderedLocation(displayLocation);
+      return undefined;
+    }
+    setLeaving(true);
+    timeoutRef.current = window.setTimeout(() => {
+      setRenderedLocation(displayLocation);
+      setLeaving(false);
+    }, ROUTE_EXIT_MS);
+    return () => window.clearTimeout(timeoutRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayLocation]);
+
+  return { renderedLocation, leaving };
+}
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -66,51 +90,58 @@ function EditProfileModalRoute() {
 export default function App() {
   const location = useLocation();
   const background = location.state?.background;
+  const displayLocation = background || location;
+  const { renderedLocation, leaving } = usePageTransition(displayLocation);
 
   return (
     <>
       <Navbar />
       <div className="container">
-        <Routes location={background || location}>
-          <Route path="/" element={<Landing />} />
-          <Route path="/directorio" element={<Directory />} />
-          <Route path="/plomero/:id" element={<PlumberProfile />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/registro" element={<Register />} />
-          <Route
-            path="/panel"
-            element={
-              <Protected>
-                <Dashboard />
-              </Protected>
-            }
-          />
-          <Route
-            path="/trabajo/:id"
-            element={
-              <Protected>
-                <JobDetail />
-              </Protected>
-            }
-          />
-          <Route
-            path="/mi-perfil-plomero"
-            element={
-              <Protected>
-                <MyPlumberProfile />
-              </Protected>
-            }
-          />
-          <Route
-            path="/mi-perfil"
-            element={
-              <Protected>
-                <EditProfileModalRoute />
-              </Protected>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <div
+          className={`route-transition ${leaving ? "is-leaving" : ""}`}
+          key={renderedLocation.pathname}
+        >
+          <Routes location={renderedLocation}>
+            <Route path="/" element={<Landing />} />
+            <Route path="/directorio" element={<Directory />} />
+            <Route path="/plomero/:id" element={<PlumberProfile />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/registro" element={<Register />} />
+            <Route
+              path="/panel"
+              element={
+                <Protected>
+                  <Dashboard />
+                </Protected>
+              }
+            />
+            <Route
+              path="/trabajo/:id"
+              element={
+                <Protected>
+                  <JobDetail />
+                </Protected>
+              }
+            />
+            <Route
+              path="/mi-perfil-plomero"
+              element={
+                <Protected>
+                  <MyPlumberProfile />
+                </Protected>
+              }
+            />
+            <Route
+              path="/mi-perfil"
+              element={
+                <Protected>
+                  <EditProfileModalRoute />
+                </Protected>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </div>
       {background && (
         <Routes>
