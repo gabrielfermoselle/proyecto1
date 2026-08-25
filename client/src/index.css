@@ -370,6 +370,175 @@ textarea { min-height: 90px; resize: vertical; }
 .map-box { height: 320px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--paper-line); }
 .map-tall { height: 420px; }
 
+.dir-results-head { margin: 4px 0 2px; }
+
+/* Directory — oficios sidebar (left) + profile feed (right) */
+.dir-feed-layout { display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: start; }
+@media (max-width: 800px) { .dir-feed-layout { grid-template-columns: 1fr; } }
+
+.dir-sidebar { position: sticky; top: 84px; }
+.dir-sidebar-list { display: flex; flex-direction: column; gap: 6px; }
+.dir-sidebar-list .chip.oficio {
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  padding: 9px 14px;
+  font-size: 13.5px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+.dir-sidebar-list .chip.oficio:hover { transform: translateX(2px); border-color: var(--gold-line); }
+.dir-sidebar-list .chip.oficio.chip-active { background: var(--maroon); border-color: var(--maroon-deep); color: var(--paper); }
+@media (max-width: 800px) {
+  .dir-sidebar { position: static; }
+  .dir-sidebar-list { flex-direction: row; flex-wrap: wrap; }
+  .dir-sidebar-list .chip.oficio { width: auto; border-radius: 999px; }
+}
+
+/* Otros — modal list of every oficio */
+.dir-otros-modal-list { display: flex; flex-direction: column; gap: 8px; }
+.dir-otros-modal-item {
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--paper-line);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.dir-otros-modal-item:hover { border-color: var(--gold-line); transform: translateX(2px); }
+.dir-otros-modal-item.active { background: var(--maroon); border-color: var(--maroon-deep); color: var(--paper); }
+
+.link-loc {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--maroon); font-family: var(--font-label); font-weight: 700; font-size: 13px;
+}
+.link-loc:hover { text-decoration: underline; }
+
+.dir-profile-list { display: flex; flex-direction: column; gap: 16px; }
+.worker-profile { display: flex; gap: 16px; align-items: flex-start; }
+.worker-profile .avatar-lg { width: 72px; height: 72px; }
+.worker-profile-body { flex: 1; min-width: 0; }
+
+/* "Buscar por el mapa" — artistic CTA matching the vidriera/gold-leaf theme */
+.dir-map-cta-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.btn-map-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px 8px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--gold-line);
+  background: linear-gradient(135deg, #3b2f15 0%, #713018 130%);
+  color: var(--gold-bright);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(28, 22, 16, 0.22), inset 0 0 0 1px rgba(217, 165, 44, 0.08);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.btn-map-search::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 20%, rgba(240, 194, 90, 0.28) 45%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-map-search:hover { transform: translateY(-2px); border-color: var(--gold-bright); box-shadow: 0 14px 30px rgba(28, 22, 16, 0.3), inset 0 0 0 1px rgba(217, 165, 44, 0.15); }
+.btn-map-search:hover::before { transform: translateX(120%); }
+.btn-map-search:active { transform: translateY(0) scale(0.98); }
+.btn-map-search-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--ground);
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(217, 165, 44, 0.5), 0 0 12px rgba(217, 165, 44, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-map-search, .btn-map-search::before { transition: none; }
+}
+
+/* Map picker modal — Uber-style: fixed center pin, drag the map underneath */
+.map-picker { display: flex; flex-direction: column; gap: 14px; }
+.map-picker-map {
+  position: relative;
+  height: 56vh;
+  min-height: 340px;
+  max-height: 560px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--paper-line);
+  box-shadow: var(--shadow-card);
+}
+.map-picker-pin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 450;
+  color: var(--maroon);
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+  transition: transform 0.15s ease;
+}
+.map-picker-pin.is-dragging { transform: translate(-50%, -112%); }
+.map-picker-pin-shadow {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  width: 14px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: rgba(20, 17, 15, 0.35);
+  border-radius: 50%;
+  filter: blur(1px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.map-picker-pin.is-dragging .map-picker-pin-shadow { transform: translateX(-50%) scale(0.7); opacity: 0.6; }
+.map-picker-locate {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 450;
+  background: rgba(237, 228, 207, 0.95);
+  backdrop-filter: blur(4px);
+}
+.map-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.map-picker-coords {
+  font-family: var(--font-label);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+}
+@media (max-width: 620px) {
+  .map-picker-map { height: 50vh; min-height: 280px; }
+}
+
 /* Portfolio */
 .portfolio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .portfolio-item img { width: 100%; height: 130px; object-fit: cover; border-radius: 4px; }

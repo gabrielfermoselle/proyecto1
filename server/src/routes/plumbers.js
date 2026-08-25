@@ -14,12 +14,13 @@ import {
 
 const router = Router();
 
-// Directorio público con filtros: especialidad, texto, y geolocalización (distancia).
-router.get("/", (req, res) => {
-  const { especialidad, q, lat, lng, radius, sort } = req.query;
+// Directorio público con filtros: especialidad, texto, calificación mínima y geolocalización (distancia).
+function searchPlumbers(req, res) {
+  const { especialidad, q, lat, lng, radius, sort, minRating } = req.query;
   const userLat = lat != null ? parseFloat(lat) : null;
   const userLng = lng != null ? parseFloat(lng) : null;
   const maxRadius = radius != null ? parseFloat(radius) : null;
+  const minAvgRating = minRating != null ? parseFloat(minRating) : null;
 
   let list = db.plumbers
     // Solo mostramos perfiles con al menos una especialidad publicada.
@@ -55,6 +56,10 @@ router.get("/", (req, res) => {
   if (maxRadius != null && userLat != null && userLng != null) {
     list = list.filter((c) => c.distanceKm != null && c.distanceKm <= maxRadius);
   }
+  // Filtro por calificación mínima.
+  if (minAvgRating != null && !Number.isNaN(minAvgRating)) {
+    list = list.filter((c) => c.avgRating >= minAvgRating);
+  }
 
   if (sort === "distance" && userLat != null) {
     list.sort((a, b) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9));
@@ -63,7 +68,10 @@ router.get("/", (req, res) => {
   }
 
   res.json(list);
-});
+}
+
+router.get("/", searchPlumbers);
+router.get("/search", searchPlumbers);
 
 // Lista de especialidades disponibles (para filtros).
 router.get("/especialidades", (_req, res) => {
