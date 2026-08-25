@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../services/api.js";
-import MapView from "../components/MapView.jsx";
+import MapSearchModal from "../components/MapSearchModal.jsx";
+import Modal from "../components/Modal.jsx";
 import { StarsDisplay } from "../components/Stars.jsx";
+import { MapPinIcon } from "../components/Icons.jsx";
 
 const DEFAULT_CENTER = [-34.9011, -56.1645]; // Montevideo
 
@@ -11,13 +13,17 @@ export default function Directory() {
   const [plumbers, setPlumbers] = useState([]);
   const [especialidades, setEspecialidades] = useState([]);
   const [especialidad, setEspecialidad] = useState(searchParams.get("especialidad") || "");
-  const [q, setQ] = useState("");
-  const [radius, setRadius] = useState("");
-  const [sort, setSort] = useState("rating");
   const [me, setMe] = useState(null); // { lat, lng }
   const [loading, setLoading] = useState(false);
   const [geoMsg, setGeoMsg] = useState("");
   const [apiDown, setApiDown] = useState(false);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [otrosModalOpen, setOtrosModalOpen] = useState(false);
+
+  const MAIN_OFICIOS_LIMIT = 6;
+  const mainOficios = especialidades.slice(0, MAIN_OFICIOS_LIMIT);
+  const otrosOficios = especialidades.slice(MAIN_OFICIOS_LIMIT);
+  const isOtroActive = especialidad !== "" && otrosOficios.includes(especialidad);
 
   useEffect(() => {
     api.get("/plumbers/especialidades").then(setEspecialidades).catch(() => {});
@@ -27,15 +33,14 @@ export default function Directory() {
     setLoading(true);
     const params = new URLSearchParams();
     if (especialidad) params.set("especialidad", especialidad);
-    if (q) params.set("q", q);
-    if (sort) params.set("sort", sort);
+    // Con ubicación conocida priorizamos a los más cercanos primero.
+    params.set("sort", me ? "distance" : "rating");
     if (me) {
       params.set("lat", me.lat);
       params.set("lng", me.lng);
-      if (radius) params.set("radius", radius);
     }
     try {
-      const data = await api.get(`/plumbers?${params.toString()}`);
+      const data = await api.get(`/plumbers/search?${params.toString()}`);
       setPlumbers(Array.isArray(data) ? data : []);
       setApiDown(false);
     } catch {
@@ -50,7 +55,7 @@ export default function Directory() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [especialidad, sort, me, radius]);
+  }, [especialidad, me]);
 
   function useMyLocation() {
     setGeoMsg("Obteniendo ubicación…");
@@ -71,30 +76,20 @@ export default function Directory() {
     );
   }
 
-  const markers = useMemo(
-    () =>
-      plumbers
-        .filter((p) => p.latitud != null && p.longitud != null)
-        .map((p) => ({
-          id: p.id,
-          lat: p.latitud,
-          lng: p.longitud,
-          name: p.name,
-          label: `${p.especialidad.join(", ")}${p.distanceKm != null ? ` · ${p.distanceKm} km` : ""}`
-        })),
-    [plumbers]
-  );
-
-  const center = me ? [me.lat, me.lng] : DEFAULT_CENTER;
+  function onMapConfirm(lat, lng) {
+    setMe({ lat, lng });
+    setGeoMsg("");
+    setMapModalOpen(false);
+  }
 
   return (
-    <div>
-      <div className="spread" style={{ margin: "24px 0 4px" }}>
+    <div className="panel-page">
+      <div className="panel-header">
         <h1 className="section-title" style={{ margin: 0 }}>Directorio de plomeros</h1>
+        <p className="muted" style={{ margin: "4px 0 0" }}>
+          Filtrá por especialidad, zona y distancia. Cada reseña está anclada a un trabajo real y completado.
+        </p>
       </div>
-      <p className="muted" style={{ marginBottom: 20 }}>
-        Filtrá por especialidad, zona y distancia. Cada reseña está anclada a un trabajo real y completado.
-      </p>
 
       {apiDown && (
         <div className="alert info" style={{ marginBottom: 20 }}>
@@ -103,106 +98,132 @@ export default function Directory() {
         </div>
       )}
 
-      <div className="grid dir-layout">
-        <div className="card">
-          <h3>Filtros</h3>
-          <div className="field">
-            <label>Buscar</label>
-            <input
-              placeholder="Nombre, especialidad o palabra clave"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && load()}
-            />
-          </div>
-          <div className="field">
-            <label>Especialidad</label>
-            <select value={especialidad} onChange={(e) => setEspecialidad(e.target.value)}>
-              <option value="">Todas las especialidades</option>
-              {especialidades.map((e) => (
-                <option key={e} value={e}>
-                  {e}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Ordenar por</label>
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="rating">Mejor calificados</option>
-              <option value="distance">Más cercanos</option>
-            </select>
-          </div>
+      <div className="dir-map-cta-row">
+        <button type="button" className="btn-map-search" onClick={() => setMapModalOpen(true)}>
+          <span className="btn-map-search-badge"><MapPinIcon width={16} height={16} /></span>
+          Buscar por el mapa
+        </button>
+      </div>
 
-          <hr className="sep" />
-          <label>Zona de cobertura</label>
-          <button className="btn ghost block" onClick={useMyLocation}>
-            📍 Usar mi ubicación
+      <div className="spread dir-results-head">
+        {!me ? (
+          <button className="link-loc" onClick={useMyLocation}>
+            <MapPinIcon width={14} height={14} /> Usar mi ubicación para ver a los más cercanos primero
           </button>
-          {me && (
-            <div className="field" style={{ marginTop: 12 }}>
-              <label>Distancia máxima: {radius || "sin límite"} {radius ? "km" : ""}</label>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                step="1"
-                value={radius || 0}
-                onChange={(e) => setRadius(e.target.value === "0" ? "" : e.target.value)}
-              />
-            </div>
-          )}
-          {geoMsg && <div className="muted" style={{ marginTop: 8 }}>{geoMsg}</div>}
-          <button className="btn block" style={{ marginTop: 12 }} onClick={load}>
-            Aplicar filtros
-          </button>
-        </div>
+        ) : (
+          <span className="dist-tag dist-in">📍 Mostrando primero a los más cercanos</span>
+        )}
+        <span className="muted">
+          {loading ? "Buscando…" : `${plumbers.length} ${plumbers.length === 1 ? "profesional" : "profesionales"}`}
+        </span>
+      </div>
+      {geoMsg && <div className="muted" style={{ marginBottom: 8 }}>{geoMsg}</div>}
 
-        <div className="grid" style={{ gap: 20 }}>
-          <MapView center={center} markers={markers} me={me ? { ...me, label: "Tú estás aquí" } : null} />
-
-          <div className="spread">
-            <span className="section-title" style={{ margin: 0 }}>
-              {loading ? "Buscando…" : `${plumbers.length} profesionales`}
-            </span>
+      <div className="dir-feed-layout">
+        <aside className="card dir-sidebar">
+          <h3>Oficios</h3>
+          <div className="dir-sidebar-list">
+            <button
+              type="button"
+              className={`chip oficio ${!especialidad ? "chip-active" : ""}`}
+              onClick={() => setEspecialidad("")}
+            >
+              Todas
+            </button>
+            {mainOficios.map((e) => (
+              <button
+                key={e}
+                type="button"
+                className={`chip oficio ${especialidad === e ? "chip-active" : ""}`}
+                onClick={() => setEspecialidad(e)}
+              >
+                {e}
+              </button>
+            ))}
+            {otrosOficios.length > 0 && (
+              <button
+                type="button"
+                className={`chip oficio ${isOtroActive ? "chip-active" : ""}`}
+                onClick={() => setOtrosModalOpen(true)}
+              >
+                Otros
+              </button>
+            )}
           </div>
+        </aside>
+
+        <div className="dir-content">
 
           {plumbers.length === 0 && !loading && (
             <div className="card empty">No hay profesionales que coincidan con tu búsqueda.</div>
           )}
 
-          <div className="worker-list">
+          <div className="dir-profile-list">
             {plumbers.map((p) => (
-              <Link to={`/plomero/${p.id}`} key={p.id} className="card worker">
-                <div className="top">
-                  <img className="avatar" src={p.fotoUrl || `https://i.pravatar.cc/100?u=${p.id}`} alt={p.name} />
-                  <div>
-                    <div className="name">{p.name}</div>
-                    <StarsDisplay value={p.avgRating} count={p.reviewCount} />
+              <Link to={`/plomero/${p.id}`} key={p.id} className="card worker-profile">
+                <img className="avatar avatar-lg" src={p.fotoUrl || `https://i.pravatar.cc/160?u=${p.id}`} alt={p.name} />
+                <div className="worker-profile-body">
+                  <div className="spread" style={{ alignItems: "flex-start" }}>
+                    <div>
+                      <div className="name">{p.name}</div>
+                      <StarsDisplay value={p.avgRating} count={p.reviewCount} />
+                    </div>
+                    {p.distanceKm != null && (
+                      <span className={`dist-tag ${p.inCoverage ? "dist-in" : "dist-out"}`}>
+                        {p.distanceKm} km {p.inCoverage ? "· en zona" : ""}
+                      </span>
+                    )}
                   </div>
-                </div>
-                <div className="chips">
-                  {p.especialidad.map((e) => (
-                    <span className="chip" key={e}>{e}</span>
-                  ))}
-                  {!p.disponible && <span className="chip chip-off">No disponible</span>}
-                </div>
-                <div className="muted" style={{ minHeight: 34 }}>
-                  {p.descripcion ? p.descripcion.slice(0, 90) + (p.descripcion.length > 90 ? "…" : "") : "Sin descripción"}
-                </div>
-                <div className="meta-row">
-                  <span>{p.completedJobs} trabajos hechos</span>
-                  {p.distanceKm != null && (
-                    <span className={`dist-tag ${p.inCoverage ? "dist-in" : "dist-out"}`}>
-                      {p.distanceKm} km {p.inCoverage ? "· en zona" : ""}
-                    </span>
-                  )}
+                  <div className="chips" style={{ margin: "8px 0" }}>
+                    {p.especialidad.map((e) => (
+                      <span className="chip" key={e}>{e}</span>
+                    ))}
+                    {!p.disponible && <span className="chip chip-off">No disponible</span>}
+                  </div>
+                  <div className="muted">
+                    {p.descripcion ? p.descripcion.slice(0, 140) + (p.descripcion.length > 140 ? "…" : "") : "Sin descripción"}
+                  </div>
+                  <div className="meta-row" style={{ marginTop: 10 }}>
+                    <span>{p.completedJobs} trabajos hechos</span>
+                  </div>
                 </div>
               </Link>
             ))}
           </div>
         </div>
       </div>
+
+      {mapModalOpen && (
+        <MapSearchModal
+          initialCenter={me ? [me.lat, me.lng] : null}
+          onClose={() => setMapModalOpen(false)}
+          onConfirm={onMapConfirm}
+        />
+      )}
+
+      {otrosModalOpen && (
+        <Modal onClose={() => setOtrosModalOpen(false)} eyebrow="Oficios" title="Todos los oficios">
+          <div className="dir-otros-modal-list">
+            <button
+              type="button"
+              className={`dir-otros-modal-item ${!especialidad ? "active" : ""}`}
+              onClick={() => { setEspecialidad(""); setOtrosModalOpen(false); }}
+            >
+              Todas las especialidades
+            </button>
+            {especialidades.map((e) => (
+              <button
+                key={e}
+                type="button"
+                className={`dir-otros-modal-item ${especialidad === e ? "active" : ""}`}
+                onClick={() => { setEspecialidad(e); setOtrosModalOpen(false); }}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
