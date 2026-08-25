@@ -60,11 +60,11 @@ export default function ReviewForm({ jobId, plumberId, onSubmitted }) {
 
     setSubmitting(true);
     try {
-      const review = await api.post("/reviews", {
-        jobId,
-        rating,
-        comment: comment.trim()
-      });
+      const review = await api.post(
+        "/reviews",
+        { jobId, rating, comment: comment.trim() },
+        { silent: true }
+      );
       setDone(true);
       window.dispatchEvent(
         new CustomEvent("review:created", { detail: { plumberId, review } })

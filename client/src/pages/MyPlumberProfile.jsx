@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { StarsDisplay } from "../components/Stars.jsx";
 import MapView from "../components/MapView.jsx";
 import { EditIcon } from "../components/Icons.jsx";
+import { SkeletonProfile } from "../components/Skeleton.jsx";
 
 export default function MyPlumberProfile() {
   const { plumberId } = useAuth();
@@ -14,11 +15,11 @@ export default function MyPlumberProfile() {
 
   useEffect(() => {
     if (!plumberId) return;
-    api.get(`/plumbers/${plumberId}`).then(setP).catch((e) => setError(e.message));
+    api.get(`/plumbers/${plumberId}`, { silent: true }).then(setP).catch((e) => setError(e.message));
   }, [plumberId]);
 
   if (error) return <div className="alert error">{error}</div>;
-  if (!p) return <div>Cargando…</div>;
+  if (!p) return <SkeletonProfile />;
 
   return (
     <div>

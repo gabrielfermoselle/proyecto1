@@ -4,15 +4,32 @@ import { io } from "socket.io-client";
 import { api } from "../services/api.js";
 import { getToken } from "../utils/storage.js";
 import { useAuth } from "../hooks/useAuth.js";
+import { useToast } from "../context/ToastContext.jsx";
 import ReviewForm from "../components/ReviewForm.jsx";
+import { SkeletonBlock, SkeletonText } from "../components/Skeleton.jsx";
 import { ORDER_STATUS_LABEL } from "../utils/orderStatus.js";
+
+function JobDetailSkeleton() {
+  return (
+    <div className="grid cols-2" aria-busy="true" aria-label="Cargando pedido">
+      <div className="card">
+        <SkeletonBlock className="mb-3 h-6 w-2/3" />
+        <SkeletonText lines={3} />
+      </div>
+      <div className="card">
+        <SkeletonBlock className="h-5 w-1/3" />
+        <SkeletonBlock className="mt-4 h-64 w-full" />
+      </div>
+    </div>
+  );
+}
 
 export default function JobDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const toast = useToast();
   const [job, setJob] = useState(null);
   const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
 
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
@@ -23,7 +40,7 @@ export default function JobDetail() {
 
   async function loadJob() {
     try {
-      const j = await api.get(`/jobs/${id}`);
+      const j = await api.get(`/jobs/${id}`, { silent: true });
       setJob(j);
       if (j.agreedPrice != null) setPrice(j.agreedPrice);
     } catch (e) {
@@ -60,29 +77,27 @@ export default function JobDetail() {
   }
 
   async function changeStatus(status) {
-    setError("");
     try {
       const j = await api.patch(`/jobs/${id}/status`, { status });
       setJob(j);
-    } catch (e) {
-      setError(e.message);
+    } catch {
+      // El toast global ya avisó del error.
     }
   }
 
   async function savePrice(e) {
     e.preventDefault();
-    setError("");
     try {
       const j = await api.patch(`/jobs/${id}/price`, { agreedPrice: price });
       setJob(j);
-      setMsg("Presupuesto actualizado.");
-    } catch (e) {
-      setError(e.message);
+      toast.success("Presupuesto actualizado.");
+    } catch {
+      // El toast global ya avisó del error.
     }
   }
 
   if (error && !job) return <div className="alert error">{error}</div>;
-  if (!job) return <div>Cargando…</div>;
+  if (!job) return <JobDetailSkeleton />;
 
   const isClient = user.id === job.clientId;
   const isPlumber = user.id === job.plumberUserId;
@@ -101,9 +116,6 @@ export default function JobDetail() {
           {job.agreedPrice != null && (
             <p className="tag-price" style={{ fontSize: 18 }}>Presupuesto acordado: ${job.agreedPrice}</p>
           )}
-
-          {error && <div className="alert error">{error}</div>}
-          {msg && <div className="alert ok">{msg}</div>}
 
           <hr className="sep" />
 
@@ -166,7 +178,7 @@ export default function JobDetail() {
                 jobId={id}
                 plumberId={job.plumberId}
                 onSubmitted={() => {
-                  setMsg("¡Gracias por tu reseña!");
+                  toast.success("¡Gracias por tu reseña!");
                   loadJob();
                 }}
               />

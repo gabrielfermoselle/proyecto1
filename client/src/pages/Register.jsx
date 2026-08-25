@@ -31,7 +31,6 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -58,7 +57,6 @@ export default function Register() {
 
   async function submit(e) {
     e.preventDefault();
-    setError("");
     if (!validate()) return;
     setBusy(true);
     try {
@@ -75,8 +73,8 @@ export default function Register() {
       }
       const user = await register(payload);
       navigate(user.role === "plomero" ? "/mi-perfil-plomero" : "/panel");
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      // El toast global ya avisó del error.
     } finally {
       setBusy(false);
     }
@@ -84,7 +82,6 @@ export default function Register() {
 
   return (
     <AuthLayout title="Creá tu cuenta" subtitle="Sumate como cliente para contratar, o como plomero para ofrecer tus servicios.">
-      {error && <div className="alert error">{error}</div>}
       <form onSubmit={submit} noValidate>
         <div className="field">
           <label>¿Cómo querés usar la plataforma?</label>

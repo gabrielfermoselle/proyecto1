@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../services/api.js";
 import { useAuth } from "../hooks/useAuth.js";
+import { useToast } from "../context/ToastContext.jsx";
 import MapView from "../components/MapView.jsx";
 import { EditIcon, ImageIcon, MapPinIcon, PlusIcon, TrashIcon } from "../components/Icons.jsx";
 
@@ -22,11 +23,10 @@ function splitName(fullName) {
 export default function EditPlumberProfile({ onDone, onDirtyChange }) {
   const { user, plumberId, refresh } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [form, setForm] = useState(null);
   const [tab, setTab] = useState("datos");
   const [photoError, setPhotoError] = useState("");
-  const [msg, setMsg] = useState("");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dispBusy, setDispBusy] = useState(false);
   const fileInputRef = useRef(null);
@@ -54,7 +54,7 @@ export default function EditPlumberProfile({ onDone, onDirtyChange }) {
       };
       initialSnapshot.current = JSON.stringify(next);
       setForm(next);
-    });
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plumberId]);
 
@@ -116,8 +116,6 @@ export default function EditPlumberProfile({ onDone, onDirtyChange }) {
   async function save(e) {
     e.preventDefault();
     setBusy(true);
-    setError("");
-    setMsg("");
     try {
       const fullName = `${form.nombre} ${form.apellido}`.trim();
       await Promise.all([
@@ -137,9 +135,9 @@ export default function EditPlumberProfile({ onDone, onDirtyChange }) {
       await refresh();
       initialSnapshot.current = JSON.stringify(form);
       onDirtyChange?.(false);
-      setMsg("Perfil guardado correctamente.");
-    } catch (err) {
-      setError(err.message);
+      toast.success("Perfil guardado correctamente.");
+    } catch {
+      // El toast global ya avisó del error.
     } finally {
       setBusy(false);
     }
@@ -148,12 +146,11 @@ export default function EditPlumberProfile({ onDone, onDirtyChange }) {
   async function toggleDisponibilidad() {
     const next = !form.disponible;
     setDispBusy(true);
-    setError("");
     try {
       const updated = await api.patch(`/plumbers/${plumberId}/disponibilidad`, { disponible: next });
       setForm((f) => ({ ...f, disponible: updated.disponible }));
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      // El toast global ya avisó del error.
     } finally {
       setDispBusy(false);
     }
@@ -219,9 +216,6 @@ export default function EditPlumberProfile({ onDone, onDirtyChange }) {
           </button>
         </div>
       </div>
-
-      {error && <div className="alert error">{error}</div>}
-      {msg && <div className="alert ok">{msg}</div>}
 
       <div className="modal-tabs" role="tablist">
         {TABS.map((t) => (

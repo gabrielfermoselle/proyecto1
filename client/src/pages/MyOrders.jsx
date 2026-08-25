@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api.js";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_DOT } from "../utils/orderStatus.js";
+import { SkeletonJobList } from "../components/Skeleton.jsx";
 
 export default function MyOrders() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/jobs").then(setJobs).finally(() => setLoading(false));
+    api.get("/jobs").then(setJobs).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   return (
@@ -25,9 +26,11 @@ export default function MyOrders() {
         </div>
       </div>
 
+      {loading && <SkeletonJobList />}
+
+      {!loading && (
       <div className="card job-list-card">
-        {loading && <div className="empty">Cargando…</div>}
-        {!loading && jobs.length === 0 && (
+        {jobs.length === 0 && (
           <div className="empty">
             Todavía no contrataste a nadie. Buscá un profesional en el directorio.
           </div>
@@ -51,6 +54,7 @@ export default function MyOrders() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

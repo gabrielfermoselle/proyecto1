@@ -82,22 +82,6 @@ a { color: inherit; text-decoration: none; }
 /* ==========================================================================
    Nav — el toldo del local
    ========================================================================== */
-.nav {
-  position: sticky;
-  top: 0;
-  z-index: 500;
-  background: var(--ground);
-  border-bottom: 3px solid var(--gold);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-}
-.nav-inner {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
 .brand {
   font-family: var(--font-heading);
   font-weight: 800;
@@ -122,22 +106,6 @@ a { color: inherit; text-decoration: none; }
   font-size: 13px;
   color: var(--gold-bright);
 }
-.nav-links { display: flex; gap: 4px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-.nav-links a, .nav-links button {
-  color: var(--muted-on-dark);
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-family: var(--font-label);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-.nav-links a:hover, .nav-links button:hover { background: rgba(232, 184, 75, 0.1); color: var(--gold-bright); }
-.nav-links a.active { color: var(--ground); background: var(--gold); }
-
 /* ==========================================================================
    Landing (persuade)
    ========================================================================== */
@@ -562,8 +530,12 @@ textarea { min-height: 90px; resize: vertical; }
 .portfolio-item .pt { font-weight: 700; font-size: 14px; margin-top: 6px; }
 
 /* Jobs */
-.job-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--paper-line); gap: 12px; }
+.job-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--paper-line); gap: 12px; flex-wrap: wrap; }
 .job-row:last-child { border-bottom: none; }
+@media (max-width: 560px) {
+  .job-row { flex-direction: column; align-items: stretch; }
+  .job-row > .row { justify-content: flex-start; }
+}
 .status { font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; text-transform: capitalize; font-family: var(--font-label); }
 .status.requested { background: var(--warn-bg); color: var(--warn); }
 .status.accepted { background: rgba(28, 61, 50, 0.12); color: var(--teal); }
@@ -573,6 +545,7 @@ textarea { min-height: 90px; resize: vertical; }
 
 /* Chat */
 .chat { display: flex; flex-direction: column; height: 460px; }
+@media (max-width: 620px) { .chat { height: min(70vh, 400px); } }
 .chat-log { flex: 1; overflow-y: auto; padding: 12px; background: var(--paper-soft); border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
 .bubble { max-width: 75%; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.35; }
 .bubble .who { font-size: 11px; opacity: 0.7; margin-bottom: 2px; }
@@ -610,6 +583,11 @@ textarea { min-height: 90px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   .review-star, .review-done { animation: none !important; transition: none !important; }
 }
+
+/* Toasts */
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.toast-in { animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .toast-in { animation: none; } }
 
 .alert { padding: 10px 14px; border-radius: 4px; font-size: 14px; margin-bottom: 12px; }
 .alert.error { background: var(--danger-bg); color: var(--danger); }

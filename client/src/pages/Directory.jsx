@@ -5,6 +5,7 @@ import MapSearchModal from "../components/MapSearchModal.jsx";
 import Modal from "../components/Modal.jsx";
 import { StarsDisplay } from "../components/Stars.jsx";
 import { MapPinIcon } from "../components/Icons.jsx";
+import { SkeletonPlumberCard } from "../components/Skeleton.jsx";
 
 const DEFAULT_CENTER = [-34.9011, -56.1645]; // Montevideo
 
@@ -26,7 +27,7 @@ export default function Directory() {
   const isOtroActive = especialidad !== "" && otrosOficios.includes(especialidad);
 
   useEffect(() => {
-    api.get("/plumbers/especialidades").then(setEspecialidades).catch(() => {});
+    api.get("/plumbers/especialidades", { silent: true }).then(setEspecialidades).catch(() => {});
   }, []);
 
   async function load() {
@@ -40,7 +41,7 @@ export default function Directory() {
       params.set("lng", me.lng);
     }
     try {
-      const data = await api.get(`/plumbers/search?${params.toString()}`);
+      const data = await api.get(`/plumbers/search?${params.toString()}`, { silent: true });
       setPlumbers(Array.isArray(data) ? data : []);
       setApiDown(false);
     } catch {
@@ -153,12 +154,20 @@ export default function Directory() {
 
         <div className="dir-content">
 
+          {loading && (
+            <div className="dir-profile-list" aria-busy="true" aria-label="Cargando profesionales">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonPlumberCard key={i} />
+              ))}
+            </div>
+          )}
+
           {plumbers.length === 0 && !loading && (
             <div className="card empty">No hay profesionales que coincidan con tu búsqueda.</div>
           )}
 
           <div className="dir-profile-list">
-            {plumbers.map((p) => (
+            {!loading && plumbers.map((p) => (
               <Link to={`/plomero/${p.id}`} key={p.id} className="card worker-profile">
                 <img className="avatar avatar-lg" src={p.fotoUrl || `https://i.pravatar.cc/160?u=${p.id}`} alt={p.name} />
                 <div className="worker-profile-body">

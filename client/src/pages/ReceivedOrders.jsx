@@ -4,6 +4,7 @@ import { api } from "../services/api.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { BriefcaseIcon, ClockIcon, CoinIcon } from "../components/Icons.jsx";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_DOT } from "../utils/orderStatus.js";
+import { SkeletonJobList } from "../components/Skeleton.jsx";
 
 // Próximas acciones disponibles para el plomero según el estado actual del pedido.
 const NEXT_ACTIONS = {
@@ -28,10 +29,9 @@ export default function ReceivedOrders() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/jobs").then(setJobs).finally(() => setLoading(false));
+    api.get("/jobs").then(setJobs).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const stats = useMemo(() => {
@@ -44,13 +44,12 @@ export default function ReceivedOrders() {
   }, [jobs]);
 
   async function changeStatus(job, status) {
-    setError("");
     setBusyId(job.id);
     try {
       const updated = await api.patch(`/jobs/${job.id}/status`, { status });
       setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
-    } catch (e) {
-      setError(e.message);
+    } catch {
+      // El toast global ya avisó del error.
     } finally {
       setBusyId(null);
     }
@@ -91,11 +90,11 @@ export default function ReceivedOrders() {
         </div>
       </div>
 
-      {error && <div className="alert error">{error}</div>}
+      {loading && <SkeletonJobList rows={3} />}
 
+      {!loading && (
       <div className="card job-list-card">
-        {loading && <div className="empty">Cargando…</div>}
-        {!loading && jobs.length === 0 && <div className="empty">Todavía no recibiste pedidos.</div>}
+        {jobs.length === 0 && <div className="empty">Todavía no recibiste pedidos.</div>}
         {jobs.map((j, i) => (
           <div className="job-row job-row-anim" style={{ "--i": i }} key={j.id}>
             <div className="job-row-main">
@@ -126,6 +125,7 @@ export default function ReceivedOrders() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
