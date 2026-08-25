@@ -51,6 +51,9 @@ function EditProfileModalRoute() {
   const background = location.state?.background;
   const [dirty, setDirty] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Guarda la función de cierre animado que expone <Modal>, para poder dispararla
+  // tanto desde el botón "Cancelar" del formulario como desde el ConfirmDialog.
+  const animateCloseRef = useRef(() => {});
 
   function close() {
     if (background) navigate(-1);
@@ -67,18 +70,21 @@ function EditProfileModalRoute() {
 
   function handleCancel() {
     if (dirty) setConfirmOpen(true);
-    else close();
+    else animateCloseRef.current();
   }
 
   function confirmExit() {
     setConfirmOpen(false);
-    close();
+    animateCloseRef.current();
   }
 
   return (
     <>
       <Modal onClose={close} onRequestClose={requestClose} eyebrow="Mi perfil" title="Editar perfil de plomero" wide>
-        <EditPlumberProfile onDone={handleCancel} onDirtyChange={setDirty} />
+        {(animateClose) => {
+          animateCloseRef.current = animateClose;
+          return <EditPlumberProfile onDone={handleCancel} onDirtyChange={setDirty} />;
+        }}
       </Modal>
       {confirmOpen && (
         <ConfirmDialog onCancel={() => setConfirmOpen(false)} onConfirm={confirmExit} />

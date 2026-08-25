@@ -6,11 +6,19 @@ export default function Modal({ onClose, onRequestClose, title, eyebrow, childre
   const [closing, setClosing] = useState(false);
   const panelRef = useRef(null);
 
+  // Dispara la animación de cierre y recién al terminar desmonta (avisa a onClose).
+  // Se expone a los hijos para que cualquier acción interna (cancelar, confirmar, elegir
+  // un ítem de una lista) cierre con la misma transición prolija que el X/backdrop/Escape.
+  function animateClose() {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(onClose, 450);
+  }
+
   function requestClose() {
     if (closing) return;
     if (onRequestClose && !onRequestClose()) return;
-    setClosing(true);
-    window.setTimeout(onClose, 450);
+    animateClose();
   }
 
   useEffect(() => {
@@ -48,7 +56,9 @@ export default function Modal({ onClose, onRequestClose, title, eyebrow, childre
             <CloseIcon />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <div className="modal-body">
+          {typeof children === "function" ? children(animateClose) : children}
+        </div>
       </div>
     </div>,
     document.body

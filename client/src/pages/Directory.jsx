@@ -79,7 +79,6 @@ export default function Directory() {
   function onMapConfirm(lat, lng) {
     setMe({ lat, lng });
     setGeoMsg("");
-    setMapModalOpen(false);
   }
 
   return (
@@ -203,25 +202,27 @@ export default function Directory() {
 
       {otrosModalOpen && (
         <Modal onClose={() => setOtrosModalOpen(false)} eyebrow="Oficios" title="Todos los oficios">
-          <div className="dir-otros-modal-list">
-            <button
-              type="button"
-              className={`dir-otros-modal-item ${!especialidad ? "active" : ""}`}
-              onClick={() => { setEspecialidad(""); setOtrosModalOpen(false); }}
-            >
-              Todas las especialidades
-            </button>
-            {especialidades.map((e) => (
+          {(close) => (
+            <div className="dir-otros-modal-list">
               <button
-                key={e}
                 type="button"
-                className={`dir-otros-modal-item ${especialidad === e ? "active" : ""}`}
-                onClick={() => { setEspecialidad(e); setOtrosModalOpen(false); }}
+                className={`dir-otros-modal-item ${!especialidad ? "active" : ""}`}
+                onClick={() => { setEspecialidad(""); close(); }}
               >
-                {e}
+                Todas las especialidades
               </button>
-            ))}
-          </div>
+              {especialidades.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  className={`dir-otros-modal-item ${especialidad === e ? "active" : ""}`}
+                  onClick={() => { setEspecialidad(e); close(); }}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
     </div>

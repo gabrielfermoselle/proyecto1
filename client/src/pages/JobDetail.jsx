@@ -5,13 +5,7 @@ import { api } from "../services/api.js";
 import { getToken } from "../utils/storage.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { StarsInput } from "../components/Stars.jsx";
-
-const STATUS_LABEL = {
-  requested: "Solicitado",
-  accepted: "Aceptado",
-  completed: "Completado",
-  cancelled: "Cancelado"
-};
+import { ORDER_STATUS_LABEL } from "../utils/orderStatus.js";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -114,7 +108,7 @@ export default function JobDetail() {
         <div className="card">
           <div className="spread">
             <h2 style={{ margin: 0 }}>{job.title}</h2>
-            <span className={`status ${job.status}`}>{STATUS_LABEL[job.status]}</span>
+            <span className={`status ${job.status}`}>{ORDER_STATUS_LABEL[job.status]}</span>
           </div>
           <p className="muted">{isClient ? `Con ${other} (plomero)` : `Con ${other} (cliente)`}</p>
           <p>{job.description || "Sin detalles."}</p>
@@ -146,7 +140,16 @@ export default function JobDetail() {
                 </form>
               )}
               {job.status === "accepted" && (
-                <button className="btn" onClick={() => changeStatus("completed")}>Marcar como completado</button>
+                <div className="row">
+                  <button className="btn" onClick={() => changeStatus("started")}>Iniciar trabajo</button>
+                  <button className="btn danger" onClick={() => changeStatus("cancelled")}>Cancelar</button>
+                </div>
+              )}
+              {job.status === "started" && (
+                <div className="row">
+                  <button className="btn success" onClick={() => changeStatus("completed")}>Finalizar trabajo</button>
+                  <button className="btn danger" onClick={() => changeStatus("cancelled")}>Cancelar</button>
+                </div>
               )}
             </div>
           )}
@@ -154,13 +157,13 @@ export default function JobDetail() {
           {/* Acciones del cliente */}
           {isClient && (
             <div className="grid" style={{ gap: 12 }}>
-              {(job.status === "requested" || job.status === "accepted") && (
+              {(job.status === "requested" || job.status === "accepted" || job.status === "started") && (
                 <button className="btn danger" onClick={() => changeStatus("cancelled")}>Cancelar contratación</button>
               )}
-              {job.status === "accepted" && (
-                <button className="btn" onClick={() => changeStatus("completed")}>
-                  Confirmar trabajo completado
-                </button>
+              {job.status === "started" && (
+                <p className="muted" style={{ margin: 0 }}>
+                  El plomero está trabajando en tu pedido. Cuando termine, lo va a marcar como finalizado.
+                </p>
               )}
             </div>
           )}

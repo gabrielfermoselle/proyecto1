@@ -4,6 +4,7 @@ import { api } from "../services/api.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { StarsDisplay } from "../components/Stars.jsx";
 import MapView from "../components/MapView.jsx";
+import CreateOrderModal from "../components/CreateOrderModal.jsx";
 
 export default function PlumberProfile() {
   const { id } = useParams();
@@ -12,25 +13,14 @@ export default function PlumberProfile() {
   const [p, setP] = useState(null);
   const [error, setError] = useState("");
   const [showHire, setShowHire] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "" });
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.get(`/plumbers/${id}`).then(setP).catch((e) => setError(e.message));
   }, [id]);
 
-  async function hire(e) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const job = await api.post("/jobs", { plumberId: id, ...form });
-      navigate(`/trabajo/${job.id}`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+  function onOrderCreated(job) {
+    setShowHire(false);
+    navigate(`/trabajo/${job.id}`);
   }
 
   if (error) return <div className="alert error">{error}</div>;
@@ -69,42 +59,9 @@ export default function PlumberProfile() {
           {canHire && (
             <>
               <hr className="sep" />
-              {!showHire ? (
-                <button className="btn" onClick={() => (user ? setShowHire(true) : navigate("/login"))}>
-                  Solicitar contratación
-                </button>
-              ) : (
-                <form onSubmit={hire}>
-                  <div className="field">
-                    <label>¿Qué necesitás?</label>
-                    <input
-                      placeholder="Ej: Arreglo de canilla que pierde"
-                      value={form.title}
-                      onChange={(e) => setForm({ ...form, title: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Detalles</label>
-                    <textarea
-                      placeholder="Contá el problema, materiales, disponibilidad…"
-                      value={form.description}
-                      onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    />
-                  </div>
-                  <div className="row">
-                    <button className="btn success" disabled={busy}>
-                      {busy ? "Enviando…" : "Enviar solicitud"}
-                    </button>
-                    <button type="button" className="btn ghost" onClick={() => setShowHire(false)}>
-                      Cancelar
-                    </button>
-                  </div>
-                  <p className="muted" style={{ marginTop: 8 }}>
-                    Se abrirá un chat interno con el profesional para acordar el presupuesto.
-                  </p>
-                </form>
-              )}
+              <button className="btn" onClick={() => (user ? setShowHire(true) : navigate("/login"))}>
+                Solicitar contratación
+              </button>
             </>
           )}
         </div>
@@ -156,6 +113,10 @@ export default function PlumberProfile() {
           ))}
         </div>
       </div>
+
+      {showHire && (
+        <CreateOrderModal plumber={p} onClose={() => setShowHire(false)} onCreated={onOrderCreated} />
+      )}
     </div>
   );
 }
