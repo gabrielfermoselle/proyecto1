@@ -13,7 +13,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   function validate() {
@@ -27,14 +26,13 @@ export default function Login() {
 
   async function submit(e) {
     e.preventDefault();
-    setError("");
     if (!validate()) return;
     setBusy(true);
     try {
       const user = await login(email.trim(), password);
       navigate(user.role === "plomero" ? "/mi-perfil-plomero" : "/panel");
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      // El toast global ya avisó del error.
     } finally {
       setBusy(false);
     }
@@ -48,7 +46,6 @@ export default function Login() {
 
   return (
     <AuthLayout title="Bienvenido de nuevo" subtitle="Ingresá para gestionar tus contrataciones o tu perfil profesional.">
-      {error && <div className="alert error">{error}</div>}
       <form onSubmit={submit} noValidate>
         <div className="field">
           <label>Email</label>

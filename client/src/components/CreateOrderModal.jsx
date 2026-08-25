@@ -5,7 +5,6 @@ import { api } from "../services/api.js";
 export default function CreateOrderModal({ plumber, onClose, onCreated }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const createdJobRef = useRef(null);
 
@@ -18,14 +17,13 @@ export default function CreateOrderModal({ plumber, onClose, onCreated }) {
 
   async function submit(e, close) {
     e.preventDefault();
-    setError("");
     setBusy(true);
     try {
       const job = await api.post("/jobs", { plumberId: plumber.id, title, description });
       createdJobRef.current = job;
       close();
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      // El toast global ya avisó del error.
       setBusy(false);
     }
   }
@@ -53,7 +51,6 @@ export default function CreateOrderModal({ plumber, onClose, onCreated }) {
               rows={5}
             />
           </div>
-          {error && <div className="alert error">{error}</div>}
           <p className="muted" style={{ margin: "8px 0 18px" }}>
             Se abrirá un chat interno con el profesional para acordar el presupuesto. Tus datos de
             contacto no se comparten.

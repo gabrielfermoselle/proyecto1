@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { StarsDisplay } from "../components/Stars.jsx";
 import MapView from "../components/MapView.jsx";
 import CreateOrderModal from "../components/CreateOrderModal.jsx";
+import { SkeletonProfile } from "../components/Skeleton.jsx";
 
 export default function PlumberProfile() {
   const { id } = useParams();
@@ -15,7 +16,7 @@ export default function PlumberProfile() {
   const [showHire, setShowHire] = useState(false);
 
   useEffect(() => {
-    api.get(`/plumbers/${id}`).then(setP).catch((e) => setError(e.message));
+    api.get(`/plumbers/${id}`, { silent: true }).then(setP).catch((e) => setError(e.message));
   }, [id]);
 
   // Si se publica una reseña nueva para este plomero (p.ej. desde el chat/detalle
@@ -36,7 +37,7 @@ export default function PlumberProfile() {
   }
 
   if (error) return <div className="alert error">{error}</div>;
-  if (!p) return <div>Cargando…</div>;
+  if (!p) return <SkeletonProfile />;
 
   const canHire = !user || user.role === "client";
 

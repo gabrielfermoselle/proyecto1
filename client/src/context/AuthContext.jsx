@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
       return;
     }
     try {
-      const data = await api.get("/auth/me");
+      const data = await api.get("/auth/me", { silent: true });
       persistUser(data.user);
       setPlumberId(data.plumberId);
     } catch {
