@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, saveDB } from "../db.js";
 import { authMiddleware, checkRole } from "../auth.js";
 import { haversineKm } from "../geo.js";
-import { plumberCard, plumberStats } from "../helpers.js";
+import { plumberCard, plumberStats, asyncHandler } from "../helpers.js";
 import {
   findById,
   findByUserId,
@@ -102,13 +102,13 @@ router.get("/:id", (req, res) => {
 });
 
 // Crear el propio perfil de plomero (solo usuarios con rol 'plomero', uno por usuario).
-router.post("/", authMiddleware, checkRole("plomero"), (req, res) => {
+router.post("/", authMiddleware, checkRole("plomero"), asyncHandler(async (req, res) => {
   if (findByUserId(req.user.id)) {
     return res.status(409).json({ error: "Ya tenés un perfil de plomero" });
   }
   const { especialidad, descripcion, hourlyRate, address, radioTrabajoKm, latitud, longitud, fotoUrl, portfolio } =
     req.body || {};
-  const plumber = createPlumber({
+  const plumber = await createPlumber({
     userId: req.user.id,
     especialidad,
     descripcion,
@@ -121,21 +121,21 @@ router.post("/", authMiddleware, checkRole("plomero"), (req, res) => {
     portfolio
   });
   res.status(201).json(toPublic(plumber));
-});
+}));
 
 // Editar el propio perfil (solo el dueño, con rol 'plomero').
-router.put("/:id", authMiddleware, checkRole("plomero"), (req, res) => {
+router.put("/:id", authMiddleware, checkRole("plomero"), asyncHandler(async (req, res) => {
   const plumber = findById(req.params.id);
   if (!plumber) return res.status(404).json({ error: "Perfil no encontrado" });
   if (plumber.userId !== req.user.id) {
     return res.status(403).json({ error: "No podés editar el perfil de otro plomero" });
   }
-  updatePlumber(plumber, req.body || {});
+  await updatePlumber(plumber, req.body || {});
   res.json({ ...toPublic(plumber), ...plumberStats(plumber.id) });
-});
+}));
 
 // Actualizar solo la disponibilidad (solo el dueño, con rol 'plomero').
-router.patch("/:id/disponibilidad", authMiddleware, checkRole("plomero"), (req, res) => {
+router.patch("/:id/disponibilidad", authMiddleware, checkRole("plomero"), asyncHandler(async (req, res) => {
   const plumber = findById(req.params.id);
   if (!plumber) return res.status(404).json({ error: "Perfil no encontrado" });
   if (plumber.userId !== req.user.id) {
@@ -145,8 +145,8 @@ router.patch("/:id/disponibilidad", authMiddleware, checkRole("plomero"), (req, 
   if (typeof disponible !== "boolean") {
     return res.status(400).json({ error: "El campo 'disponible' debe ser booleano" });
   }
-  setDisponibilidad(plumber, disponible);
+  await setDisponibilidad(plumber, disponible);
   res.json(toPublic(plumber));
-});
+}));
 
 export default router;

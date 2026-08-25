@@ -4,7 +4,8 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { nanoid } from "nanoid";
 
-import { db, saveDB } from "./db.js";
+import { db, saveDB, loadDB, pingDatabase } from "./db.js";
+import { asyncHandler } from "./helpers.js";
 import { verifyToken } from "./auth.js";
 import authRoutes from "./routes/auth.js";
 import plumberRoutes from "./routes/plumbers.js";
@@ -18,7 +19,10 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "6mb" }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", asyncHandler(async (_req, res) => {
+  const dbStatus = await pingDatabase();
+  res.json({ ok: dbStatus.ok, database: dbStatus.driver, error: dbStatus.error });
+}));
 app.use("/api/auth", authRoutes);
 app.use("/api/plumbers", plumberRoutes);
 app.use("/api/jobs", jobRoutes);
@@ -52,7 +56,7 @@ io.on("connection", (socket) => {
     socket.join(`job:${jobId}`);
   });
 
-  socket.on("chat:message", ({ jobId, body }) => {
+  socket.on("chat:message", async ({ jobId, body }) => {
     if (!canAccessJob(socket.user.id, jobId)) return;
     const text = String(body || "").trim();
     if (!text) return;
@@ -65,11 +69,28 @@ io.on("connection", (socket) => {
       createdAt: new Date().toISOString()
     };
     db.messages.push(message);
-    saveDB();
+    try {
+      await saveDB();
+    } catch (err) {
+      db.messages.pop();
+      console.error("[chat] No se pudo guardar el mensaje:", err.message);
+      return;
+    }
     io.to(`job:${jobId}`).emit("chat:message", message);
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`API + chat en http://localhost:${PORT}`);
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  res.status(500).json({ error: "Error interno del servidor" });
 });
+
+try {
+  await loadDB();
+  server.listen(PORT, () => {
+    console.log(`API + chat en http://localhost:${PORT}`);
+  });
+} catch (err) {
+  console.error("No se pudo inicializar la base de datos:", err.message);
+  process.exit(1);
+}

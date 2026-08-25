@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
-import { resetDB, saveDB, loadDB } from "./db.js";
+import { resetDB } from "./db.js";
 
 const hash = (p) => bcrypt.hashSync(p, 10);
 
@@ -169,9 +169,7 @@ reviews.push({
 // Un trabajo en curso (para probar chat y flujo).
 makeJob(luis, jose, "Placard para dormitorio", "Necesito presupuesto y medidas", "requested", null);
 
-resetDB({ users, plumbers, jobs, reviews, messages: [] });
-loadDB();
-saveDB();
+await resetDB({ users, plumbers, jobs, reviews, messages: [] });
 
 console.log("Base de datos poblada con datos de demo.");
 console.log("Usuarios de prueba (contraseña: 123456):");

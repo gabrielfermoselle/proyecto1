@@ -18,7 +18,7 @@ function normalizeEspecialidad(value) {
   return trimmed ? [trimmed] : [];
 }
 
-export function createPlumber({
+export async function createPlumber({
   userId,
   especialidad,
   descripcion,
@@ -46,11 +46,11 @@ export function createPlumber({
     createdAt: new Date().toISOString()
   };
   db.plumbers.push(plumber);
-  saveDB();
+  await saveDB();
   return plumber;
 }
 
-export function updatePlumber(plumber, fields) {
+export async function updatePlumber(plumber, fields) {
   const { especialidad, descripcion, hourlyRate, address, radioTrabajoKm, latitud, longitud, fotoUrl, portfolio } =
     fields || {};
   if (especialidad != null) plumber.especialidad = normalizeEspecialidad(especialidad);
@@ -62,13 +62,13 @@ export function updatePlumber(plumber, fields) {
   if (longitud != null) plumber.longitud = Number(longitud);
   if (fotoUrl != null) plumber.fotoUrl = String(fotoUrl);
   if (Array.isArray(portfolio)) plumber.portfolio = portfolio;
-  saveDB();
+  await saveDB();
   return plumber;
 }
 
-export function setDisponibilidad(plumber, disponible) {
+export async function setDisponibilidad(plumber, disponible) {
   plumber.disponible = Boolean(disponible);
-  saveDB();
+  await saveDB();
   return plumber;
 }
 
