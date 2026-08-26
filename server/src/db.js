@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase, isSupabaseConfigured } from "./supabase.js";
+import { toGeographyPoint } from "./geo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -85,6 +86,11 @@ const OPTIONAL_NULLS = {
   jobs: ["precio_acordado", "completado_en"]
 };
 
+// geography Point lo mantiene un trigger SQL a partir de latitud/longitud.
+const SKIP_KEYS = {
+  plumbers: new Set(["ubicacion"])
+};
+
 const NUMERIC_FIELDS = {
   plumbers: ["hourlyRate", "radioTrabajoKm", "latitud", "longitud"],
   jobs: ["agreedPrice"],
@@ -93,9 +99,10 @@ const NUMERIC_FIELDS = {
 
 function toRow(table, obj) {
   const map = COLUMN_MAP[table] || {};
+  const skip = SKIP_KEYS[table] || new Set();
   const row = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) continue;
+    if (value === undefined || skip.has(key)) continue;
     row[map[key] || key] = value;
   }
   for (const col of OPTIONAL_NULLS[table] || []) {
@@ -106,12 +113,18 @@ function toRow(table, obj) {
 
 function fromRow(table, row) {
   const inv = invertMap(COLUMN_MAP[table] || {});
+  const skip = SKIP_KEYS[table] || new Set();
   const obj = {};
   for (const [key, value] of Object.entries(row)) {
-    obj[inv[key] || key] = value;
+    const camel = inv[key] || key;
+    if (skip.has(camel) || skip.has(key)) continue;
+    obj[camel] = value;
   }
   for (const field of NUMERIC_FIELDS[table] || []) {
     if (obj[field] != null) obj[field] = Number(obj[field]);
+  }
+  if (table === "plumbers") {
+    obj.ubicacion = toGeographyPoint(obj.latitud, obj.longitud);
   }
   return obj;
 }

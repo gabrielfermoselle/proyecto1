@@ -9,7 +9,8 @@ import {
   createPlumber,
   updatePlumber,
   setDisponibilidad,
-  toPublic
+  toPublic,
+  searchByProximity
 } from "../models/Plumber.js";
 
 const router = Router();
@@ -70,8 +71,86 @@ function searchPlumbers(req, res) {
   res.json(list);
 }
 
+function parseRequiredNumber(value, name) {
+  if (value == null || value === "") {
+    return { error: `El parámetro '${name}' es obligatorio` };
+  }
+  const n = Number(value);
+  if (Number.isNaN(n)) {
+    return { error: `El parámetro '${name}' debe ser numérico` };
+  }
+  return { value: n };
+}
+
+function parseOptionalNumber(value, name) {
+  if (value == null || value === "") return { value: null };
+  const n = Number(value);
+  if (Number.isNaN(n)) {
+    return { error: `El parámetro '${name}' debe ser numérico` };
+  }
+  return { value: n };
+}
+
+// Búsqueda por proximidad (PostGIS): ST_DWithin + ST_Distance, ordenada por distancia.
+async function searchPlumbersByProximity(req, res) {
+  const latParsed = parseRequiredNumber(req.query.lat, "lat");
+  if (latParsed.error) return res.status(400).json({ error: latParsed.error });
+  const lngParsed = parseRequiredNumber(req.query.lng, "lng");
+  if (lngParsed.error) return res.status(400).json({ error: lngParsed.error });
+  const radioParsed = parseRequiredNumber(req.query.radioKm, "radioKm");
+  if (radioParsed.error) return res.status(400).json({ error: radioParsed.error });
+
+  const lat = latParsed.value;
+  const lng = lngParsed.value;
+  const radioKm = radioParsed.value;
+
+  if (lat < -90 || lat > 90) {
+    return res.status(400).json({ error: "lat debe estar entre -90 y 90" });
+  }
+  if (lng < -180 || lng > 180) {
+    return res.status(400).json({ error: "lng debe estar entre -180 y 180" });
+  }
+  if (radioKm <= 0) {
+    return res.status(400).json({ error: "radioKm debe ser mayor a 0" });
+  }
+
+  const especialidad =
+    req.query.especialidad != null && String(req.query.especialidad).trim() !== ""
+      ? String(req.query.especialidad).trim()
+      : null;
+
+  const califParsed = parseOptionalNumber(req.query.calificacionMinima, "calificacionMinima");
+  if (califParsed.error) return res.status(400).json({ error: califParsed.error });
+  const calificacionMinima = califParsed.value;
+  if (calificacionMinima != null && (calificacionMinima < 0 || calificacionMinima > 5)) {
+    return res.status(400).json({ error: "calificacionMinima debe estar entre 0 y 5" });
+  }
+
+  const limitParsed = parseOptionalNumber(req.query.limit, "limit");
+  if (limitParsed.error) return res.status(400).json({ error: limitParsed.error });
+  const offsetParsed = parseOptionalNumber(req.query.offset, "offset");
+  if (offsetParsed.error) return res.status(400).json({ error: offsetParsed.error });
+
+  let limit = limitParsed.value == null ? 20 : Math.trunc(limitParsed.value);
+  let offset = offsetParsed.value == null ? 0 : Math.trunc(offsetParsed.value);
+  if (limit < 1) return res.status(400).json({ error: "limit debe ser mayor a 0" });
+  if (limit > 100) limit = 100;
+  if (offset < 0) return res.status(400).json({ error: "offset no puede ser negativo" });
+
+  const result = await searchByProximity({
+    lat,
+    lng,
+    radioKm,
+    especialidad,
+    calificacionMinima,
+    limit,
+    offset
+  });
+  res.json(result);
+}
+
 router.get("/", searchPlumbers);
-router.get("/search", searchPlumbers);
+router.get("/search", asyncHandler(searchPlumbersByProximity));
 
 // Lista de especialidades disponibles (para filtros).
 router.get("/especialidades", (_req, res) => {

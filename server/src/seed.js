@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
 import { resetDB } from "./db.js";
+import { toGeographyPoint } from "./geo.js";
 
 const hash = (p) => bcrypt.hashSync(p, 10);
 
@@ -44,6 +45,7 @@ function makePlumber(user, data) {
     createdAt: new Date().toISOString(),
     ...data
   };
+  p.ubicacion = toGeographyPoint(p.latitud, p.longitud);
   plumbers.push(p);
   return p;
 }
