@@ -74,9 +74,10 @@ npm run dev
 ## Estructura
 
 ```
-server/   API Express + Socket.io + datastore JSON
+backend/   API Express + Socket.io + datastore JSON
   src/routes/   auth, workers, jobs, reviews, messages
   src/geo.js    cálculo de distancia (Haversine)
-client/   App React (Vite)
+frontend/  App React (Vite)
   src/pages/    Directory, WorkerProfile, Dashboard, JobDetail, EditProfile, Login, Register
+db/        Esquema y migraciones de Supabase (SQL)
 ```

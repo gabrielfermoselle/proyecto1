@@ -1,5 +1,5 @@
 node_modules/
-server/data/db.json
+backend/data/db.json
 dist/
 .env
 *.log

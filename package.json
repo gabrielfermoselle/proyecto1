@@ -4,10 +4,10 @@
   "private": true,
   "description": "Directorio y Contratación de Oficios Tradicionales Validados (MVP)",
   "scripts": {
-    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
-    "dev": "concurrently -n server,client -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
-    "seed": "npm --prefix server run seed",
-    "start": "npm --prefix server start"
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "seed": "npm --prefix backend run seed",
+    "start": "npm --prefix backend start"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
