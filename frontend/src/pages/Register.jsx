@@ -9,9 +9,10 @@ import {
   EyeOffIcon,
   UserIcon,
   PhoneIcon,
-  WrenchIcon,
-  HomeIcon
+  TruckIcon,
+  BoxIcon
 } from "../components/Icons.jsx";
+import { VEHICULOS } from "../utils/catalogos.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,9 +25,9 @@ export default function Register() {
     password: "",
     confirmPassword: "",
     phone: "",
-    role: "client",
-    specialty: "",
-    coverageKm: "10"
+    rol: "cliente",
+    tipoVehiculo: "",
+    radioTrabajoKm: "10"
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -34,7 +35,7 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const setRole = (role) => setForm({ ...form, role });
+  const setRol = (rol) => setForm({ ...form, rol });
 
   function validate() {
     const errs = {};
@@ -44,11 +45,11 @@ export default function Register() {
     if (!form.password) errs.password = "La contraseña es obligatoria.";
     else if (form.password.length < 6) errs.password = "Debe tener al menos 6 caracteres.";
     if (form.confirmPassword !== form.password) errs.confirmPassword = "Las contraseñas no coinciden.";
-    if (form.role === "plomero") {
-      if (!form.specialty.trim()) errs.specialty = "Indicá tu especialidad (ej. Plomería).";
-      const radius = Number(form.coverageKm);
-      if (!form.coverageKm || Number.isNaN(radius) || radius <= 0) {
-        errs.coverageKm = "Ingresá un radio de trabajo válido (en km).";
+    if (form.rol === "fletero") {
+      if (!form.tipoVehiculo) errs.tipoVehiculo = "Elegí tu tipo de vehículo.";
+      const radio = Number(form.radioTrabajoKm);
+      if (!form.radioTrabajoKm || Number.isNaN(radio) || radio <= 0) {
+        errs.radioTrabajoKm = "Ingresá un radio de trabajo válido (en km).";
       }
     }
     setFieldErrors(errs);
@@ -61,18 +62,18 @@ export default function Register() {
     setBusy(true);
     try {
       const payload = {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        phone: form.phone.trim(),
-        role: form.role
+        nombre: form.name.trim(),
+        correo: form.email.trim(),
+        contrasena: form.password,
+        telefono: form.phone.trim(),
+        rol: form.rol
       };
-      if (form.role === "plomero") {
-        payload.specialty = form.specialty.trim();
-        payload.coverageKm = Number(form.coverageKm);
+      if (form.rol === "fletero") {
+        payload.tipoVehiculo = form.tipoVehiculo;
+        payload.radioTrabajoKm = Number(form.radioTrabajoKm);
       }
-      const user = await register(payload);
-      navigate(user.role === "plomero" ? "/mi-perfil-plomero" : "/panel");
+      const usuario = await register(payload);
+      navigate(usuario.rol === "fletero" ? "/mi-perfil-fletero" : "/solicitudes/nueva");
     } catch {
       // El toast global ya avisó del error.
     } finally {
@@ -81,28 +82,26 @@ export default function Register() {
   }
 
   return (
-    <AuthLayout title="Creá tu cuenta" subtitle="Sumate como cliente para contratar, o como plomero para ofrecer tus servicios.">
+    <AuthLayout title="Crear cuenta">
       <form onSubmit={submit} noValidate>
         <div className="field">
-          <label>¿Cómo querés usar la plataforma?</label>
+          <label>Tipo de cuenta</label>
           <div className="role-select">
             <button
               type="button"
-              className={`role-option ${form.role === "client" ? "active" : ""}`}
-              onClick={() => setRole("client")}
+              className={`role-option ${form.rol === "cliente" ? "active" : ""}`}
+              onClick={() => setRol("cliente")}
             >
-              <HomeIcon />
+              <BoxIcon />
               <div className="title">Cliente</div>
-              <div className="desc">Busco contratar un servicio</div>
             </button>
             <button
               type="button"
-              className={`role-option ${form.role === "plomero" ? "active" : ""}`}
-              onClick={() => setRole("plomero")}
+              className={`role-option ${form.rol === "fletero" ? "active" : ""}`}
+              onClick={() => setRol("fletero")}
             >
-              <WrenchIcon />
-              <div className="title">Plomero</div>
-              <div className="desc">Ofrezco servicios de plomería</div>
+              <TruckIcon />
+              <div className="title">Fletero</div>
             </button>
           </div>
         </div>
@@ -126,10 +125,10 @@ export default function Register() {
         </div>
 
         <div className="field">
-          <label>Teléfono <span className="muted">(privado, no se muestra públicamente)</span></label>
+          <label>Teléfono</label>
           <div className="input-wrap">
             <span className="input-icon"><PhoneIcon /></span>
-            <input value={form.phone} onChange={set("phone")} placeholder="099 123 456" autoComplete="tel" />
+            <input value={form.phone} onChange={set("phone")} placeholder="381 123 4567" autoComplete="tel" />
           </div>
         </div>
 
@@ -172,24 +171,26 @@ export default function Register() {
           </div>
         </div>
 
-        {form.role === "plomero" && (
+        {form.rol === "fletero" && (
           <div className="worker-fields">
-            <div className="worker-fields-title"><WrenchIcon /> Datos de tu oficio</div>
+            <div className="worker-fields-title"><TruckIcon /> Vehículo</div>
             <div className="grid cols-2" style={{ gap: 14 }}>
               <div className="field" style={{ marginBottom: 0 }}>
-                <label>Especialidad</label>
-                <input value={form.specialty} onChange={set("specialty")} placeholder="Plomería, Electricidad…" />
-                {fieldErrors.specialty && <div className="field-error">{fieldErrors.specialty}</div>}
+                <label>Tipo de vehículo</label>
+                <select value={form.tipoVehiculo} onChange={set("tipoVehiculo")}>
+                  <option value="">Elegí uno…</option>
+                  {VEHICULOS.map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+                {fieldErrors.tipoVehiculo && <div className="field-error">{fieldErrors.tipoVehiculo}</div>}
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Radio de trabajo (km)</label>
-                <input value={form.coverageKm} onChange={set("coverageKm")} type="number" min="1" />
-                {fieldErrors.coverageKm && <div className="field-error">{fieldErrors.coverageKm}</div>}
+                <input value={form.radioTrabajoKm} onChange={set("radioTrabajoKm")} type="number" min="1" />
+                {fieldErrors.radioTrabajoKm && <div className="field-error">{fieldErrors.radioTrabajoKm}</div>}
               </div>
             </div>
-            <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-              Después de crear la cuenta vas a poder sumar foto, portafolio y tu ubicación exacta en el mapa.
-            </p>
           </div>
         )}
 

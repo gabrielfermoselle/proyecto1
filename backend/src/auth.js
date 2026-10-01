@@ -1,12 +1,12 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
-export const JWT_SECRET = process.env.JWT_SECRET || "mvp-oficios-secret-dev";
+export const JWT_SECRET = process.env.JWT_SECRET || "fletes-tucuman-secret-dev";
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
 export function signToken(user) {
   return jwt.sign(
-    { id: user.id, role: user.role, name: user.name },
+    { id: user.id, rol: user.rol, nombre: user.nombre },
     JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -35,7 +35,7 @@ export function authMiddleware(req, res, next) {
 export function checkRole(...roles) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: "No autenticado" });
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user.rol)) {
       return res.status(403).json({ error: "No tenés permisos para esta acción" });
     }
     next();
@@ -51,8 +51,8 @@ export function generateResetToken() {
 }
 
 export function verifyResetToken(user, token) {
-  if (!user?.resetTokenHash || !user?.resetTokenExpiresAt) return false;
-  if (new Date(user.resetTokenExpiresAt) < new Date()) return false;
+  if (!user?.hashTokenReset || !user?.tokenResetExpiraEn) return false;
+  if (new Date(user.tokenResetExpiraEn) < new Date()) return false;
   const tokenHash = crypto.createHash("sha256").update(String(token || "")).digest("hex");
-  return tokenHash === user.resetTokenHash;
+  return tokenHash === user.hashTokenReset;
 }

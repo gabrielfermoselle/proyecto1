@@ -12,7 +12,7 @@ const linkCls = ({ isActive }) =>
   }`;
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { usuario, rol, logout } = useAuth();
   const navigate = useNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,28 +40,39 @@ export default function Navbar() {
     navigate("/");
   }
 
+  const close = () => setMenuOpen(false);
   const navItems = (
     <>
-      <NavLink to="/directorio" className={linkCls} onClick={() => setMenuOpen(false)}>
-        Directorio
+      <NavLink to="/fleteros" className={linkCls} onClick={close}>
+        Fleteros
       </NavLink>
-      {user && (
-        <NavLink to="/panel" className={linkCls} onClick={() => setMenuOpen(false)}>
-          {user.role === "plomero" ? "Pedidos recibidos" : "Mis pedidos"}
+      {rol === "cliente" && (
+        <NavLink to="/solicitudes/nueva" className={linkCls} onClick={close}>
+          Publicar flete
         </NavLink>
       )}
-      {user && user.role === "plomero" && (
-        <NavLink to="/mi-perfil-plomero" className={linkCls} onClick={() => setMenuOpen(false)}>
+      {rol === "fletero" && (
+        <NavLink to="/disponibles" className={linkCls} onClick={close}>
+          Solicitudes cerca
+        </NavLink>
+      )}
+      {usuario && (
+        <NavLink to="/panel" className={linkCls} onClick={close}>
+          {rol === "fletero" ? "Mis fletes" : "Mis solicitudes"}
+        </NavLink>
+      )}
+      {rol === "fletero" && (
+        <NavLink to="/mi-perfil-fletero" className={linkCls} onClick={close}>
           Mi perfil
         </NavLink>
       )}
-      {!user && (
-        <NavLink to="/login" className={linkCls} onClick={() => setMenuOpen(false)}>
+      {!usuario && (
+        <NavLink to="/login" className={linkCls} onClick={close}>
           Ingresar
         </NavLink>
       )}
-      {!user && (
-        <NavLink to="/registro" className={linkCls} onClick={() => setMenuOpen(false)}>
+      {!usuario && (
+        <NavLink to="/registro" className={linkCls} onClick={close}>
           Registrarse
         </NavLink>
       )}
@@ -72,15 +83,15 @@ export default function Navbar() {
     <nav className="sticky top-0 z-[500] border-b-[3px] border-[var(--gold)] bg-[var(--ground)] shadow-[0_6px_18px_rgba(0,0,0,0.25)]">
       <div className="mx-auto flex max-w-[1160px] items-center gap-3 px-4 py-3 sm:px-5">
         <NavLink to="/" className="brand flex-1" onClick={() => setMenuOpen(false)}>
-          <span className="dot">✓</span> Oficios Validados
+          <span className="dot">⇄</span> Fletes Tucumán
         </NavLink>
 
         {/* Nav inline — visible desde tablet/desktop en adelante */}
         <div className="hidden items-center gap-1 md:flex">
           {navItems}
-          {user && (
+          {usuario && (
             <>
-              <span className="muted px-2 text-sm">{user.name}</span>
+              <span className="muted px-2 text-sm">{usuario.nombre}</span>
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
@@ -141,10 +152,10 @@ export default function Navbar() {
 
           <div className="flex flex-col gap-1">{navItems}</div>
 
-          {user && (
+          {usuario && (
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="px-4 pb-2 text-sm text-[var(--muted-on-dark)]">
-                Sesión: <span className="font-semibold text-[var(--gold-bright)]">{user.name}</span>
+                Sesión: <span className="font-semibold text-[var(--gold-bright)]">{usuario.nombre}</span>
               </div>
               <button
                 type="button"

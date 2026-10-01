@@ -1,25 +1,23 @@
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
 // Íconos por defecto de Leaflet (se rompen con bundlers si no se apuntan a CDN).
-const defaultIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const meIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  className: "me-marker"
-});
+const LEAFLET_IMG = "https://unpkg.com/leaflet@1.9.4/dist/images";
+function makeIcon(className) {
+  return new L.Icon({
+    iconUrl: `${LEAFLET_IMG}/marker-icon.png`,
+    iconRetinaUrl: `${LEAFLET_IMG}/marker-icon-2x.png`,
+    shadowUrl: `${LEAFLET_IMG}/marker-shadow.png`,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+    className
+  });
+}
+const defaultIcon = makeIcon("");
+const meIcon = makeIcon("me-marker");
+const destinoIcon = makeIcon("destino-marker");
 
 function ClickHandler({ onPick }) {
   useMapEvents({
@@ -30,6 +28,12 @@ function ClickHandler({ onPick }) {
   return null;
 }
 
+/**
+ * Mapa genérico.
+ * - markers: [{ id, lat, lng, name, label }]
+ * - me: punto destacado (+ círculo de cobertura opcional con pickCoverageKm)
+ * - route: { origen: {lat,lng,label}, destino: {lat,lng,label} } dibuja el recorrido del flete
+ */
 export default function MapView({
   center,
   zoom = 12,
@@ -37,15 +41,24 @@ export default function MapView({
   me = null,
   onPick = null,
   pickCoverageKm = null,
+  route = null,
   tall = false
 }) {
+  const bounds =
+    route?.origen && route?.destino
+      ? L.latLngBounds([route.origen.lat, route.origen.lng], [route.destino.lat, route.destino.lng]).pad(0.3)
+      : null;
+
   return (
     <div className={tall ? "map-box map-tall" : "map-box"}>
-      <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }}>
-        <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+      <MapContainer
+        // react-leaflet prioriza center/zoom sobre bounds: con recorrido se encuadran ambos puntos.
+        center={bounds ? undefined : center}
+        zoom={bounds ? undefined : zoom}
+        bounds={bounds || undefined}
+        style={{ height: "100%", width: "100%" }}
+      >
+        <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {onPick && <ClickHandler onPick={onPick} />}
 
         {markers.map((m) => (
@@ -57,6 +70,26 @@ export default function MapView({
             </Popup>
           </Marker>
         ))}
+
+        {route?.origen && (
+          <Marker position={[route.origen.lat, route.origen.lng]} icon={meIcon}>
+            <Popup>Origen{route.origen.label ? `: ${route.origen.label}` : ""}</Popup>
+          </Marker>
+        )}
+        {route?.destino && (
+          <Marker position={[route.destino.lat, route.destino.lng]} icon={destinoIcon}>
+            <Popup>Destino{route.destino.label ? `: ${route.destino.label}` : ""}</Popup>
+          </Marker>
+        )}
+        {route?.origen && route?.destino && (
+          <Polyline
+            positions={[
+              [route.origen.lat, route.origen.lng],
+              [route.destino.lat, route.destino.lng]
+            ]}
+            pathOptions={{ color: "#7a1f1f", weight: 3, dashArray: "6 8" }}
+          />
+        )}
 
         {me && (
           <>

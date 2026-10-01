@@ -6,58 +6,58 @@ export function asyncHandler(fn) {
   };
 }
 
-// Perfil público de un usuario: nunca exponemos email/teléfono/hash.
-export function publicUser(user) {
-  if (!user) return null;
-  return { id: user.id, name: user.name, role: user.role };
-}
-
-// Estadísticas de reputación calculadas a partir de reseñas reales.
-export function plumberStats(plumberId) {
-  const reviews = db.reviews.filter((r) => r.plumberId === plumberId);
-  const completedJobs = db.jobs.filter(
-    (j) => j.plumberId === plumberId && j.status === "completed"
+// Reputación calculada a partir de reseñas reales y fletes completados.
+export function fleteroStats(fleteroId) {
+  const resenas = db.resenas.filter((r) => r.fleteroId === fleteroId);
+  const fletesCompletados = db.solicitudes.filter(
+    (s) => s.fleteroId === fleteroId && s.estado === "completada"
   ).length;
-  const avg =
-    reviews.length > 0
-      ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-      : 0;
+  const promedio =
+    resenas.length > 0 ? resenas.reduce((sum, r) => sum + r.calificacion, 0) / resenas.length : 0;
   return {
-    reviewCount: reviews.length,
-    completedJobs,
-    avgRating: Math.round(avg * 10) / 10
+    cantidadResenas: resenas.length,
+    fletesCompletados,
+    promedioCalificacion: Math.round(promedio * 10) / 10
   };
 }
 
-// Vista pública de un plomero con datos del usuario dueño.
-export function plumberCard(plumber) {
-  const user = db.users.find((u) => u.id === plumber.userId);
+// Vista pública de un fletero. Nunca expone correo ni teléfono.
+export function fleteroCard(fletero) {
+  const usuario = db.usuarios.find((u) => u.id === fletero.usuarioId);
   return {
-    id: plumber.id,
-    userId: plumber.userId,
-    name: user ? user.name : "Desconocido",
-    especialidad: plumber.especialidad,
-    descripcion: plumber.descripcion,
-    hourlyRate: plumber.hourlyRate,
-    address: plumber.address,
-    latitud: plumber.latitud,
-    longitud: plumber.longitud,
-    radioTrabajoKm: plumber.radioTrabajoKm,
-    fotoUrl: plumber.fotoUrl,
-    portfolio: plumber.portfolio || [],
-    disponible: plumber.disponible,
-    ...plumberStats(plumber.id)
+    id: fletero.id,
+    usuarioId: fletero.usuarioId,
+    nombre: usuario ? usuario.nombre : "Fletero",
+    tipoVehiculo: fletero.tipoVehiculo,
+    vehiculoDescripcion: fletero.vehiculoDescripcion || "",
+    capacidadKg: fletero.capacidadKg ?? null,
+    descripcion: fletero.descripcion || "",
+    tarifaBase: fletero.tarifaBase || 0,
+    direccion: fletero.direccion || "",
+    latitud: fletero.latitud,
+    longitud: fletero.longitud,
+    radioTrabajoKm: fletero.radioTrabajoKm || 0,
+    fotoUrl: fletero.fotoUrl || "",
+    fotoVehiculoUrl: fletero.fotoVehiculoUrl || "",
+    disponible: fletero.disponible !== false,
+    ...fleteroStats(fletero.id)
   };
 }
 
-// ¿Puede este cliente reseñar a este plomero?
-// Solo si existe un trabajo COMPLETADO entre ambos que aún no fue reseñado.
-export function reviewableJob(clientId, plumberId) {
-  return db.jobs.find(
-    (j) =>
-      j.clientId === clientId &&
-      j.plumberId === plumberId &&
-      j.status === "completed" &&
-      !db.reviews.some((r) => r.jobId === j.id)
-  );
+export function fleteroByUsuario(usuarioId) {
+  return db.fleteros.find((f) => f.usuarioId === usuarioId) || null;
 }
+
+export function nombreUsuario(usuarioId, fallback = "Usuario") {
+  const usuario = db.usuarios.find((u) => u.id === usuarioId);
+  return usuario ? usuario.nombre : fallback;
+}
+
+// Helpers de validación de query params.
+export function parseOptionalNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? NaN : n;
+}
+
+export const round1 = (value) => Math.round(Number(value) * 10) / 10;

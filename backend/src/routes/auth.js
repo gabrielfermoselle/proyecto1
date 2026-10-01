@@ -1,123 +1,100 @@
 import { Router } from "express";
 import { db, saveDB } from "../db.js";
-import { asyncHandler } from "../helpers.js";
+import { asyncHandler, fleteroByUsuario } from "../helpers.js";
+import { signToken, authMiddleware, generateResetToken, verifyResetToken } from "../auth.js";
 import {
-  signToken,
-  authMiddleware,
-  generateResetToken,
-  verifyResetToken
-} from "../auth.js";
-import {
-  ROLES,
-  findByEmail,
-  createUser,
-  verifyPassword,
-  setPassword,
+  findByCorreo,
+  createUsuario,
+  verifyContrasena,
+  setContrasena,
   toPublic
-} from "../models/User.js";
-import { createPlumber } from "../models/Plumber.js";
+} from "../models/Usuario.js";
+import { createFletero } from "../models/Fletero.js";
+import { ROLES, TIPOS_VEHICULO } from "../constants.js";
 
 const router = Router();
 
 router.post("/register", asyncHandler(async (req, res) => {
-  const { name, email, password, role, phone, specialty, coverageKm } = req.body || {};
-  if (!name || !email || !password || !role) {
+  const { nombre, correo, contrasena, rol, telefono, tipoVehiculo, radioTrabajoKm } = req.body || {};
+  if (!nombre || !correo || !contrasena || !rol) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
-  if (!ROLES.includes(role)) {
+  if (!ROLES.includes(rol)) {
     return res.status(400).json({ error: "Rol inválido" });
   }
-  if (role === "plomero" && !String(specialty || "").trim()) {
-    return res.status(400).json({ error: "La especialidad es obligatoria para plomeros" });
+  if (rol === "fletero" && !TIPOS_VEHICULO.includes(tipoVehiculo)) {
+    return res.status(400).json({ error: "Indicá el tipo de vehículo" });
   }
-  if (findByEmail(email)) {
+  if (findByCorreo(correo)) {
     return res.status(409).json({ error: "El email ya está registrado" });
   }
 
-  const user = await createUser({ name, email, password, role, phone });
+  const usuario = await createUsuario({ nombre, correo, contrasena, rol, telefono });
 
-  // Si es plomero, creamos su perfil de plomero vacío por defecto.
-  if (role === "plomero") {
-    const parsedRadius = Number(coverageKm);
-    await createPlumber({
-      userId: user.id,
-      especialidad: String(specialty).trim(),
-      descripcion: "",
-      radioTrabajoKm: Number.isFinite(parsedRadius) && parsedRadius > 0 ? parsedRadius : 10,
-      latitud: null,
-      longitud: null,
-      fotoUrl: ""
-    });
+  // Un fletero arranca con su perfil de vehículo mínimo; lo completa después.
+  if (rol === "fletero") {
+    await createFletero({ usuarioId: usuario.id, tipoVehiculo, radioTrabajoKm });
   }
 
-  const token = signToken(user);
-  res.json({ token, user: toPublic(user) });
+  res.json({ token: signToken(usuario), usuario: toPublic(usuario) });
 }));
 
 router.post("/login", (req, res) => {
-  const { email, password } = req.body || {};
-  const user = findByEmail(email);
-  if (!user || !verifyPassword(user, password)) {
+  const { correo, contrasena } = req.body || {};
+  const usuario = findByCorreo(correo);
+  if (!usuario || !verifyContrasena(usuario, contrasena)) {
     return res.status(401).json({ error: "Credenciales incorrectas" });
   }
-  const token = signToken(user);
-  res.json({ token, user: toPublic(user) });
+  res.json({ token: signToken(usuario), usuario: toPublic(usuario) });
 });
 
 router.get("/me", authMiddleware, (req, res) => {
-  const user = db.users.find((u) => u.id === req.user.id);
-  if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
-  const plumber = db.plumbers.find((p) => p.userId === user.id) || null;
-  res.json({
-    user: toPublic(user),
-    plumberId: plumber ? plumber.id : null
-  });
+  const usuario = db.usuarios.find((u) => u.id === req.user.id);
+  if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+  const fletero = fleteroByUsuario(usuario.id);
+  res.json({ usuario: toPublic(usuario), fleteroId: fletero ? fletero.id : null });
 });
 
 router.put("/me", authMiddleware, asyncHandler(async (req, res) => {
-  const { name } = req.body || {};
-  if (!String(name || "").trim()) {
+  const { nombre } = req.body || {};
+  if (!String(nombre || "").trim()) {
     return res.status(400).json({ error: "El nombre es obligatorio" });
   }
-  const user = db.users.find((u) => u.id === req.user.id);
-  if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
-  user.name = String(name).trim();
+  const usuario = db.usuarios.find((u) => u.id === req.user.id);
+  if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+  usuario.nombre = String(nombre).trim();
   await saveDB();
-  res.json({ user: toPublic(user) });
+  res.json({ usuario: toPublic(usuario) });
 }));
 
-// Genera un token de reset de un solo uso. Por no tener un servicio de email
-// configurado, el token se devuelve en la respuesta (modo dev) en vez de enviarse.
+// Genera un token de reset de un solo uso. Sin servicio de email configurado,
+// el token se devuelve en la respuesta (modo dev) en vez de enviarse.
 router.post("/forgot-password", asyncHandler(async (req, res) => {
-  const { email } = req.body || {};
-  const user = findByEmail(email);
+  const usuario = findByCorreo(req.body?.correo);
   // Respuesta genérica: no revelamos si el email existe o no.
-  if (!user) return res.json({ ok: true });
+  if (!usuario) return res.json({ ok: true });
 
   const { token, tokenHash, expiresAt } = generateResetToken();
-  user.resetTokenHash = tokenHash;
-  user.resetTokenExpiresAt = expiresAt;
+  usuario.hashTokenReset = tokenHash;
+  usuario.tokenResetExpiraEn = expiresAt;
   await saveDB();
 
-  console.log(`[reset-password] token para ${user.email}: ${token}`);
+  console.log(`[reset-password] token para ${usuario.correo}: ${token}`);
   res.json({ ok: true, devResetToken: token });
 }));
 
 router.post("/reset-password", asyncHandler(async (req, res) => {
-  const { email, token, password } = req.body || {};
-  if (!email || !token || !password) {
+  const { correo, token, contrasena } = req.body || {};
+  if (!correo || !token || !contrasena) {
     return res.status(400).json({ error: "Faltan campos obligatorios" });
   }
-  const user = findByEmail(email);
-  if (!user || !verifyResetToken(user, token)) {
+  const usuario = findByCorreo(correo);
+  if (!usuario || !verifyResetToken(usuario, token)) {
     return res.status(400).json({ error: "Token inválido o expirado" });
   }
-
-  await setPassword(user, password);
-  delete user.resetTokenHash;
-  delete user.resetTokenExpiresAt;
-  await saveDB();
-
+  delete usuario.hashTokenReset;
+  delete usuario.tokenResetExpiraEn;
+  await setContrasena(usuario, contrasena);
   res.json({ ok: true });
 }));
 

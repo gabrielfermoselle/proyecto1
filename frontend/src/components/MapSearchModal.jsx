@@ -4,7 +4,9 @@ import Modal from "./Modal.jsx";
 import { MapPinIcon } from "./Icons.jsx";
 
 const CITY_ZOOM = 15;
-const DEFAULT_CENTER = [-34.9011, -56.1645]; // Montevideo
+import { CENTRO_TUCUMAN } from "../utils/catalogos.js";
+
+const DEFAULT_CENTER = CENTRO_TUCUMAN;
 
 function MapController({ mapRef }) {
   const map = useMap();
@@ -27,7 +29,14 @@ function CenterTracker({ onSettle, onMoveStart }) {
   return null;
 }
 
-export default function MapSearchModal({ initialCenter, onClose, onConfirm }) {
+export default function MapSearchModal({
+  initialCenter,
+  onClose,
+  onConfirm,
+  eyebrow = "Mapa",
+  title = "Elegí un punto",
+  confirmLabel = "Buscar en esta zona"
+}) {
   const mapRef = useRef(null);
   const [center, setCenter] = useState(initialCenter || DEFAULT_CENTER);
   const [dragging, setDragging] = useState(false);
@@ -52,7 +61,7 @@ export default function MapSearchModal({ initialCenter, onClose, onConfirm }) {
         setLocating(false);
       },
       () => {
-        setGeoMsg("No se pudo obtener tu ubicación. Mové el mapa para elegir la zona.");
+        setGeoMsg("No se pudo obtener tu ubicación.");
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 8000 }
@@ -66,14 +75,9 @@ export default function MapSearchModal({ initialCenter, onClose, onConfirm }) {
   }, []);
 
   return (
-    <Modal onClose={onClose} eyebrow="Buscar por el mapa" title="Elegí la zona donde buscar" wide>
+    <Modal onClose={onClose} eyebrow={eyebrow} title={title} wide>
       {(close) => (
         <>
-          <p className="muted" style={{ marginTop: -6, marginBottom: 16 }}>
-            Arrastrá el mapa para mover el punto, o usá tu ubicación actual. Los plomeros se buscan
-            alrededor del punto marcado.
-          </p>
-
           <div className="map-picker">
             <div className="map-picker-map">
               <MapContainer
@@ -126,7 +130,7 @@ export default function MapSearchModal({ initialCenter, onClose, onConfirm }) {
                   close();
                 }}
               >
-                Buscar en esta zona
+                {confirmLabel}
               </button>
             </div>
           </div>

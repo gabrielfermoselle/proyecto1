@@ -1,5 +1,5 @@
-const TOKEN_KEY = "oficios_token";
-const USER_KEY = "oficios_user";
+const TOKEN_KEY = "fletes_token";
+const USER_KEY = "fletes_user";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);

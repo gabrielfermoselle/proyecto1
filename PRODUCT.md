@@ -8,50 +8,49 @@ web
 
 ## Stack
 
-React + Vite + React Router + React-Leaflet + Socket.io-client (frontend); Node.js + Express + Socket.io, JWT + bcrypt auth (backend). Persistence currently in a JSON datastore (demo-era choice); the project is moving toward real production, so this is expected to migrate to a real database — treat it as a known constraint to revisit, not a durable architectural fact.
+React + Vite + React Router + React-Leaflet + Socket.io-client (frontend); Node.js + Express + Socket.io, JWT + bcrypt auth (backend). Persistence in Supabase (Postgres + PostGIS) with a local JSON-file fallback for development.
 
 ## Users
 
 Two roles on one platform:
-- **Clientes (vecinos):** people who need to hire a tradesperson (plumber, electrician, carpenter, painter, etc.) for home services and currently lack transparent, trustworthy ways to find and vet one.
-- **Trabajadores (oficios):** tradespeople offering validated services who need visibility, a way to be found by proximity, and a way to build verifiable reputation.
+- **Clientes:** people in Tucumán who need to move something (a house move, a piece of furniture, a purchase, a parcel) and today have to find a fletero on their own and ask each one for a quote.
+- **Fleteros:** drivers with a moto, auto, camioneta or camión who offer freight services and need a steady flow of nearby requests to quote on.
 
 ## Product Purpose
 
-A directory and hiring platform for traditional trades ("Directorio y Contratación de Oficios Tradicionales Validados") that solves the lack of transparency in hiring home-service workers. Success means clients can find a nearby, trustworthy worker and complete a hire safely; workers can be discovered and build real, unfakeable reputation.
+"Fletes Tucumán": a freight marketplace for San Miguel de Tucumán and surroundings. Clients publish what they need to move (origin, destination, date, photos, item inventory); nearby fleteros send quotes; the client compares by price, rating, vehicle and proximity and picks one. The freight is then tracked by stage, and a digital inventory controls that everything loaded arrives. Success means a client moves their things safely at a price they chose, and fleteros get real work close to them.
 
 ## Positioning
 
-Three technical pillars a copycat directory could not casually replicate:
-1. **Geolocation-based matching:** Haversine-distance filtering by coverage zone, interactive OpenStreetMap/Leaflet map.
-2. **Transaction-anchored reviews:** a client can only review a worker if a **completed** hire exists between them, and only once — eliminating fake/spam reviews.
-3. **In-app real-time chat (Socket.io)** per hire, so budget/logistics can be discussed **without ever exposing contact info** (email/phone are never shared).
+What it adds over asking around or posting in groups:
+1. **Organization:** all freight information (items, photos, route, quotes, status) in one place.
+2. **Communication:** in-app chat per request and fletero, without exposing phone or email.
+3. **Control:** a digital inventory where each item is registered as loaded and unloaded.
+4. **Tracking:** the client sees each stage and confirms delivery; ratings are only possible after a confirmed delivery.
 
 ## Operating Context
 
-Core flow: client browses/searches the worker directory (map + distance filter) → views a worker profile → requests a hire ("Solicitar contratación") → real-time chat opens → worker accepts, sets a budget, chats → job marked completed → client leaves a review (only unlockable at that point). Roles: cliente, trabajador. Demo/seed data currently models trades: Plomería, Electricidad, Carpintería, Pintura.
+Core flow: client publishes request → nearby fleteros send quotes → client compares and chooses → freight confirmed → fletero registers loading → transfer → fletero registers unloading → client confirms reception and rates the fletero. States: publicada, confirmada, en_transito, entregada, completada, cancelada. Demo data is set in Gran San Miguel de Tucumán with one fletero per vehicle type.
 
 ## Capabilities and Constraints
 
-- Auth via JWT + bcrypt.
-- Distance/geolocation filtering via Haversine formula.
-- Reviews are gated strictly behind a completed transaction between the two specific parties.
-- Chat is scoped per job/hire, real-time via Socket.io; contact info (email/phone) is never exposed through the platform.
-- Current persistence is a JSON file datastore — acceptable for demo, expected to change as the project moves toward production (undecided: target database/hosting).
-- Deployed frontend on Vercel as a SPA (recent commits reference Vercel deploy config, rewrites excluding `/api`, and handling non-JSON responses gracefully); backend production hosting is undecided.
+- Auth via JWT + bcrypt; roles cliente and fletero.
+- Proximity search (Haversine locally, PostGIS ST_DWithin/ST_Distance on Supabase).
+- Photos are compressed in the browser and stored as data URLs (to revisit: object storage).
+- Specifications are intentionally generic for now: pricing rules, vehicle capacities, payments and notifications are still to be defined.
 
 ## Evidence on Hand
 
-- README.md documents the three technical pillars, stack, and full demo flow with seeded demo accounts (ana@demo.com, luis@demo.com as clientes; carlos@demo.com, marta@demo.com, jose@demo.com, sole@demo.com as trabajadores, one trade each).
-- Existing pages: Directory, WorkerProfile, Dashboard, JobDetail, EditProfile, Login, Register — plus MapView, Navbar, and Stars (rating) components.
-- No case studies, press, testimonials, or real customer evidence exist yet — this is thesis/demo data and must not be treated as real proof.
+- Project brief (PDF "Plataforma de fletes"): problem, solution, main features for clientes, fleteros, chat and inventory/tracking, and the 7-step operating flow.
+- No real users, testimonials or metrics yet; all data is demo data.
 
 ## Product Principles
 
-1. Trust is earned through structural guarantees (transaction-anchored reviews), not just UI polish — never let a design change weaken that guarantee.
-2. Privacy by design: contact info never leaves the platform; all coordination happens in-app.
-3. Proximity is a first-class decision input — geolocation/distance should stay visible and usable, not buried.
-4. This is graduating from thesis MVP toward a real product — favor durable, production-minded choices over demo shortcuts going forward.
+1. The client decides: quotes are compared side by side, never auto-assigned.
+2. Control over the load: nothing leaves without registered loading, nothing is "delivered" without registered unloading.
+3. Privacy by design: contact info stays off the platform; coordination happens in the chat.
+4. Proximity is a first-class input: distance to the origin is visible wherever fleteros or requests are listed.
+5. Trust is earned: ratings only come from clients who confirmed a real delivery.
 
 ## Accessibility & Inclusion
 
