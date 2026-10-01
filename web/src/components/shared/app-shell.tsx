@@ -1,4 +1,5 @@
 import type { UsuarioActual } from "@/lib/session";
+import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { SignOutButton } from "./sign-out-button";
 
@@ -12,10 +13,13 @@ const ETIQUETA_ROL: Record<UsuarioActual["rol"], string> = {
 export function AppShell({
   usuario,
   nav,
+  mobileNav,
   children,
 }: {
   usuario: Pick<UsuarioActual, "nombre" | "rol">;
   nav?: React.ReactNode;
+  /** Barra inferior fija en el celular (fuera del header: su backdrop-filter rompería el position: fixed). */
+  mobileNav?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -33,9 +37,10 @@ export function AppShell({
         </div>
         {nav ? <div className="container">{nav}</div> : null}
       </header>
-      <main id="contenido" className="container flex-1 py-6 sm:py-8">
+      <main id="contenido" className={cn("container flex-1 py-6 sm:py-8", mobileNav && "pb-28 md:pb-8")}>
         {children}
       </main>
+      {mobileNav}
     </div>
   );
 }

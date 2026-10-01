@@ -31,3 +31,25 @@ export const FRANJA: Record<FranjaHoraria, { etiqueta: string; desde: number; ha
   TARDE: { etiqueta: "Tarde (16 a 20 h)", desde: 16, hasta: 20 },
   FLEXIBLE: { etiqueta: "Horario flexible", desde: 8, hasta: 20 },
 };
+
+export const ETAPAS_FLETE = [
+  "CONFIRMADO",
+  "CARGADO",
+  "EN_TRANSITO",
+  "ENTREGADO",
+  "COMPLETADO",
+  "CANCELADO",
+] as const;
+export type EtapaFlete = (typeof ETAPAS_FLETE)[number];
+
+export const ETIQUETA_ETAPA: Record<EtapaFlete, string> = {
+  CONFIRMADO: "Confirmado",
+  CARGADO: "Cargado",
+  EN_TRANSITO: "En viaje",
+  ENTREGADO: "Entregado",
+  COMPLETADO: "Completado",
+  CANCELADO: "Cancelado",
+};
+
+export const ESTADOS_PRESUPUESTO = ["PENDIENTE", "ACEPTADO", "RECHAZADO", "RETIRADO"] as const;
+export type EstadoPresupuesto = (typeof ESTADOS_PRESUPUESTO)[number];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aproximarCoordenadas, distanciaRutaKm, FACTOR_RUTA_URBANA, haversineKm } from "./geo";
+import { aproximarCoordenadas, distanciaRutaKm, estaEnRegion, FACTOR_RUTA_URBANA, haversineKm } from "./geo";
 
 const PLAZA_INDEPENDENCIA = { lat: -26.8303, lng: -65.2038 };
 const YERBA_BUENA = { lat: -26.8163, lng: -65.2851 };
@@ -44,5 +44,14 @@ describe("aproximarCoordenadas", () => {
     const a = aproximarCoordenadas({ lat: -26.8301, lng: -65.2041 });
     const b = aproximarCoordenadas({ lat: -26.8304, lng: -65.2036 });
     expect(a).toEqual(b);
+  });
+});
+
+describe("estaEnRegion", () => {
+  it("acepta el Gran Tucumán y rechaza otras provincias", () => {
+    expect(estaEnRegion(PLAZA_INDEPENDENCIA)).toBe(true);
+    expect(estaEnRegion({ lat: -27.05, lng: -65.4 })).toBe(true); // Famaillá
+    expect(estaEnRegion({ lat: -34.6, lng: -58.38 })).toBe(false); // Buenos Aires
+    expect(estaEnRegion({ lat: Number.NaN, lng: -65.2 })).toBe(false);
   });
 });

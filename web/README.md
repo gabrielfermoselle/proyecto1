@@ -18,13 +18,13 @@ se imprime al final del seed.
 
 ## Scripts
 
-| Script                     | Qué hace                                                         |
-| -------------------------- | ---------------------------------------------------------------- |
-| `npm run typecheck`        | `tsc` con `strict`, `noUncheckedIndexedAccess` y `exactOptional…` |
-| `npm run lint`             | ESLint (el dominio no puede importar Prisma, Next ni `lib/`)      |
-| `npm test`                 | Tests unitarios del dominio (Vitest)                             |
-| `npm run db:migrate`       | Crea una migración nueva en desarrollo                           |
-| `npm run db:studio`        | Prisma Studio                                                    |
+| Script               | Qué hace                                                          |
+| -------------------- | ----------------------------------------------------------------- |
+| `npm run typecheck`  | `tsc` con `strict`, `noUncheckedIndexedAccess` y `exactOptional…` |
+| `npm run lint`       | ESLint (el dominio no puede importar Prisma, Next ni `lib/`)      |
+| `npm test`           | Tests unitarios del dominio (Vitest)                              |
+| `npm run db:migrate` | Crea una migración nueva en desarrollo                            |
+| `npm run db:studio`  | Prisma Studio                                                     |
 
 ## Arquitectura
 

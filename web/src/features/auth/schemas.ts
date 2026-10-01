@@ -19,7 +19,7 @@ export const passwordSchema = z
   .regex(/[A-Za-zÁÉÍÓÚáéíóúÑñ]/, "Incluí al menos una letra")
   .regex(/\d/, "Incluí al menos un número");
 
-const nombreSchema = (campo: string) =>
+export const nombreSchema = (campo: string) =>
   z
     .string()
     .trim()

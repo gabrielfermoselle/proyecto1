@@ -56,3 +56,20 @@ export function aproximarCoordenadas({ lat, lng }: Coordenadas): Coordenadas {
     redondear(Math.round(v / PASO_APROXIMACION_GRADOS) * PASO_APROXIMACION_GRADOS, 6);
   return { lat: ajustar(lat), lng: ajustar(lng) };
 }
+
+/** San Miguel de Tucumán: centro por defecto de los mapas. */
+export const CENTRO_TUCUMAN: Coordenadas = { lat: -26.8303, lng: -65.2038 };
+
+/** Región donde opera la plataforma (provincia de Tucumán con margen). */
+export const REGION_SERVICIO = { latMin: -28.5, latMax: -25.5, lngMin: -66.5, lngMax: -64.0 } as const;
+
+export function estaEnRegion({ lat, lng }: Coordenadas): boolean {
+  const r = REGION_SERVICIO;
+  return (
+    esCoordenadaValida({ lat, lng }) &&
+    lat >= r.latMin &&
+    lat <= r.latMax &&
+    lng >= r.lngMin &&
+    lng <= r.lngMax
+  );
+}

@@ -1,45 +1,45 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { FieldShell } from "./field-shell";
 
-interface FormFieldProps extends React.ComponentProps<"input"> {
+interface CampoBase {
   name: string;
   label: string;
   error?: string | undefined;
   hint?: string | undefined;
 }
 
-/** Campo accesible: label asociado, error anunciado y vinculado por aria-describedby. */
-export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ name, label, error, hint, id, ...props }, ref) => {
-    const inputId = id ?? name;
-    const hintId = `${inputId}-hint`;
-    const errorId = `${inputId}-error`;
-    const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
-
-    return (
-      <div className="grid gap-2">
-        <Label htmlFor={inputId}>{label}</Label>
-        <Input
-          ref={ref}
-          id={inputId}
-          name={name}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          {...props}
-        />
-        {hint ? (
-          <p id={hintId} className="text-sm text-muted-foreground">
-            {hint}
-          </p>
-        ) : null}
-        {error ? (
-          <p id={errorId} className="text-sm font-medium text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </div>
-    );
-  },
+/** Input con label, ayuda y error accesibles. Compatible con `register` de react-hook-form. */
+export const FormField = React.forwardRef<HTMLInputElement, CampoBase & React.ComponentProps<"input">>(
+  ({ name, label, error, hint, id, ...props }, ref) => (
+    <FieldShell id={id ?? name} label={label} error={error} hint={hint}>
+      {(aria) => <Input ref={ref} name={name} {...aria} {...props} />}
+    </FieldShell>
+  ),
 );
 FormField.displayName = "FormField";
+
+export const TextareaField = React.forwardRef<
+  HTMLTextAreaElement,
+  CampoBase & React.ComponentProps<"textarea">
+>(({ name, label, error, hint, id, ...props }, ref) => (
+  <FieldShell id={id ?? name} label={label} error={error} hint={hint}>
+    {(aria) => <Textarea ref={ref} name={name} {...aria} {...props} />}
+  </FieldShell>
+));
+TextareaField.displayName = "TextareaField";
+
+export const SelectField = React.forwardRef<HTMLSelectElement, CampoBase & React.ComponentProps<"select">>(
+  ({ name, label, error, hint, id, children, ...props }, ref) => (
+    <FieldShell id={id ?? name} label={label} error={error} hint={hint}>
+      {(aria) => (
+        <Select ref={ref} name={name} {...aria} {...props}>
+          {children}
+        </Select>
+      )}
+    </FieldShell>
+  ),
+);
+SelectField.displayName = "SelectField";

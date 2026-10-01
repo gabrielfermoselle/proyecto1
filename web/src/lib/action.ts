@@ -4,9 +4,9 @@ import type { z } from "zod";
 import type { Rol } from "@/domain/roles";
 import { getUsuarioActual, type UsuarioActual } from "./session";
 
-export type FieldErrors = Partial<Record<string, string[]>>;
+import type { ActionResult, FieldErrors } from "./action-result";
 
-export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string; fieldErrors?: FieldErrors };
+export type { ActionResult, FieldErrors };
 
 /** Error de negocio esperado: su mensaje se muestra tal cual al usuario. */
 export class ActionError extends Error {
@@ -17,6 +17,14 @@ export class ActionError extends Error {
     super(message);
     this.name = "ActionError";
   }
+}
+
+/** El error es una violación de un índice único (P2002), opcionalmente sobre un campo. */
+export function esViolacionUnica(error: unknown, campo?: string): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false;
+  if (!campo) return true;
+  const target = error.meta?.target;
+  return Array.isArray(target) ? target.includes(campo) : String(target ?? "").includes(campo);
 }
 
 const MENSAJE_INESPERADO = "Algo salió mal. Probá de nuevo en unos minutos.";
@@ -43,7 +51,7 @@ async function ejecutar<S extends z.ZodTypeAny, T>(
         ? { ok: false, error: error.message, fieldErrors: error.fieldErrors }
         : { ok: false, error: error.message };
     }
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (esViolacionUnica(error)) {
       return { ok: false, error: "Ya existe un registro con esos datos." };
     }
     console.error("[action] error inesperado", error);
@@ -75,4 +83,27 @@ export function createPublicAction<S extends z.ZodTypeAny, T>(config: {
   handler: (input: z.output<S>) => Promise<T>;
 }) {
   return async (raw: z.input<S>): Promise<ActionResult<T>> => ejecutar(config.schema, raw, config.handler);
+}
+
+/**
+ * Server Action del fletero: inyecta su `fleteroId`. Por defecto exige el onboarding completo;
+ * las acciones del propio onboarding pasan `requiereOnboarding: false`.
+ */
+export function createFleteroAction<S extends z.ZodTypeAny, T>(config: {
+  schema: S;
+  requiereOnboarding?: boolean;
+  handler: (input: z.output<S>, ctx: { usuario: UsuarioActual; fleteroId: string }) => Promise<T>;
+}) {
+  return createAction({
+    schema: config.schema,
+    roles: ["FLETERO"],
+    handler: async (input, { usuario }) => {
+      const perfil = usuario.fleteroProfile;
+      if (!perfil) throw new ActionError("No encontramos tu perfil de fletero.");
+      if (config.requiereOnboarding !== false && !perfil.onboardingCompletadoEn) {
+        throw new ActionError("Terminá de configurar tu perfil para poder hacer esto.");
+      }
+      return config.handler(input, { usuario, fleteroId: perfil.id });
+    },
+  });
 }

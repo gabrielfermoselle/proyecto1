@@ -55,3 +55,28 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Pines de Leaflet (divIcon): sin imágenes, con los colores del tema. */
+.pin {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 3px solid hsl(var(--card));
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  background: hsl(var(--primary));
+}
+.pin--base {
+  background: hsl(var(--secondary));
+}
+.pin--destino {
+  background: hsl(var(--accent));
+}
+.pin--aprox {
+  opacity: 0.9;
+}
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}

@@ -1,7 +1,7 @@
-import { AppShell } from "@/components/shared/app-shell";
 import { requireRol } from "@/lib/session";
 
+/** Solo fleteros. Cada grupo (onboarding / app) arma su propio marco. */
 export default async function FleteroLayout({ children }: { children: React.ReactNode }) {
-  const usuario = await requireRol("FLETERO");
-  return <AppShell usuario={usuario}>{children}</AppShell>;
+  await requireRol("FLETERO");
+  return children;
 }

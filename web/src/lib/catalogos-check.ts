@@ -1,7 +1,14 @@
 // Verificación en tiempo de compilación: los catálogos del dominio (puros, sin Prisma)
 // tienen que coincidir exactamente con los enums de la base. Si alguien agrega un valor
 // en un lado y no en el otro, `npm run typecheck` falla acá.
-import type { FranjaHoraria, Rol, TipoFlete, TipoVehiculo } from "@prisma/client";
+import type {
+  EstadoPresupuesto,
+  EtapaFlete,
+  FranjaHoraria,
+  Rol,
+  TipoFlete,
+  TipoVehiculo,
+} from "@prisma/client";
 import type * as Catalogos from "@/domain/catalogos";
 import type * as Roles from "@/domain/roles";
 
@@ -13,4 +20,6 @@ export type _Verificaciones = [
   Afirmar<Iguales<TipoVehiculo, Catalogos.TipoVehiculo>>,
   Afirmar<Iguales<TipoFlete, Catalogos.TipoFlete>>,
   Afirmar<Iguales<FranjaHoraria, Catalogos.FranjaHoraria>>,
+  Afirmar<Iguales<EtapaFlete, Catalogos.EtapaFlete>>,
+  Afirmar<Iguales<EstadoPresupuesto, Catalogos.EstadoPresupuesto>>,
 ];

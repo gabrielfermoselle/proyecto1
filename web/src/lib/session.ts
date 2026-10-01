@@ -45,3 +45,15 @@ export async function requireRol(...roles: readonly Rol[]): Promise<UsuarioActua
   if (!roles.includes(usuario.rol)) redirect(AREA_POR_ROL[usuario.rol]);
   return usuario;
 }
+
+/**
+ * Para el área del fletero. Devuelve su `fleteroId`, que toda query debe usar como filtro.
+ * Si el onboarding no está completo, manda a terminarlo (salvo en las páginas del onboarding).
+ */
+export async function requireFletero({ permitirOnboardingIncompleto = false } = {}) {
+  const usuario = await requireRol("FLETERO");
+  const perfil = usuario.fleteroProfile;
+  if (!perfil) throw new Error(`El usuario ${usuario.id} es FLETERO pero no tiene perfil`);
+  if (!permitirOnboardingIncompleto && !perfil.onboardingCompletadoEn) redirect("/fletero/onboarding");
+  return { usuario, fleteroId: perfil.id, onboardingCompleto: perfil.onboardingCompletadoEn !== null };
+}

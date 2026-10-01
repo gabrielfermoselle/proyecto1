@@ -7,10 +7,11 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { FormField } from "@/components/shared/form-field";
+import { RadioCard } from "@/components/shared/radio-card";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { Alert } from "@/components/ui/alert";
 import type { RolRegistrable } from "@/domain/roles";
-import { cn } from "@/lib/utils";
+import { aplicarErroresDeCampo } from "@/lib/action-result";
 import { registrarUsuario } from "../actions";
 import { registroSchema, type RegistroDatos, type RegistroInput } from "../schemas";
 import { rutaDePanel } from "../rutas";
@@ -51,10 +52,7 @@ export function RegistroForm({ rolInicial }: { rolInicial?: RolRegistrable | und
     const resultado = await registrarUsuario(input);
     if (!resultado.ok) {
       setError(resultado.error);
-      for (const [campo, mensajes] of Object.entries(resultado.fieldErrors ?? {})) {
-        const mensaje = mensajes?.[0];
-        if (mensaje) setFieldError(campo as keyof RegistroInput, { message: mensaje });
-      }
+      aplicarErroresDeCampo(resultado.fieldErrors, setFieldError);
       return;
     }
 
@@ -80,21 +78,14 @@ export function RegistroForm({ rolInicial }: { rolInicial?: RolRegistrable | und
         <legend className="mb-1 text-sm font-semibold">¿Cómo vas a usar Fletes Tucumán?</legend>
         <div className="grid gap-3 sm:grid-cols-2">
           {OPCIONES_ROL.map(({ valor, titulo, detalle, Icono }) => (
-            <label
+            <RadioCard
               key={valor}
-              className={cn(
-                "flex cursor-pointer gap-3 rounded-lg border-2 border-input bg-card p-4 transition-colors",
-                "hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5",
-                "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-              )}
-            >
-              <input type="radio" value={valor} className="sr-only" {...register("rol")} />
-              <Icono className="mt-0.5 size-6 shrink-0 text-primary" aria-hidden="true" />
-              <span className="grid gap-1">
-                <span className="font-semibold">{titulo}</span>
-                <span className="text-sm text-muted-foreground">{detalle}</span>
-              </span>
-            </label>
+              value={valor}
+              title={titulo}
+              description={detalle}
+              icon={<Icono aria-hidden="true" />}
+              {...register("rol")}
+            />
           ))}
         </div>
         {errors.rol ? (
