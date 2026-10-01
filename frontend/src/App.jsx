@@ -3,15 +3,16 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-
 import Navbar from "./components/Navbar.jsx";
 import Modal from "./components/Modal.jsx";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
-import Landing from "./pages/Landing.jsx";
-import Directory from "./pages/Directory.jsx";
-import PlumberProfile from "./pages/PlumberProfile.jsx";
+import Fleteros from "./pages/Fleteros.jsx";
+import FleteroPerfil from "./pages/FleteroPerfil.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
-import JobDetail from "./pages/JobDetail.jsx";
-import EditPlumberProfile from "./pages/EditPlumberProfile.jsx";
-import MyPlumberProfile from "./pages/MyPlumberProfile.jsx";
+import Panel from "./pages/Panel.jsx";
+import NuevaSolicitud from "./pages/NuevaSolicitud.jsx";
+import SolicitudDetalle from "./pages/SolicitudDetalle.jsx";
+import SolicitudesDisponibles from "./pages/SolicitudesDisponibles.jsx";
+import MiPerfilFletero from "./pages/MiPerfilFletero.jsx";
+import EditarPerfilFletero from "./pages/EditarPerfilFletero.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 
 const ROUTE_EXIT_MS = 150;
@@ -38,10 +39,20 @@ function usePageTransition(displayLocation) {
   return { renderedLocation, leaving };
 }
 
-function Protected({ children }) {
-  const { user, loading } = useAuth();
+// Inicio: cada rol arranca en su pantalla de trabajo.
+function Inicio() {
+  const { usuario, loading } = useAuth();
+  if (loading) return null;
+  if (!usuario) return <Navigate to="/fleteros" replace />;
+  return <Navigate to={usuario.rol === "fletero" ? "/disponibles" : "/panel"} replace />;
+}
+
+// Exige sesión y, opcionalmente, un rol ("cliente" | "fletero").
+function Protected({ rol, children }) {
+  const { usuario, loading } = useAuth();
   if (loading) return <div className="container">Cargando…</div>;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!usuario) return <Navigate to="/login" replace />;
+  if (rol && usuario.rol !== rol) return <Navigate to="/panel" replace />;
   return children;
 }
 
@@ -57,7 +68,7 @@ function EditProfileModalRoute() {
 
   function close() {
     if (background) navigate(-1);
-    else navigate("/mi-perfil-plomero", { replace: true });
+    else navigate("/mi-perfil-fletero", { replace: true });
   }
 
   function requestClose() {
@@ -80,15 +91,13 @@ function EditProfileModalRoute() {
 
   return (
     <>
-      <Modal onClose={close} onRequestClose={requestClose} eyebrow="Mi perfil" title="Editar perfil de plomero" wide>
+      <Modal onClose={close} onRequestClose={requestClose} eyebrow="Mi perfil" title="Editar perfil de fletero" wide>
         {(animateClose) => {
           animateCloseRef.current = animateClose;
-          return <EditPlumberProfile onDone={handleCancel} onDirtyChange={setDirty} />;
+          return <EditarPerfilFletero onDone={handleCancel} onDirtyChange={setDirty} />;
         }}
       </Modal>
-      {confirmOpen && (
-        <ConfirmDialog onCancel={() => setConfirmOpen(false)} onConfirm={confirmExit} />
-      )}
+      {confirmOpen && <ConfirmDialog onCancel={() => setConfirmOpen(false)} onConfirm={confirmExit} />}
     </>
   );
 }
@@ -103,62 +112,27 @@ export default function App() {
     <>
       <Navbar />
       <div className="container">
-        <div
-          className={`route-transition ${leaving ? "is-leaving" : ""}`}
-          key={renderedLocation.pathname}
-        >
+        <div className={`route-transition ${leaving ? "is-leaving" : ""}`} key={renderedLocation.pathname}>
           <Routes location={renderedLocation}>
-            <Route path="/" element={<Landing />} />
-            <Route path="/directorio" element={<Directory />} />
-            <Route path="/plomero/:id" element={<PlumberProfile />} />
+            <Route path="/" element={<Inicio />} />
+            <Route path="/fleteros" element={<Fleteros />} />
+            <Route path="/fletero/:id" element={<FleteroPerfil />} />
             <Route path="/login" element={<Login />} />
             <Route path="/registro" element={<Register />} />
-            <Route
-              path="/panel"
-              element={
-                <Protected>
-                  <Dashboard />
-                </Protected>
-              }
-            />
-            <Route
-              path="/trabajo/:id"
-              element={
-                <Protected>
-                  <JobDetail />
-                </Protected>
-              }
-            />
-            <Route
-              path="/mi-perfil-plomero"
-              element={
-                <Protected>
-                  <MyPlumberProfile />
-                </Protected>
-              }
-            />
-            <Route
-              path="/mi-perfil"
-              element={
-                <Protected>
-                  <EditProfileModalRoute />
-                </Protected>
-              }
-            />
+            <Route path="/panel" element={<Protected><Panel /></Protected>} />
+            <Route path="/solicitudes/nueva" element={<Protected rol="cliente"><NuevaSolicitud /></Protected>} />
+            <Route path="/solicitud/:id" element={<Protected><SolicitudDetalle /></Protected>} />
+            <Route path="/solicitud/:id/editar" element={<Protected rol="cliente"><NuevaSolicitud /></Protected>} />
+            <Route path="/disponibles" element={<Protected rol="fletero"><SolicitudesDisponibles /></Protected>} />
+            <Route path="/mi-perfil-fletero" element={<Protected rol="fletero"><MiPerfilFletero /></Protected>} />
+            <Route path="/mi-perfil" element={<Protected rol="fletero"><EditProfileModalRoute /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </div>
       {background && (
         <Routes>
-          <Route
-            path="/mi-perfil"
-            element={
-              <Protected>
-                <EditProfileModalRoute />
-              </Protected>
-            }
-          />
+          <Route path="/mi-perfil" element={<Protected rol="fletero"><EditProfileModalRoute /></Protected>} />
         </Routes>
       )}
     </>

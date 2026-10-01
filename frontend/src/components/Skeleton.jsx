@@ -14,7 +14,7 @@ export function SkeletonText({ lines = 1, className = "" }) {
   );
 }
 
-// Fila tipo "pedido" (MyOrders / ReceivedOrders).
+// Fila de solicitud (MisSolicitudes / MisFletes).
 export function SkeletonJobRow() {
   return (
     <div className="flex flex-col gap-3 border-b border-[var(--paper-line)] py-4 last:border-none sm:flex-row sm:items-center sm:justify-between">
@@ -43,8 +43,8 @@ export function SkeletonJobList({ rows = 4 }) {
   );
 }
 
-// Tarjeta de plomero (Directorio).
-export function SkeletonPlumberCard() {
+// Tarjeta de listado (fleteros, solicitudes).
+export function SkeletonCard() {
   return (
     <div className="card flex gap-4">
       <SkeletonBlock className="h-[72px] w-[72px] flex-none rounded-full" />
@@ -57,7 +57,7 @@ export function SkeletonPlumberCard() {
   );
 }
 
-// Perfil de plomero (PlumberProfile / MyPlumberProfile).
+// Perfil de fletero (FleteroPerfil / MiPerfilFletero).
 export function SkeletonProfile() {
   return (
     <div className="grid cols-2">

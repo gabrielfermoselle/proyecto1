@@ -38,10 +38,10 @@ function StarPicker({ value, hovered, onHover, onPick }) {
 
 /**
  * Formulario de reseña (1-5 estrellas + comentario).
- * Se muestra únicamente cuando el pedido está finalizado y aún no fue reseñado.
+ * Se muestra únicamente cuando el flete está completado y aún no fue calificado.
  * Al confirmar el envío, notifica a onSubmitted con la reseña creada.
  */
-export default function ReviewForm({ jobId, plumberId, onSubmitted }) {
+export default function ReviewForm({ solicitudId, fleteroId, onSubmitted }) {
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState("");
@@ -61,13 +61,13 @@ export default function ReviewForm({ jobId, plumberId, onSubmitted }) {
     setSubmitting(true);
     try {
       const review = await api.post(
-        "/reviews",
-        { jobId, rating, comment: comment.trim() },
+        "/resenas",
+        { solicitudId, calificacion: rating, comentario: comment.trim() },
         { silent: true }
       );
       setDone(true);
       window.dispatchEvent(
-        new CustomEvent("review:created", { detail: { plumberId, review } })
+        new CustomEvent("resena:creada", { detail: { fleteroId, review } })
       );
       onSubmitted?.(review);
     } catch (err) {
@@ -83,9 +83,6 @@ export default function ReviewForm({ jobId, plumberId, onSubmitted }) {
         <span className="review-done-badge">✓</span>
         <div>
           <strong>¡Gracias por tu reseña!</strong>
-          <p className="muted" style={{ margin: "2px 0 0" }}>
-            Ya se publicó en el perfil del profesional.
-          </p>
         </div>
       </div>
     );
@@ -109,7 +106,7 @@ export default function ReviewForm({ jobId, plumberId, onSubmitted }) {
             ? RATING_HINTS[hovered || rating]
             : ratingMissing
             ? "Elegí una calificación para continuar"
-            : "Tocá una estrella para calificar"}
+            : ""}
         </div>
       </div>
 
@@ -120,7 +117,7 @@ export default function ReviewForm({ jobId, plumberId, onSubmitted }) {
           value={comment}
           maxLength={MAX_COMMENT}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Contá cómo fue tu experiencia: puntualidad, calidad del trabajo, trato…"
+          placeholder="Comentario (opcional)"
         />
         <div className="review-char-count muted">
           {comment.length}/{MAX_COMMENT}

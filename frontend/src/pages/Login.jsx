@@ -29,8 +29,8 @@ export default function Login() {
     if (!validate()) return;
     setBusy(true);
     try {
-      const user = await login(email.trim(), password);
-      navigate(user.role === "plomero" ? "/mi-perfil-plomero" : "/panel");
+      const usuario = await login(email.trim(), password);
+      navigate(usuario.rol === "fletero" ? "/disponibles" : "/panel");
     } catch {
       // El toast global ya avisó del error.
     } finally {
@@ -45,7 +45,7 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="Bienvenido de nuevo" subtitle="Ingresá para gestionar tus contrataciones o tu perfil profesional.">
+    <AuthLayout title="Ingresar">
       <form onSubmit={submit} noValidate>
         <div className="field">
           <label>Email</label>
@@ -97,10 +97,10 @@ export default function Login() {
         <div className="demo-box-title">Cuentas de demo</div>
         <div className="demo-chips">
           <button type="button" className="demo-chip" onClick={() => fillDemo("ana@demo.com")}>
-            👤 Cliente · ana@demo.com
+            📦 Cliente · ana@demo.com
           </button>
           <button type="button" className="demo-chip" onClick={() => fillDemo("carlos@demo.com")}>
-            🔧 Plomero · carlos@demo.com
+            🚚 Fletero · carlos@demo.com
           </button>
         </div>
         <div className="muted" style={{ marginTop: 8 }}>Clave para ambas: <b>123456</b></div>

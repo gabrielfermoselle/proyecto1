@@ -1,0 +1,357 @@
+// Plataforma de fletes de Tucumán.
+// Las columnas geo (`Unsupported`) son columnas GENERATED en la migración: se derivan
+// de lat/lng y Prisma nunca las escribe. `@default(dbgenerated())` le indica a Prisma que el
+// valor lo pone la base, así `migrate dev` no intenta tocarlas. Los CHECK y los índices GIST también viven en SQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Rol {
+  CLIENTE
+  FLETERO
+  ADMIN
+}
+
+enum TipoVehiculo {
+  MOTO
+  AUTO
+  CAMIONETA
+  CAMION
+}
+
+enum TipoFlete {
+  MUDANZA
+  MUEBLES
+  COMPRAS
+  PAQUETERIA
+  OTRO
+}
+
+/// MANANA 8–12 · MEDIODIA 12–16 · TARDE 16–20 · FLEXIBLE: cualquier horario del día.
+enum FranjaHoraria {
+  MANANA
+  MEDIODIA
+  TARDE
+  FLEXIBLE
+}
+
+enum EstadoSolicitud {
+  ABIERTA
+  ADJUDICADA
+  CANCELADA
+  VENCIDA
+}
+
+enum EstadoPresupuesto {
+  PENDIENTE
+  ACEPTADO
+  RECHAZADO
+  RETIRADO
+}
+
+enum EtapaFlete {
+  CONFIRMADO
+  CARGADO
+  EN_TRANSITO
+  ENTREGADO
+  COMPLETADO
+  CANCELADO
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  passwordHash   String
+  nombre         String          @db.VarChar(60)
+  apellido       String          @db.VarChar(60)
+  /// Nunca se expone a la otra parte: la coordinación es por el chat.
+  telefono       String?         @db.VarChar(20)
+  avatarUrl      String?
+  rol            Rol
+  activo         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  clienteProfile ClienteProfile?
+  fleteroProfile FleteroProfile?
+  mensajes       Mensaje[]
+  cambiosEstado  EstadoFlete[]
+
+  @@map("users")
+}
+
+model ClienteProfile {
+  id                String         @id @default(cuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direccionHabitual String?
+  lat               Float?
+  lng               Float?
+  solicitudes       Solicitud[]
+  fletes            Flete[]
+  calificaciones    Calificacion[]
+
+  @@map("cliente_profiles")
+}
+
+model FleteroProfile {
+  id                     String                                @id @default(cuid())
+  userId                 String                                @unique
+  user                   User                                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dni                    String?                               @unique @db.VarChar(10)
+  bio                    String?                               @db.VarChar(500)
+  /// Zona de trabajo: se completa en el onboarding.
+  baseDireccion          String?
+  baseLat                Float?
+  baseLng                Float?
+  baseGeo                Unsupported("geography(Point,4326)")? @default(dbgenerated())
+  radioCoberturaKm       Int                                   @default(15)
+  /// Tarifas en ARS. Precio sugerido = max(mínimo, km × porKm + m³ × porM3) + ayudantes × porAyudante.
+  precioMinimo           Decimal                               @default(0) @db.Decimal(12, 2)
+  precioPorKm            Decimal                               @default(0) @db.Decimal(10, 2)
+  precioPorM3            Decimal                               @default(0) @db.Decimal(10, 2)
+  precioPorAyudante      Decimal                               @default(0) @db.Decimal(10, 2)
+  disponible             Boolean                               @default(true)
+  verificado             Boolean                               @default(false)
+  /// Hasta que no termina el onboarding no aparece en el buscador ni ve el feed.
+  onboardingCompletadoEn DateTime?
+  /// Desnormalizado para ordenar el buscador; se recalcula en la transacción de cada calificación.
+  ratingPromedio         Decimal                               @default(0) @db.Decimal(3, 2)
+  cantidadCalificaciones Int                                   @default(0)
+  vehiculos              Vehiculo[]
+  presupuestos           Presupuesto[]
+  fletes                 Flete[]
+  conversaciones         Conversacion[]
+  calificaciones         Calificacion[]
+
+  @@index([disponible, ratingPromedio])
+  @@index([baseGeo], map: "fletero_profiles_baseGeo_gix", type: Gist)
+  @@map("fletero_profiles")
+}
+
+model Vehiculo {
+  id           String         @id @default(cuid())
+  fleteroId    String
+  fletero      FleteroProfile @relation(fields: [fleteroId], references: [id], onDelete: Cascade)
+  tipo         TipoVehiculo
+  marca        String         @db.VarChar(40)
+  modelo       String         @db.VarChar(40)
+  anio         Int?
+  /// Normalizada: mayúsculas y sin espacios (AB123CD, ABC123, A123BCD).
+  patente      String         @unique @db.VarChar(10)
+  capacidadKg  Int
+  volumenM3    Decimal        @db.Decimal(5, 2)
+  activo       Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  fotos        Foto[]
+  presupuestos Presupuesto[]
+  fletes       Flete[]
+
+  @@index([fleteroId, tipo, activo])
+  @@map("vehiculos")
+}
+
+model Solicitud {
+  id                   String                                @id @default(cuid())
+  clienteId            String
+  cliente              ClienteProfile                        @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipoFlete            TipoFlete
+  titulo               String                                @db.VarChar(120)
+  descripcion          String?                               @db.VarChar(1000)
+  origenDireccion      String
+  origenLat            Float
+  origenLng            Float
+  origenGeo            Unsupported("geography(Point,4326)")? @default(dbgenerated())
+  origenPiso           Int?
+  origenAscensor       Boolean                               @default(false)
+  destinoDireccion     String
+  destinoLat           Float
+  destinoLng           Float
+  destinoPiso          Int?
+  destinoAscensor      Boolean                               @default(false)
+  /// Distancia en línea recta (Haversine), calculada en el servidor.
+  distanciaKm          Decimal                               @db.Decimal(7, 2)
+  /// Totales de la carga, calculados con `domain/carga` al guardar los ítems.
+  pesoTotalKg          Decimal                               @default(0) @db.Decimal(9, 2)
+  volumenTotalM3       Decimal                               @default(0) @db.Decimal(7, 3)
+  itemsSinMedidas      Int                                   @default(0)
+  fecha                DateTime                              @db.Date
+  franja               FranjaHoraria
+  tipoVehiculoSugerido TipoVehiculo?
+  ayudantesRequeridos  Int                                   @default(0)
+  estado               EstadoSolicitud                       @default(ABIERTA)
+  createdAt            DateTime                              @default(now())
+  updatedAt            DateTime                              @updatedAt
+  items                ItemInventario[]
+  fotos                Foto[]
+  presupuestos         Presupuesto[]
+  conversaciones       Conversacion[]
+  flete                Flete?
+
+  @@index([estado, fecha])
+  @@index([clienteId, estado])
+  @@index([origenGeo], map: "solicitudes_origenGeo_gix", type: Gist)
+  @@map("solicitudes")
+}
+
+model ItemInventario {
+  id           String    @id @default(cuid())
+  solicitudId  String
+  solicitud    Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  nombre       String    @db.VarChar(80)
+  cantidad     Int       @default(1)
+  largoCm      Int?
+  anchoCm      Int?
+  altoCm       Int?
+  pesoKgAprox  Decimal?  @db.Decimal(7, 2)
+  fragil       Boolean   @default(false)
+  notas        String?   @db.VarChar(300)
+  orden        Int       @default(0)
+  /// Control de inventario: lo marca el fletero al cargar y al descargar.
+  cargadoEn    DateTime?
+  descargadoEn DateTime?
+  fotos        Foto[]
+
+  @@index([solicitudId])
+  @@map("items_inventario")
+}
+
+/// Una foto pertenece a exactamente un dueño (CHECK num_nonnulls = 1 en la migración).
+model Foto {
+  id          String          @id @default(cuid())
+  url         String
+  /// Identificador en Cloudinary, para poder borrarla.
+  publicId    String          @unique
+  ancho       Int?
+  alto        Int?
+  createdAt   DateTime        @default(now())
+  solicitudId String?
+  solicitud   Solicitud?      @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  itemId      String?
+  item        ItemInventario? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  vehiculoId  String?
+  vehiculo    Vehiculo?       @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
+
+  @@index([solicitudId])
+  @@index([itemId])
+  @@index([vehiculoId])
+  @@map("fotos")
+}
+
+model Presupuesto {
+  id               String            @id @default(cuid())
+  solicitudId      String
+  solicitud        Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  fleteroId        String
+  fletero          FleteroProfile    @relation(fields: [fleteroId], references: [id], onDelete: Cascade)
+  vehiculoId       String
+  vehiculo         Vehiculo          @relation(fields: [vehiculoId], references: [id])
+  monto            Decimal           @db.Decimal(12, 2)
+  /// Lo que sugirió el sistema; permite medir cuánto lo ajusta el fletero.
+  montoSugerido    Decimal           @db.Decimal(12, 2)
+  incluyeAyudantes Int               @default(0)
+  mensaje          String?           @db.VarChar(500)
+  validoHasta      DateTime
+  estado           EstadoPresupuesto @default(PENDIENTE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  flete            Flete?
+
+  /// Un fletero presupuesta una sola vez cada solicitud.
+  @@unique([solicitudId, fleteroId])
+  @@index([solicitudId, estado])
+  @@index([fleteroId, estado])
+  @@map("presupuestos")
+}
+
+/// Se crea en la misma transacción en la que el cliente acepta un presupuesto.
+model Flete {
+  id                    String         @id @default(cuid())
+  solicitudId           String         @unique
+  solicitud             Solicitud      @relation(fields: [solicitudId], references: [id])
+  presupuestoId         String         @unique
+  presupuesto           Presupuesto    @relation(fields: [presupuestoId], references: [id])
+  /// clienteId y fleteroId están desnormalizados para los dashboards, con índice y sin joins.
+  clienteId             String
+  cliente               ClienteProfile @relation(fields: [clienteId], references: [id])
+  fleteroId             String
+  fletero               FleteroProfile @relation(fields: [fleteroId], references: [id])
+  vehiculoId            String
+  vehiculo              Vehiculo       @relation(fields: [vehiculoId], references: [id])
+  precioAcordado        Decimal        @db.Decimal(12, 2)
+  etapa                 EtapaFlete     @default(CONFIRMADO)
+  recepcionConfirmadaEn DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  historial             EstadoFlete[]
+  calificacion          Calificacion?
+
+  @@index([clienteId, etapa])
+  @@index([fleteroId, etapa])
+  @@map("fletes")
+}
+
+/// Historial auditable de cada cambio de etapa (alimenta el timeline).
+model EstadoFlete {
+  id        String     @id @default(cuid())
+  fleteId   String
+  flete     Flete      @relation(fields: [fleteId], references: [id], onDelete: Cascade)
+  etapa     EtapaFlete
+  autorId   String
+  autor     User       @relation(fields: [autorId], references: [id])
+  nota      String?    @db.VarChar(300)
+  createdAt DateTime   @default(now())
+
+  @@index([fleteId, createdAt])
+  @@map("estados_flete")
+}
+
+model Conversacion {
+  id          String         @id @default(cuid())
+  solicitudId String
+  solicitud   Solicitud      @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  fleteroId   String
+  fletero     FleteroProfile @relation(fields: [fleteroId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  mensajes    Mensaje[]
+
+  @@unique([solicitudId, fleteroId])
+  @@map("conversaciones")
+}
+
+model Mensaje {
+  id             String       @id @default(cuid())
+  conversacionId String
+  conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  autorId        String
+  autor          User         @relation(fields: [autorId], references: [id])
+  contenido      String       @db.VarChar(2000)
+  leidoEn        DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversacionId, createdAt])
+  @@map("mensajes")
+}
+
+/// Una por flete, y solo cuando el cliente confirmó la recepción (COMPLETADO).
+model Calificacion {
+  id         String         @id @default(cuid())
+  fleteId    String         @unique
+  flete      Flete          @relation(fields: [fleteId], references: [id])
+  clienteId  String
+  cliente    ClienteProfile @relation(fields: [clienteId], references: [id])
+  fleteroId  String
+  fletero    FleteroProfile @relation(fields: [fleteroId], references: [id])
+  puntaje    Int
+  comentario String?        @db.VarChar(1000)
+  createdAt  DateTime       @default(now())
+
+  @@index([fleteroId, createdAt])
+  @@map("calificaciones")
+}

@@ -5,30 +5,30 @@ import { getToken, setToken, getStoredUser, setStoredUser } from "../utils/stora
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => getStoredUser());
-  const [plumberId, setPlumberId] = useState(null);
+  const [usuario, setUsuario] = useState(() => getStoredUser());
+  const [fleteroId, setFleteroId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  function persistUser(nextUser) {
-    setUser(nextUser);
-    setStoredUser(nextUser);
+  function persistUsuario(next) {
+    setUsuario(next);
+    setStoredUser(next);
   }
 
   async function refresh() {
     if (!getToken()) {
-      persistUser(null);
-      setPlumberId(null);
+      persistUsuario(null);
+      setFleteroId(null);
       setLoading(false);
       return;
     }
     try {
       const data = await api.get("/auth/me", { silent: true });
-      persistUser(data.user);
-      setPlumberId(data.plumberId);
+      persistUsuario(data.usuario);
+      setFleteroId(data.fleteroId);
     } catch {
       setToken(null);
-      persistUser(null);
-      setPlumberId(null);
+      persistUsuario(null);
+      setFleteroId(null);
     } finally {
       setLoading(false);
     }
@@ -38,32 +38,32 @@ export function AuthProvider({ children }) {
     refresh();
   }, []);
 
-  async function login(email, password) {
-    const data = await api.post("/auth/login", { email, password });
+  async function login(correo, contrasena) {
+    const data = await api.post("/auth/login", { correo, contrasena });
     setToken(data.token);
-    persistUser(data.user);
+    persistUsuario(data.usuario);
     await refresh();
-    return data.user;
+    return data.usuario;
   }
 
   async function register(payload) {
     const data = await api.post("/auth/register", payload);
     setToken(data.token);
-    persistUser(data.user);
+    persistUsuario(data.usuario);
     await refresh();
-    return data.user;
+    return data.usuario;
   }
 
   function logout() {
     setToken(null);
-    persistUser(null);
-    setPlumberId(null);
+    persistUsuario(null);
+    setFleteroId(null);
   }
 
   const value = {
-    user,
-    role: user?.role ?? null,
-    plumberId,
+    usuario,
+    rol: usuario?.rol ?? null,
+    fleteroId,
     loading,
     login,
     register,

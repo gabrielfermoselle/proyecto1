@@ -2,108 +2,61 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabase, isSupabaseConfigured } from "./supabase.js";
-import { toGeographyPoint } from "./geo.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, "..", "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 
+// Colecciones en memoria. Cada una se persiste en una tabla homónima de Supabase
+// (o en data/db.json si Supabase no está configurado).
 const EMPTY_DB = {
-  users: [],
-  plumbers: [],
-  jobs: [],
-  reviews: [],
-  messages: []
+  usuarios: [],
+  fleteros: [],
+  solicitudes: [],
+  presupuestos: [],
+  mensajes: [],
+  resenas: []
 };
 
-const TABLE_ORDER = ["users", "plumbers", "jobs", "reviews", "messages"];
+// Orden respetando claves foráneas (padres primero).
+const TABLE_ORDER = ["usuarios", "fleteros", "solicitudes", "presupuestos", "mensajes", "resenas"];
 
-const TABLAS = {
-  users: "usuarios",
-  plumbers: "plomeros",
-  jobs: "trabajos",
-  reviews: "resenas",
-  messages: "mensajes"
+// Columnas que pueden quedar vacías: se envían como null explícito para que un
+// upsert limpie valores borrados en memoria.
+const OPTIONAL_NULLS = {
+  usuarios: ["hash_token_reset", "token_reset_expira_en"],
+  fleteros: ["latitud", "longitud"],
+  solicitudes: ["fletero_id", "presupuesto_id", "precio_acordado", "fecha", "tipo_vehiculo", "completada_en"]
 };
 
-const COLUMN_MAP = {
-  users: {
-    role: "rol",
-    name: "nombre",
-    email: "correo",
-    passwordHash: "hash_contrasena",
-    phone: "telefono",
-    createdAt: "creado_en",
-    resetTokenHash: "hash_token_reset",
-    resetTokenExpiresAt: "token_reset_expira_en"
-  },
-  plumbers: {
-    userId: "usuario_id",
-    hourlyRate: "tarifa_hora",
-    address: "direccion",
-    radioTrabajoKm: "radio_trabajo_km",
-    fotoUrl: "url_foto",
-    portfolio: "portafolio",
-    createdAt: "creado_en"
-  },
-  jobs: {
-    clientId: "cliente_id",
-    plumberId: "plomero_id",
-    title: "titulo",
-    description: "descripcion",
-    status: "estado",
-    agreedPrice: "precio_acordado",
-    createdAt: "creado_en",
-    completedAt: "completado_en"
-  },
-  reviews: {
-    jobId: "trabajo_id",
-    plumberId: "plomero_id",
-    clientId: "cliente_id",
-    rating: "calificacion",
-    comment: "comentario",
-    createdAt: "creado_en"
-  },
-  messages: {
-    jobId: "trabajo_id",
-    senderId: "remitente_id",
-    senderName: "nombre_remitente",
-    body: "cuerpo",
-    createdAt: "creado_en"
-  }
+// Columnas geography que mantiene un trigger SQL a partir de latitud/longitud.
+const SKIP_COLUMNS = new Set(["ubicacion", "origen_ubicacion"]);
+
+const NUMERIC_FIELDS = {
+  fleteros: ["tarifaBase", "radioTrabajoKm", "capacidadKg", "latitud", "longitud"],
+  solicitudes: ["origenLat", "origenLng", "destinoLat", "destinoLng", "precioAcordado"],
+  presupuestos: ["monto"],
+  resenas: ["calificacion"]
 };
+
+const toSnake = (key) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+const toCamel = (key) => key.replace(/_([a-z])/g, (_m, c) => c.toUpperCase());
 
 let cache = null;
 let persistQueue = Promise.resolve();
+// Si Supabase está configurado pero no responde al arrancar, se usa el JSON local.
+let supabaseActivo = false;
 
-function invertMap(map) {
-  return Object.fromEntries(Object.entries(map).map(([camel, snake]) => [snake, camel]));
+export function usingSupabase() {
+  return supabaseActivo;
 }
 
-const OPTIONAL_NULLS = {
-  users: ["hash_token_reset", "token_reset_expira_en"],
-  plumbers: ["latitud", "longitud"],
-  jobs: ["precio_acordado", "completado_en"]
-};
-
-// geography Point lo mantiene un trigger SQL a partir de latitud/longitud.
-const SKIP_KEYS = {
-  plumbers: new Set(["ubicacion"])
-};
-
-const NUMERIC_FIELDS = {
-  plumbers: ["hourlyRate", "radioTrabajoKm", "latitud", "longitud"],
-  jobs: ["agreedPrice"],
-  reviews: ["rating"]
-};
-
 function toRow(table, obj) {
-  const map = COLUMN_MAP[table] || {};
-  const skip = SKIP_KEYS[table] || new Set();
   const row = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined || skip.has(key)) continue;
-    row[map[key] || key] = value;
+    const col = toSnake(key);
+    if (value === undefined || SKIP_COLUMNS.has(col)) continue;
+    row[col] = value;
   }
   for (const col of OPTIONAL_NULLS[table] || []) {
     if (!(col in row)) row[col] = null;
@@ -112,19 +65,13 @@ function toRow(table, obj) {
 }
 
 function fromRow(table, row) {
-  const inv = invertMap(COLUMN_MAP[table] || {});
-  const skip = SKIP_KEYS[table] || new Set();
   const obj = {};
-  for (const [key, value] of Object.entries(row)) {
-    const camel = inv[key] || key;
-    if (skip.has(camel) || skip.has(key)) continue;
-    obj[camel] = value;
+  for (const [col, value] of Object.entries(row)) {
+    if (SKIP_COLUMNS.has(col)) continue;
+    obj[toCamel(col)] = value;
   }
   for (const field of NUMERIC_FIELDS[table] || []) {
     if (obj[field] != null) obj[field] = Number(obj[field]);
-  }
-  if (table === "plumbers") {
-    obj.ubicacion = toGeographyPoint(obj.latitud, obj.longitud);
   }
   return obj;
 }
@@ -136,7 +83,7 @@ function ensureDir() {
 async function loadFromSupabase() {
   const loaded = structuredClone(EMPTY_DB);
   for (const table of TABLE_ORDER) {
-    const { data, error } = await supabase.from(TABLAS[table]).select("*");
+    const { data, error } = await supabase.from(table).select("*");
     if (error) throw error;
     loaded[table] = (data || []).map((row) => fromRow(table, row));
   }
@@ -144,22 +91,22 @@ async function loadFromSupabase() {
 }
 
 async function persistToSupabase(data) {
+  // Primero borramos lo que ya no existe en memoria (hijos antes que padres)...
   for (const table of [...TABLE_ORDER].reverse()) {
     const keep = new Set((data[table] || []).map((item) => item.id));
-    const tabla = TABLAS[table];
-    const { data: existing, error: selectError } = await supabase.from(tabla).select("id");
+    const { data: existing, error: selectError } = await supabase.from(table).select("id");
     if (selectError) throw selectError;
     const extra = (existing || []).map((row) => row.id).filter((id) => !keep.has(id));
     if (extra.length) {
-      const { error } = await supabase.from(tabla).delete().in("id", extra);
+      const { error } = await supabase.from(table).delete().in("id", extra);
       if (error) throw error;
     }
   }
-
+  // ...y después insertamos/actualizamos (padres antes que hijos).
   for (const table of TABLE_ORDER) {
     const rows = (data[table] || []).map((item) => toRow(table, item));
     if (!rows.length) continue;
-    const { error } = await supabase.from(TABLAS[table]).upsert(rows, { onConflict: "id" });
+    const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
     if (error) throw error;
   }
 }
@@ -169,7 +116,10 @@ function loadFromFile() {
   if (!fs.existsSync(DB_FILE)) return structuredClone(EMPTY_DB);
   try {
     const raw = fs.readFileSync(DB_FILE, "utf-8");
-    return { ...structuredClone(EMPTY_DB), ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    // Un db.json del esquema anterior (plomeros) no tiene estas colecciones: se reinicia.
+    if (!Array.isArray(parsed.usuarios)) return structuredClone(EMPTY_DB);
+    return { ...structuredClone(EMPTY_DB), ...parsed };
   } catch (err) {
     console.error("No se pudo leer la base de datos, se reinicia:", err.message);
     return structuredClone(EMPTY_DB);
@@ -184,20 +134,26 @@ function saveToFile() {
 export async function loadDB() {
   if (cache) return cache;
   if (isSupabaseConfigured) {
-    cache = await loadFromSupabase();
-    console.log("[db] Conectado a Supabase");
+    try {
+      cache = await loadFromSupabase();
+      supabaseActivo = true;
+      console.log("[db] Conectado a Supabase");
+      return cache;
+    } catch (err) {
+      console.warn(`[db] Supabase no responde (${err.message}). Usando JSON local: ${DB_FILE}`);
+    }
   } else {
-    cache = loadFromFile();
-    saveToFile();
     console.warn("[db] Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY. Usando JSON local.");
   }
+  cache = loadFromFile();
+  saveToFile();
   return cache;
 }
 
 export async function saveDB() {
   if (!cache) return;
   const run = persistQueue.then(async () => {
-    if (isSupabaseConfigured) {
+    if (supabaseActivo) {
       await persistToSupabase(cache);
     } else {
       saveToFile();
@@ -210,13 +166,21 @@ export async function saveDB() {
 }
 
 export async function resetDB(data) {
+  if (isSupabaseConfigured && !supabaseActivo) {
+    try {
+      await supabase.from("usuarios").select("id").limit(1).throwOnError();
+      supabaseActivo = true;
+    } catch (err) {
+      console.warn(`[db] Supabase no responde (${err.message}). Se escribe en el JSON local.`);
+    }
+  }
   cache = { ...structuredClone(EMPTY_DB), ...data };
   await saveDB();
   return cache;
 }
 
 export async function pingDatabase() {
-  if (!isSupabaseConfigured) return { ok: true, driver: "json" };
+  if (!supabaseActivo) return { ok: true, driver: "json" };
   const { error } = await supabase.from("usuarios").select("id").limit(1);
   if (error) return { ok: false, driver: "supabase", error: error.message };
   return { ok: true, driver: "supabase" };
