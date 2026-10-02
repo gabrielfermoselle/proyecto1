@@ -65,7 +65,7 @@ export default async function PasoOnboardingPage({ params }: { params: Promise<{
           ) : null}
           {paso === "vehiculos" ? (
             <div className="grid gap-6">
-              <VehiculosEditor vehiculos={perfil.vehiculos} fotosHabilitadas={perfil.fotosHabilitadas} />
+              <VehiculosEditor vehiculos={perfil.vehiculos} storage={perfil.storage} />
               {completos.vehiculos && siguienteHref ? (
                 <Button asChild className="w-full sm:w-auto sm:justify-self-end">
                   <Link href={siguienteHref}>

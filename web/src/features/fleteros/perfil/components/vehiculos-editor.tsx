@@ -8,6 +8,7 @@ import { ETIQUETA_VEHICULO } from "@/domain/catalogos";
 import { VehiculoIcono } from "@/features/fleteros/components/vehiculo-icono";
 import { formatearKg, formatearM3 } from "@/lib/formato";
 import { cn } from "@/lib/utils";
+import type { ConfigStorageCliente } from "@/features/uploads/subir-imagen";
 import { cambiarEstadoVehiculo } from "../actions";
 import type { VehiculoPerfil } from "../queries";
 import { FotosVehiculo } from "./fotos-vehiculo";
@@ -15,10 +16,10 @@ import { VehiculoForm } from "./vehiculo-form";
 
 interface VehiculosEditorProps {
   vehiculos: VehiculoPerfil[];
-  fotosHabilitadas: boolean;
+  storage: ConfigStorageCliente | null;
 }
 
-export function VehiculosEditor({ vehiculos, fotosHabilitadas }: VehiculosEditorProps) {
+export function VehiculosEditor({ vehiculos, storage }: VehiculosEditorProps) {
   // Sin vehículos, el formulario arranca abierto: es lo único que se puede hacer en este paso.
   const [editando, setEditando] = useState<string | "nuevo" | null>(vehiculos.length === 0 ? "nuevo" : null);
   const [error, setError] = useState<string | null>(null);
@@ -78,12 +79,7 @@ export function VehiculosEditor({ vehiculos, fotosHabilitadas }: VehiculosEditor
                   </p>
                 </div>
               </div>
-              <FotosVehiculo
-                vehiculoId={v.id}
-                descripcion={descripcion}
-                fotos={v.fotos}
-                habilitadas={fotosHabilitadas}
-              />
+              <FotosVehiculo vehiculoId={v.id} descripcion={descripcion} fotos={v.fotos} storage={storage} />
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setEditando(v.id)}>
                   <Pencil aria-hidden="true" />

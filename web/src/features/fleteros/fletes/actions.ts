@@ -4,10 +4,24 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ETAPAS_FLETE } from "@/domain/catalogos";
 import { faseInventario, validarTransicion } from "@/domain/maquina-estados";
+import { conEventos } from "@/features/chat/eventos";
+import type { EventoChat } from "@/features/chat/eventos-catalogo";
 import { ActionError, createFleteroAction } from "@/lib/action";
 import { prisma } from "@/lib/prisma";
 
 const id = z.string().min(1).max(40);
+
+/** Etapas que el fletero avanza y el mensaje de sistema que dejan en el chat. */
+const EVENTO_DE_ETAPA: Partial<
+  Record<
+    (typeof ETAPAS_FLETE)[number],
+    Extract<EventoChat, "CARGA_REGISTRADA" | "EN_VIAJE" | "DESCARGA_REGISTRADA">
+  >
+> = {
+  CARGADO: "CARGA_REGISTRADA",
+  EN_TRANSITO: "EN_VIAJE",
+  ENTREGADO: "DESCARGA_REGISTRADA",
+};
 const FLETE_NO_ENCONTRADO = "No encontramos ese flete.";
 const CAMBIO_CONCURRENTE = "El flete cambió mientras tanto. Recargá la página para ver el estado actual.";
 
@@ -79,12 +93,12 @@ export const marcarTodos = createFleteroAction({
 export const avanzarEtapa = createFleteroAction({
   schema: z.object({ fleteId: id, hacia: z.enum(ETAPAS_FLETE) }),
   handler: async ({ fleteId, hacia }, { fleteroId, usuario }) => {
-    const { etapa, inventario } = await getFletePropio(fleteId, fleteroId);
+    const { etapa, inventario, solicitudId } = await getFletePropio(fleteId, fleteroId);
     if (hacia === "CANCELADO") throw new ActionError("Para cancelar, indicá el motivo.");
     const validacion = validarTransicion(etapa, hacia, "FLETERO", inventario);
     if (!validacion.ok) throw new ActionError(validacion.motivo);
 
-    await prisma.$transaction(async (tx) => {
+    await conEventos(async (tx, { emitir }) => {
       // Lock optimista: solo avanza si nadie cambió la etapa desde que la leímos.
       const { count } = await tx.flete.updateMany({
         where: { id: fleteId, fleteroId, etapa },
@@ -92,6 +106,8 @@ export const avanzarEtapa = createFleteroAction({
       });
       if (count === 0) throw new ActionError(CAMBIO_CONCURRENTE);
       await tx.estadoFlete.create({ data: { fleteId, etapa: hacia, autorId: usuario.id } });
+      const evento = EVENTO_DE_ETAPA[hacia];
+      if (evento) await emitir({ solicitudId, fleteroId, evento, datos: {} });
     });
     refrescar(fleteId);
     return { etapa: hacia };
@@ -112,7 +128,7 @@ export const cancelarFlete = createFleteroAction({
     const validacion = validarTransicion(etapa, "CANCELADO", "FLETERO", inventario);
     if (!validacion.ok) throw new ActionError("Solo se puede cancelar antes de cargar.");
 
-    await prisma.$transaction(async (tx) => {
+    await conEventos(async (tx, { emitir }) => {
       const { count } = await tx.flete.updateMany({
         where: { id: fleteId, fleteroId, etapa },
         data: { etapa: "CANCELADO" },
@@ -123,6 +139,8 @@ export const cancelarFlete = createFleteroAction({
       });
       // La solicitud queda cancelada: el cliente la puede volver a publicar.
       await tx.solicitud.update({ where: { id: solicitudId }, data: { estado: "CANCELADA" } });
+      // Bloquea el chat del par y le avisa al cliente con el motivo.
+      await emitir({ solicitudId, fleteroId, evento: "FLETE_CANCELADO", datos: { motivo, por: "FLETERO" } });
     });
     refrescar(fleteId);
     return null;

@@ -69,3 +69,11 @@ export const formatearMes = (mes: string) => mesAnio.format(new Date(`${mes}-01T
 export function nombrePublico(nombre: string, apellido: string): string {
   return apellido ? `${nombre} ${apellido.charAt(0)}.` : nombre;
 }
+
+/** "jue 9 oct": fecha absoluta, para textos que quedan guardados (no envejece como "Mañana"). */
+export function formatearDiaAbsoluto(fechaIso: string): string {
+  return diaCorto.format(diaDesdeIso(fechaIso)).replace(/\./g, "");
+}
+
+const hora = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: ZONA });
+export const formatearHora = (instante: Date) => hora.format(instante);

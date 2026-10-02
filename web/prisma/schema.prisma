@@ -56,6 +56,30 @@ enum EstadoPresupuesto {
   RETIRADO
 }
 
+enum TipoMensaje {
+  TEXTO
+  IMAGEN
+  /// Generado por la plataforma ante un evento (presupuesto enviado, carga registrada…).
+  SISTEMA
+  /// Propuesta de fecha u horario que la otra parte acepta o rechaza.
+  PROPUESTA
+}
+
+enum EstadoPropuesta {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  /// Reemplazada por una propuesta más nueva.
+  ANULADA
+}
+
+enum TipoNotificacion {
+  MENSAJE
+  PRESUPUESTO
+  FLETE
+  PROPUESTA
+}
+
 enum EtapaFlete {
   CONFIRMADO
   CARGADO
@@ -66,22 +90,25 @@ enum EtapaFlete {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  email          String          @unique
+  id             String             @id @default(cuid())
+  email          String             @unique
   passwordHash   String
-  nombre         String          @db.VarChar(60)
-  apellido       String          @db.VarChar(60)
+  nombre         String             @db.VarChar(60)
+  apellido       String             @db.VarChar(60)
   /// Nunca se expone a la otra parte: la coordinación es por el chat.
-  telefono       String?         @db.VarChar(20)
+  telefono       String?            @db.VarChar(20)
   avatarUrl      String?
   rol            Rol
-  activo         Boolean         @default(true)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  activo         Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   clienteProfile ClienteProfile?
   fleteroProfile FleteroProfile?
   mensajes       Mensaje[]
   cambiosEstado  EstadoFlete[]
+  notificaciones Notificacion[]
+  propuestas     PropuestaHorario[] @relation("PropuestaPor")
+  respuestas     PropuestaHorario[] @relation("RespondidaPor")
 
   @@map("users")
 }
@@ -96,6 +123,7 @@ model ClienteProfile {
   solicitudes       Solicitud[]
   fletes            Flete[]
   calificaciones    Calificacion[]
+  conversaciones    Conversacion[]
 
   @@map("cliente_profiles")
 }
@@ -223,11 +251,12 @@ model ItemInventario {
 }
 
 /// Una foto pertenece a exactamente un dueño (CHECK num_nonnulls = 1 en la migración).
+/// La URL no se guarda: se arma con la ruta. Las de vehículos están en el bucket público;
+/// las de solicitudes, ítems y mensajes, en el privado (URLs firmadas de corta duración).
 model Foto {
   id          String          @id @default(cuid())
-  url         String
-  /// Identificador en Cloudinary, para poder borrarla.
-  publicId    String          @unique
+  /// Ruta dentro del bucket de Supabase Storage.
+  ruta        String          @unique
   ancho       Int?
   alto        Int?
   createdAt   DateTime        @default(now())
@@ -237,10 +266,13 @@ model Foto {
   item        ItemInventario? @relation(fields: [itemId], references: [id], onDelete: Cascade)
   vehiculoId  String?
   vehiculo    Vehiculo?       @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
+  mensajeId   String?
+  mensaje     Mensaje?        @relation(fields: [mensajeId], references: [id], onDelete: Cascade)
 
   @@index([solicitudId])
   @@index([itemId])
   @@index([vehiculoId])
+  @@index([mensajeId])
   @@map("fotos")
 }
 
@@ -312,31 +344,102 @@ model EstadoFlete {
   @@map("estados_flete")
 }
 
+/// Chat entre el cliente y un fletero sobre una solicitud. Se crea cuando el fletero presupuesta.
+/// Su estado (negociación, activa, cerrada, bloqueada) se deriva de la solicitud, el presupuesto
+/// y el flete: ver domain/chat.ts.
 model Conversacion {
-  id          String         @id @default(cuid())
-  solicitudId String
-  solicitud   Solicitud      @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  fleteroId   String
-  fletero     FleteroProfile @relation(fields: [fleteroId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
-  mensajes    Mensaje[]
+  id                String         @id @default(cuid())
+  solicitudId       String
+  solicitud         Solicitud      @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  fleteroId         String
+  fletero           FleteroProfile @relation(fields: [fleteroId], references: [id], onDelete: Cascade)
+  /// Desnormalizado de la solicitud: autoriza y lista la bandeja sin joins.
+  clienteId         String
+  cliente           ClienteProfile @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  ultimaActividadEn DateTime       @default(now())
+  /// Marcas de lectura: un mensaje está leído por X si es anterior o igual a leidoHastaX.
+  leidoHastaCliente DateTime?
+  leidoHastaFletero DateTime?
+  mensajes          Mensaje[]
 
   @@unique([solicitudId, fleteroId])
+  @@index([clienteId, ultimaActividadEn])
+  @@index([fleteroId, ultimaActividadEn])
   @@map("conversaciones")
 }
 
 model Mensaje {
-  id             String       @id @default(cuid())
+  id             String            @id @default(cuid())
   conversacionId String
-  conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
-  autorId        String
-  autor          User         @relation(fields: [autorId], references: [id])
-  contenido      String       @db.VarChar(2000)
-  leidoEn        DateTime?
-  createdAt      DateTime     @default(now())
+  conversacion   Conversacion      @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  tipo           TipoMensaje       @default(TEXTO)
+  /// Null en los mensajes de sistema.
+  autorId        String?
+  autor          User?             @relation(fields: [autorId], references: [id])
+  /// Texto ya sanitizado (texto plano). En IMAGEN es el epígrafe opcional.
+  contenido      String?           @db.VarChar(2000)
+  /// Mensajes de sistema: código del evento y sus datos. El texto se arma al mostrarlo.
+  evento         String?           @db.VarChar(40)
+  datos          Json?
+  /// Generado por el navegador: idempotencia del envío y conciliación del mensaje optimista.
+  clientId       String?           @db.VarChar(40)
+  createdAt      DateTime          @default(now())
+  fotos          Foto[]
+  propuesta      PropuestaHorario?
 
-  @@index([conversacionId, createdAt])
+  @@unique([autorId, clientId])
+  @@index([conversacionId, createdAt(sort: Desc), id])
   @@map("mensajes")
+}
+
+/// Propuesta de fecha u horario hecha desde el chat. En negociación, la aceptada se aplica a la
+/// solicitud cuando el cliente acepta ese presupuesto; con el flete confirmado, se aplica al instante.
+model PropuestaHorario {
+  id              String          @id @default(cuid())
+  mensajeId       String          @unique
+  mensaje         Mensaje         @relation(fields: [mensajeId], references: [id], onDelete: Cascade)
+  fecha           DateTime        @db.Date
+  franja          FranjaHoraria
+  estado          EstadoPropuesta @default(PENDIENTE)
+  propuestaPorId  String
+  propuestaPor    User            @relation("PropuestaPor", fields: [propuestaPorId], references: [id])
+  respondidaPorId String?
+  respondidaPor   User?           @relation("RespondidaPor", fields: [respondidaPorId], references: [id])
+  respondidaEn    DateTime?
+  aplicadaEn      DateTime?
+
+  @@map("propuestas_horario")
+}
+
+/// Notificación dentro de la app. Las de chat se agrupan por conversación con `clave`
+/// ("Mensajes nuevos de Ana P.") en vez de una por mensaje.
+model Notificacion {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo      TipoNotificacion
+  titulo    String           @db.VarChar(120)
+  cuerpo    String?          @db.VarChar(300)
+  href      String           @db.VarChar(300)
+  clave     String?          @db.VarChar(120)
+  leidaEn   DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, clave])
+  @@index([userId, leidaEn, updatedAt])
+  @@map("notificaciones")
+}
+
+/// Limitador de envíos por ventana fija. Funciona con varias instancias serverless sin Redis.
+model LimiteTasa {
+  clave    String   @db.VarChar(160)
+  ventana  DateTime
+  cantidad Int      @default(0)
+
+  @@id([clave, ventana])
+  @@map("limites_tasa")
 }
 
 /// Una por flete, y solo cuando el cliente confirmó la recepción (COMPLETADO).

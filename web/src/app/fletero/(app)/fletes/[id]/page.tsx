@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, Navigation } from "lucide-react";
+import { ArrowLeft, CalendarDays, MessagesSquare, Navigation } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -115,6 +115,15 @@ export default async function FletePage({ params }: { params: Promise<{ id: stri
           ) : null}
         </CardContent>
       </Card>
+
+      {f.conversacionId ? (
+        <Button asChild variant="secondary" className="justify-self-start">
+          <Link href={`/fletero/mensajes/${f.conversacionId}`}>
+            <MessagesSquare aria-hidden="true" />
+            Chat con {f.cliente}
+          </Link>
+        </Button>
+      ) : null}
 
       <GestionFlete fleteId={f.id} etapa={f.etapa} items={f.items} />
 

@@ -14,19 +14,25 @@ const envSchema = z
     DIRECT_URL: z.string().url(),
     NEXTAUTH_SECRET: z.string().min(32, "NEXTAUTH_SECRET debe tener al menos 32 caracteres"),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    // Cloudinary es opcional: sin estas variables la carga de fotos queda deshabilitada.
-    CLOUDINARY_CLOUD_NAME: opcional,
-    CLOUDINARY_API_KEY: opcional,
-    CLOUDINARY_API_SECRET: opcional,
+    // Supabase (Realtime + Storage) es opcional: sin estas variables el chat funciona por
+    // consultas periódicas (sin "escribiendo…" ni "en línea") y la carga de fotos se deshabilita.
+    SUPABASE_URL: opcional.pipe(z.string().url().optional()),
+    SUPABASE_ANON_KEY: opcional,
+    SUPABASE_SERVICE_ROLE_KEY: opcional,
+    SUPABASE_JWT_SECRET: opcional,
   })
   .refine(
     (e) => {
-      const definidas = [e.CLOUDINARY_CLOUD_NAME, e.CLOUDINARY_API_KEY, e.CLOUDINARY_API_SECRET].filter(
-        Boolean,
-      );
-      return definidas.length === 0 || definidas.length === 3;
+      const definidas = [
+        e.SUPABASE_URL,
+        e.SUPABASE_ANON_KEY,
+        e.SUPABASE_SERVICE_ROLE_KEY,
+        e.SUPABASE_JWT_SECRET,
+      ];
+      const cantidad = definidas.filter(Boolean).length;
+      return cantidad === 0 || cantidad === definidas.length;
     },
-    { message: "Definí las tres variables CLOUDINARY_* o ninguna", path: ["CLOUDINARY_CLOUD_NAME"] },
+    { message: "Definí las cuatro variables SUPABASE_* o ninguna", path: ["SUPABASE_URL"] },
   );
 
 const parsed = envSchema.safeParse(process.env);

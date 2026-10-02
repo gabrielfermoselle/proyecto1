@@ -13,8 +13,8 @@ const nextConfig: NextConfig = {
   // El repo raíz tiene su propio package-lock (app anterior): la raíz de esta app es web/.
   outputFileTracingRoot: path.join(__dirname),
   images: {
-    // Solo imágenes de nuestra cuenta de Cloudinary; nada de hosts arbitrarios.
-    remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],
+    // Solo imágenes de Supabase Storage (públicas y URLs firmadas); nada de hosts arbitrarios.
+    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/**" }],
   },
   experimental: {
     serverActions: { bodySizeLimit: "1mb" },

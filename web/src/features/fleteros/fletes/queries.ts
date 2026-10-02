@@ -102,6 +102,10 @@ export async function getFleteParaFletero(fleteroId: string, fleteId: string) {
     },
   });
   if (!f) return null;
+  const conversacion = await prisma.conversacion.findUnique({
+    where: { solicitudId_fleteroId: { solicitudId: f.solicitud.id, fleteroId } },
+    select: { id: true },
+  });
 
   const { solicitud: s } = f;
   return {
@@ -141,6 +145,7 @@ export async function getFleteParaFletero(fleteroId: string, fleteId: string) {
       ascensor: s.destinoAscensor,
     },
     items: s.items,
+    conversacionId: conversacion?.id ?? null,
   };
 }
 

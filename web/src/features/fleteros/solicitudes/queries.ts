@@ -12,6 +12,7 @@ import { fechaIsoAr, fechaIsoDeDia } from "@/domain/fechas";
 import { aproximarCoordenadas, FACTOR_RUTA_URBANA, type Coordenadas } from "@/domain/geo";
 import { precioSugerido } from "@/domain/precio";
 import { getTurnosActivos } from "@/features/fleteros/fletes/queries";
+import { urlsFirmadas } from "@/features/uploads/storage";
 import { nombrePublico } from "@/lib/formato";
 import { prisma } from "@/lib/prisma";
 import {
@@ -111,7 +112,7 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
   );
   if (!acceso?.permitido) return null;
 
-  const [s, perfil, vehiculos, turnos] = await Promise.all([
+  const [s, perfil, vehiculos, turnos, conversacion] = await Promise.all([
     prisma.solicitud.findUniqueOrThrow({
       where: { id: solicitudId },
       select: {
@@ -140,7 +141,7 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
         tipoVehiculoSugerido: true,
         createdAt: true,
         cliente: { select: { user: { select: { nombre: true, apellido: true } } } },
-        fotos: { select: { id: true, url: true, ancho: true, alto: true } },
+        fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
         items: {
           orderBy: { orden: "asc" },
           select: {
@@ -153,7 +154,7 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
             pesoKgAprox: true,
             fragil: true,
             notas: true,
-            fotos: { select: { id: true, url: true, ancho: true, alto: true } },
+            fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
           },
         },
         flete: { select: { id: true, fleteroId: true } },
@@ -183,6 +184,10 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
     }),
     getVehiculosActivos(fleteroId),
     getTurnosActivos(fleteroId),
+    prisma.conversacion.findUnique({
+      where: { solicitudId_fleteroId: { solicitudId, fleteroId } },
+      select: { id: true },
+    }),
   ]);
 
   const esMiFlete = s.flete?.fleteroId === fleteroId;
@@ -203,6 +208,9 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
     precioPorAyudante: perfil.precioPorAyudante.toNumber(),
   };
   const fecha = fechaIsoDeDia(s.fecha);
+  // Las fotos de la solicitud son privadas: se firman por un rato solo para quien puede verlas.
+  const fotos = [...s.fotos, ...s.items.flatMap((i) => i.fotos)];
+  const urlsFotos = await urlsFirmadas(fotos.map((f) => f.ruta));
   const sugerido = vehiculoSugerido(carga, vehiculos);
   const miPresupuesto = s.presupuestos[0];
 
@@ -232,10 +240,17 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
     carga,
     ayudantesRequeridos: s.ayudantesRequeridos,
     tipoVehiculoSugerido: s.tipoVehiculoSugerido,
-    fotos: [...s.fotos, ...s.items.flatMap((i) => i.fotos)],
-    items: s.items.map((i) => ({ ...i, pesoKgAprox: i.pesoKgAprox?.toNumber() ?? null })),
+    fotos: fotos.flatMap(({ ruta, ...f }) => {
+      const url = urlsFotos.get(ruta);
+      return url ? [{ ...f, url }] : [];
+    }),
+    items: s.items.map(({ fotos: _fotos, ...i }) => ({
+      ...i,
+      pesoKgAprox: i.pesoKgAprox?.toNumber() ?? null,
+    })),
     presupuestosRecibidos: s._count.presupuestos,
     fleteId: esMiFlete ? (s.flete?.id ?? null) : null,
+    conversacionId: conversacion?.id ?? null,
     miPresupuesto: miPresupuesto ? { ...miPresupuesto, monto: miPresupuesto.monto.toNumber() } : null,
     // Para el formulario de presupuesto:
     disponible: perfil.disponible,

@@ -5,6 +5,8 @@ import { evaluarCompatibilidad, ETIQUETA_COMPATIBILIDAD, puedeLlevar } from "@/d
 import { fechaIsoAr, fechaIsoDeDia } from "@/domain/fechas";
 import { precioSugerido } from "@/domain/precio";
 import { calcularValidoHasta } from "@/domain/presupuesto";
+import { conEventos } from "@/features/chat/eventos";
+import { crearMensajeDeTexto } from "@/features/chat/mensajes";
 import { consultaAccesoSolicitud } from "@/features/fleteros/solicitudes/consultas-sql";
 import { ActionError, createFleteroAction, esViolacionUnica } from "@/lib/action";
 import { prisma } from "@/lib/prisma";
@@ -19,7 +21,10 @@ const YA_PRESUPUESTADA = "Ya enviaste un presupuesto para esta solicitud.";
  */
 export const enviarPresupuesto = createFleteroAction({
   schema: presupuestoSchema,
-  handler: async ({ solicitudId, vehiculoId, monto, ayudantes, validez, mensaje }, { fleteroId }) => {
+  handler: async (
+    { solicitudId, vehiculoId, monto, ayudantes, validez, mensaje },
+    { fleteroId, usuario },
+  ) => {
     const hoy = fechaIsoAr();
     const [perfil, [acceso], vehiculo] = await Promise.all([
       prisma.fleteroProfile.findUniqueOrThrow({
@@ -48,7 +53,7 @@ export const enviarPresupuesto = createFleteroAction({
       });
 
     try {
-      await prisma.$transaction(async (tx) => {
+      await conEventos(async (tx, { emitir, publicarDespues }) => {
         // Bloquea la solicitud mientras se crea el presupuesto: si el cliente está aceptando
         // otro en este momento, una de las dos operaciones espera a la otra.
         const [solicitud] = await tx.$queryRaw<
@@ -84,6 +89,7 @@ export const enviarPresupuesto = createFleteroAction({
           },
         );
 
+        const validoHasta = calcularValidoHasta(validez, fechaIsoDeDia(solicitud.fecha));
         await tx.presupuesto.create({
           data: {
             solicitudId,
@@ -93,9 +99,21 @@ export const enviarPresupuesto = createFleteroAction({
             montoSugerido,
             incluyeAyudantes: ayudantes,
             mensaje,
-            validoHasta: calcularValidoHasta(validez, fechaIsoDeDia(solicitud.fecha)),
+            validoHasta,
           },
         });
+
+        // Presupuestar habilita el chat: crea la conversación y deja el aviso del sistema.
+        const conversacionId = await emitir({
+          solicitudId,
+          fleteroId,
+          evento: "PRESUPUESTO_ENVIADO",
+          datos: { monto, validoHasta: validoHasta.toISOString() },
+        });
+        // El mensaje del presupuesto abre la conversación, como si el fletero lo hubiera escrito.
+        if (mensaje) {
+          publicarDespues(await crearMensajeDeTexto(tx, { conversacionId, autor: usuario, texto: mensaje }));
+        }
       });
     } catch (error) {
       if (esViolacionUnica(error)) throw new ActionError(YA_PRESUPUESTADA);
@@ -111,11 +129,23 @@ export const enviarPresupuesto = createFleteroAction({
 export const retirarPresupuesto = createFleteroAction({
   schema: retirarPresupuestoSchema,
   handler: async ({ presupuestoId }, { fleteroId }) => {
-    const { count } = await prisma.presupuesto.updateMany({
-      where: { id: presupuestoId, fleteroId, estado: "PENDIENTE" },
-      data: { estado: "RETIRADO" },
+    await conEventos(async (tx, { emitir }) => {
+      const presupuesto = await tx.presupuesto.findFirst({
+        where: { id: presupuestoId, fleteroId, estado: "PENDIENTE" },
+        select: { solicitudId: true },
+      });
+      const { count } = await tx.presupuesto.updateMany({
+        where: { id: presupuestoId, fleteroId, estado: "PENDIENTE" },
+        data: { estado: "RETIRADO" },
+      });
+      if (!presupuesto || count === 0) throw new ActionError("Ese presupuesto ya no se puede retirar.");
+      await emitir({
+        solicitudId: presupuesto.solicitudId,
+        fleteroId,
+        evento: "PRESUPUESTO_RETIRADO",
+        datos: {},
+      });
     });
-    if (count === 0) throw new ActionError("Ese presupuesto ya no se puede retirar.");
     revalidatePath("/fletero", "layout");
     return null;
   },

@@ -10,6 +10,7 @@
 import {
   PrismaClient,
   type EtapaFlete,
+  type Prisma,
   type FranjaHoraria,
   type TipoFlete,
   type TipoVehiculo,
@@ -18,6 +19,8 @@ import bcrypt from "bcryptjs";
 import { resumirCarga, type ItemCarga } from "../src/domain/carga";
 import { haversineKm, redondear, type Coordenadas } from "../src/domain/geo";
 import { precioSugerido, type Tarifas } from "../src/domain/precio";
+import { fechaIsoDeDia } from "../src/domain/fechas";
+import type { DatosEvento, EventoChat } from "../src/features/chat/eventos-catalogo";
 
 if (process.env.NODE_ENV === "production") {
   console.error("El seed borra todos los datos: no se ejecuta con NODE_ENV=production.");
@@ -288,7 +291,10 @@ async function presupuestar(
   const monto = Math.max(1_000, sugerido + (opciones.ajuste ?? 0));
   const creado = hace(solicitud.seed.creadaHaceDias - 0.5);
   const estado = opciones.estado ?? "PENDIENTE";
-  return prisma.presupuesto.create({
+  // Los pendientes siguen vigentes; el resto venció hace rato.
+  const validoHasta =
+    estado === "PENDIENTE" ? new Date(Date.now() + 2 * DIA) : new Date(creado.getTime() + 2 * DIA);
+  const presupuesto = await prisma.presupuesto.create({
     data: {
       solicitudId: solicitud.id,
       fleteroId: fletero.fleteroId,
@@ -297,14 +303,63 @@ async function presupuestar(
       montoSugerido: sugerido,
       incluyeAyudantes: ayudantes,
       mensaje: opciones.mensaje ?? null,
-      // Los pendientes siguen vigentes; el resto venció hace rato.
-      validoHasta:
-        estado === "PENDIENTE" ? new Date(Date.now() + 2 * DIA) : new Date(creado.getTime() + 2 * DIA),
+      validoHasta,
       estado,
       createdAt: creado,
     },
     select: { id: true, monto: true },
   });
+
+  // Igual que en la app: presupuestar abre el chat con el aviso del sistema y el mensaje del fletero.
+  const conversacionId = await conversacionDe(solicitud, fletero, creado);
+  await mensajeSistema(
+    conversacionId,
+    "PRESUPUESTO_ENVIADO",
+    { monto, validoHasta: validoHasta.toISOString() },
+    creado,
+  );
+  if (opciones.mensaje)
+    await mensajeTexto(conversacionId, fletero.userId, opciones.mensaje, minutosDespues(creado, 1));
+  if (estado === "RETIRADO")
+    await mensajeSistema(conversacionId, "PRESUPUESTO_RETIRADO", {}, minutosDespues(creado, 90));
+  return { ...presupuesto, conversacionId };
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+
+const minutosDespues = (instante: Date, minutos: number) =>
+  new Date(instante.getTime() + minutos * 60 * 1000);
+
+async function conversacionDe(solicitud: Solicitud, fletero: Fletero, creada: Date): Promise<string> {
+  const conversacion = await prisma.conversacion.upsert({
+    where: { solicitudId_fleteroId: { solicitudId: solicitud.id, fleteroId: fletero.fleteroId } },
+    create: {
+      solicitudId: solicitud.id,
+      fleteroId: fletero.fleteroId,
+      clienteId: solicitud.seed.cliente.clienteId,
+      createdAt: creada,
+    },
+    update: {},
+    select: { id: true },
+  });
+  return conversacion.id;
+}
+
+async function mensajeSistema<E extends EventoChat>(
+  conversacionId: string,
+  evento: E,
+  datos: DatosEvento<E>,
+  en: Date,
+) {
+  await prisma.mensaje.create({
+    data: { conversacionId, tipo: "SISTEMA", evento, datos: datos as Prisma.InputJsonValue, createdAt: en },
+  });
+}
+
+async function mensajeTexto(conversacionId: string, autorId: string, contenido: string, en: Date) {
+  await prisma.mensaje.create({ data: { conversacionId, autorId, contenido, createdAt: en } });
 }
 
 const ORDEN_ETAPAS: EtapaFlete[] = ["CONFIRMADO", "CARGADO", "EN_TRANSITO", "ENTREGADO", "COMPLETADO"];
@@ -316,8 +371,11 @@ async function adjudicar(
   etapa: EtapaFlete,
   opciones: { ajuste?: number; mensaje?: string; competidores?: Fletero[]; notaCancelacion?: string } = {},
 ) {
+  const perdedores: string[] = [];
   for (const competidor of opciones.competidores ?? []) {
-    await presupuestar(solicitud, competidor, { ajuste: 3_000, estado: "RECHAZADO" });
+    perdedores.push(
+      (await presupuestar(solicitud, competidor, { ajuste: 3_000, estado: "RECHAZADO" })).conversacionId,
+    );
   }
   const ganador = await presupuestar(solicitud, fletero, {
     estado: "ACEPTADO",
@@ -368,6 +426,33 @@ async function adjudicar(
     select: { id: true },
   });
 
+  // Mensajes de sistema de cada etapa, como los deja la app.
+  for (const h of historial) {
+    const evento = EVENTO_DE_ETAPA[h.etapa];
+    if (evento === "FLETE_CONFIRMADO") {
+      const { fecha, franja } = solicitud.seed;
+      await mensajeSistema(
+        ganador.conversacionId,
+        evento,
+        { monto: ganador.monto.toNumber(), fecha: fechaIsoDeDia(fecha), franja },
+        h.createdAt,
+      );
+    } else if (evento === "FLETE_CANCELADO") {
+      await mensajeSistema(
+        ganador.conversacionId,
+        evento,
+        { motivo: opciones.notaCancelacion ?? "Sin motivo", por: "CLIENTE" },
+        h.createdAt,
+      );
+    } else if (evento) {
+      await mensajeSistema(ganador.conversacionId, evento, {}, h.createdAt);
+    }
+  }
+  const confirmadoEn = historial[0]!.createdAt;
+  for (const conversacionId of perdedores) {
+    await mensajeSistema(conversacionId, "PRESUPUESTO_NO_ELEGIDO", {}, confirmadoEn);
+  }
+
   // Control de inventario coherente con la etapa.
   const cargado = alcanzadas.includes("CARGADO");
   const descargado = alcanzadas.includes("ENTREGADO");
@@ -381,8 +466,17 @@ async function adjudicar(
     });
   }
 
-  return { fleteId: flete.id, cliente, fletero };
+  return { fleteId: flete.id, cliente, fletero, conversacionId: ganador.conversacionId };
 }
+
+const EVENTO_DE_ETAPA: Record<EtapaFlete, EventoChat> = {
+  CONFIRMADO: "FLETE_CONFIRMADO",
+  CARGADO: "CARGA_REGISTRADA",
+  EN_TRANSITO: "EN_VIAJE",
+  ENTREGADO: "DESCARGA_REGISTRADA",
+  COMPLETADO: "RECEPCION_CONFIRMADA",
+  CANCELADO: "FLETE_CANCELADO",
+};
 
 async function calificar(
   adjudicado: Awaited<ReturnType<typeof adjudicar>>,
@@ -402,26 +496,41 @@ async function calificar(
   });
 }
 
+/** Agrega mensajes de texto a la conversación del par (ya creada al presupuestar). */
 async function conversar(
   solicitud: Solicitud,
   fletero: Fletero,
   mensajes: [autor: "cliente" | "fletero", texto: string][],
 ) {
   const inicio = hace(solicitud.seed.creadaHaceDias - 0.6);
-  await prisma.conversacion.create({
-    data: {
-      solicitudId: solicitud.id,
-      fleteroId: fletero.fleteroId,
-      createdAt: inicio,
-      mensajes: {
-        create: mensajes.map(([autor, contenido], i) => ({
-          autorId: autor === "cliente" ? solicitud.seed.cliente.userId : fletero.userId,
-          contenido,
-          createdAt: new Date(inicio.getTime() + i * 25 * 60 * 1000),
-          leidoEn: new Date(inicio.getTime() + i * 25 * 60 * 1000 + 10 * 60 * 1000),
-        })),
-      },
-    },
+  const conversacionId = await conversacionDe(solicitud, fletero, inicio);
+  for (const [i, [autor, contenido]] of mensajes.entries()) {
+    const autorId = autor === "cliente" ? solicitud.seed.cliente.userId : fletero.userId;
+    await mensajeTexto(conversacionId, autorId, contenido, minutosDespues(inicio, i * 25));
+  }
+  return conversacionId;
+}
+
+/** Última actividad = último mensaje; todo leído salvo lo que se deja pendiente para la demo. */
+async function ajustarLecturas() {
+  await prisma.$executeRaw`
+    UPDATE conversaciones c SET "ultimaActividadEn" = m.ultimo
+    FROM (SELECT "conversacionId", max("createdAt") AS ultimo FROM mensajes GROUP BY 1) m
+    WHERE m."conversacionId" = c.id`;
+  await prisma.$executeRaw`
+    UPDATE conversaciones SET "leidoHastaCliente" = "ultimaActividadEn", "leidoHastaFletero" = "ultimaActividadEn"`;
+}
+
+async function notificacion(
+  userId: string,
+  tipo: "MENSAJE" | "PRESUPUESTO" | "FLETE" | "PROPUESTA",
+  titulo: string,
+  href: string,
+  cuerpo: string,
+  clave?: string,
+) {
+  await prisma.notificacion.create({
+    data: { userId, tipo, titulo, href, cuerpo, ...(clave ? { clave } : {}) },
   });
 }
 
@@ -431,8 +540,11 @@ async function conversar(
 
 async function limpiar() {
   await prisma.$transaction([
+    prisma.limiteTasa.deleteMany(),
+    prisma.notificacion.deleteMany(),
     prisma.calificacion.deleteMany(),
     prisma.estadoFlete.deleteMany(),
+    prisma.propuestaHorario.deleteMany(),
     prisma.mensaje.deleteMany(),
     prisma.conversacion.deleteMany(),
     prisma.flete.deleteMany(),
@@ -869,10 +981,10 @@ async function main() {
       item("Sillas", 4, [45, 45, 90], 6),
     ],
   });
-  await presupuestar(mudanzaAna, carlos, {
+  const presupuestoCarlos = await presupuestar(mudanzaAna, carlos, {
     mensaje: "Lo hago el sábado temprano. Voy con un ayudante y mantas.",
   });
-  await presupuestar(mudanzaAna, fernanda, {
+  const presupuestoFernanda = await presupuestar(mudanzaAna, fernanda, {
     ajuste: -2_000,
     mensaje: "Furgón cerrado, nada se moja. Llego 8:30.",
   });
@@ -995,7 +1107,7 @@ async function main() {
     },
     "ADJUDICADA",
   );
-  await adjudicar(compraAna, soledad, "CONFIRMADO", {
+  const compraConfirmada = await adjudicar(compraAna, soledad, "CONFIRMADO", {
     mensaje: "Paso a las 17 por el Abasto.",
     competidores: [lucia],
   });
@@ -1262,6 +1374,66 @@ async function main() {
   await presupuestar(vencida, dario, { estado: "RETIRADO", mensaje: "Al final no llego con la moto." });
 
   await recalcularRatings();
+  await ajustarLecturas();
+
+  // --- Estado de demo del chat ---
+  // Ana todavía no leyó los presupuestos de su mudanza; Carlos no leyó la última respuesta de Ana.
+  await prisma.conversacion.updateMany({
+    where: { solicitudId: mudanzaAna.id },
+    data: { leidoHastaCliente: null },
+  });
+  await prisma.conversacion.update({
+    where: { id: presupuestoCarlos.conversacionId },
+    data: { leidoHastaFletero: null },
+  });
+
+  // Soledad propone cambiar el horario del flete confirmado: Ana lo acepta con un toque.
+  const propuestaEn = hace(0, 1);
+  await prisma.mensaje.create({
+    data: {
+      conversacionId: compraConfirmada.conversacionId,
+      autorId: soledad.userId,
+      tipo: "PROPUESTA",
+      createdAt: propuestaEn,
+      propuesta: { create: { fecha: dia(2), franja: "MANANA", propuestaPorId: soledad.userId } },
+    },
+  });
+  await prisma.conversacion.update({
+    where: { id: compraConfirmada.conversacionId },
+    data: { ultimaActividadEn: propuestaEn, leidoHastaFletero: propuestaEn },
+  });
+
+  const chatAna = (conversacionId: string) => `/cliente/mensajes/${conversacionId}`;
+  await notificacion(
+    ana.userId,
+    "PRESUPUESTO",
+    "Carlos R. te envió un presupuesto",
+    chatAna(presupuestoCarlos.conversacionId),
+    "Mudanza de monoambiente",
+  );
+  await notificacion(
+    ana.userId,
+    "PRESUPUESTO",
+    "Fernanda R. te envió un presupuesto",
+    chatAna(presupuestoFernanda.conversacionId),
+    "Mudanza de monoambiente",
+  );
+  await notificacion(
+    ana.userId,
+    "MENSAJE",
+    "Mensajes de Soledad C.",
+    chatAna(compraConfirmada.conversacionId),
+    "Propuso una nueva fecha para el flete",
+    `chat:${compraConfirmada.conversacionId}`,
+  );
+  await notificacion(
+    carlos.userId,
+    "MENSAJE",
+    "Mensajes de Ana P.",
+    `/fletero/mensajes/${presupuestoCarlos.conversacionId}`,
+    "Genial, gracias. Mañana te confirmo.",
+    `chat:${presupuestoCarlos.conversacionId}`,
+  );
 }
 
 main()
