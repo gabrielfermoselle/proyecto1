@@ -14,12 +14,15 @@ export function AppShell({
   usuario,
   nav,
   mobileNav,
+  headerExtra,
   children,
 }: {
   usuario: Pick<UsuarioActual, "nombre" | "rol">;
   nav?: React.ReactNode;
   /** Barra inferior fija en el celular (fuera del header: su backdrop-filter rompería el position: fixed). */
   mobileNav?: React.ReactNode;
+  /** Acciones del encabezado antes de "Salir" (p. ej. la campana de notificaciones). */
+  headerExtra?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -32,6 +35,7 @@ export function AppShell({
               <span className="block font-semibold">{usuario.nombre}</span>
               <span className="text-muted-foreground">{ETIQUETA_ROL[usuario.rol]}</span>
             </p>
+            {headerExtra}
             <SignOutButton />
           </div>
         </div>

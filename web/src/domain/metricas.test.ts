@@ -16,14 +16,14 @@ describe("calcularMetricas", () => {
   it("solo suma ganancias de fletes completados y las reparte por mes", () => {
     const m = calcularMetricas(
       [
-        { etapa: "COMPLETADO", precioAcordado: 30_000, completadoEn: new Date("2026-10-02T12:00:00Z") },
-        { etapa: "COMPLETADO", precioAcordado: 20_000, completadoEn: new Date("2026-09-20T12:00:00Z") },
+        { etapa: "CERRADO", precioAcordado: 30_000, completadoEn: new Date("2026-10-02T12:00:00Z") },
+        { etapa: "CERRADO", precioAcordado: 20_000, completadoEn: new Date("2026-09-20T12:00:00Z") },
         // Completado a las 23 h del 30/9 en Tucumán (02 h UTC del 1/10): es de septiembre.
-        { etapa: "COMPLETADO", precioAcordado: 5_000, completadoEn: new Date("2026-10-01T02:00:00Z") },
+        { etapa: "CERRADO", precioAcordado: 5_000, completadoEn: new Date("2026-10-01T02:00:00Z") },
         { etapa: "ENTREGADO", precioAcordado: 99_000, completadoEn: null },
         { etapa: "CANCELADO", precioAcordado: 50_000, completadoEn: null },
         // Fuera de la ventana de 6 meses: cuenta en el total pero no en el gráfico.
-        { etapa: "COMPLETADO", precioAcordado: 1_000, completadoEn: new Date("2025-12-01T12:00:00Z") },
+        { etapa: "CERRADO", precioAcordado: 1_000, completadoEn: new Date("2025-12-01T12:00:00Z") },
       ],
       [],
       AHORA,

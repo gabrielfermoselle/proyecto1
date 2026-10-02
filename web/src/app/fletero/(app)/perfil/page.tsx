@@ -67,7 +67,7 @@ export default async function PerfilFleteroPage() {
         titulo="Vehículos"
         descripcion="Solo vas a ver solicitudes que entren en algún vehículo activo."
       >
-        <VehiculosEditor vehiculos={perfil.vehiculos} fotosHabilitadas={perfil.fotosHabilitadas} />
+        <VehiculosEditor vehiculos={perfil.vehiculos} storage={perfil.storage} />
       </Seccion>
       <Seccion
         id="zona"

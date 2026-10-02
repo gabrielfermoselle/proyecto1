@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { aproximarCoordenadas } from "@/domain/geo";
+import { urlPublica } from "@/features/uploads/storage";
 import { nombrePublico } from "@/lib/formato";
 import { prisma } from "@/lib/prisma";
 
@@ -35,7 +36,7 @@ export const getPerfilPublico = cache(async (fleteroId: string, pagina = 1) => {
           anio: true,
           capacidadKg: true,
           volumenM3: true,
-          fotos: { select: { id: true, url: true, ancho: true, alto: true } },
+          fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
         },
       },
     },
@@ -43,7 +44,7 @@ export const getPerfilPublico = cache(async (fleteroId: string, pagina = 1) => {
   if (!perfil) return null;
 
   const [completados, distribucion, resenas] = await Promise.all([
-    prisma.flete.count({ where: { fleteroId, etapa: "COMPLETADO" } }),
+    prisma.flete.count({ where: { fleteroId, etapa: "CERRADO" } }),
     prisma.calificacion.groupBy({ by: ["puntaje"], where: { fleteroId }, _count: true }),
     prisma.calificacion.findMany({
       where: { fleteroId },
@@ -84,7 +85,11 @@ export const getPerfilPublico = cache(async (fleteroId: string, pagina = 1) => {
       puntaje,
       cantidad: conteoPorPuntaje.get(puntaje) ?? 0,
     })),
-    vehiculos: perfil.vehiculos.map((v) => ({ ...v, volumenM3: v.volumenM3.toNumber() })),
+    vehiculos: perfil.vehiculos.map((v) => ({
+      ...v,
+      volumenM3: v.volumenM3.toNumber(),
+      fotos: v.fotos.map(({ ruta, ...f }) => ({ ...f, url: urlPublica(ruta) ?? "" })),
+    })),
     resenas: resenas.slice(0, RESENAS_POR_PAGINA).map((r) => ({
       id: r.id,
       puntaje: r.puntaje,

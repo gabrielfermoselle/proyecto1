@@ -28,9 +28,12 @@ export function AddressAutocomplete({ label, onSelect, placeholder, hint }: Addr
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const contenedor = useRef<HTMLDivElement>(null);
+  // Al elegir, el texto pasa a ser la dirección elegida: eso no es una búsqueda nueva.
+  const elegida = useRef<string | null>(null);
 
   useEffect(() => {
     const consulta = texto.trim();
+    if (consulta === elegida.current) return;
     if (consulta.length < MIN_CARACTERES) {
       setResultados([]);
       return;
@@ -57,6 +60,7 @@ export function AddressAutocomplete({ label, onSelect, placeholder, hint }: Addr
   }, [texto]);
 
   function elegir(resultado: ResultadoDireccion) {
+    elegida.current = resultado.direccion.trim();
     setTexto(resultado.direccion);
     setAbierto(false);
     setResultados([]);

@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/shared/app-shell";
+import { AreaConChat } from "@/features/chat/area";
 import { FleteroNavInferior, FleteroNavTabs } from "@/features/fleteros/components/fletero-nav";
 import { requireFletero } from "@/lib/session";
 
@@ -6,8 +6,8 @@ import { requireFletero } from "@/lib/session";
 export default async function FleteroAppLayout({ children }: { children: React.ReactNode }) {
   const { usuario } = await requireFletero();
   return (
-    <AppShell usuario={usuario} nav={<FleteroNavTabs />} mobileNav={<FleteroNavInferior />}>
+    <AreaConChat usuario={usuario} nav={<FleteroNavTabs />} mobileNav={<FleteroNavInferior />}>
       {children}
-    </AppShell>
+    </AreaConChat>
   );
 }

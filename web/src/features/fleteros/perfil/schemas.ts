@@ -81,8 +81,7 @@ export const disponibilidadSchema = z.object({ disponible: z.boolean() });
 
 export const fotoVehiculoSchema = z.object({
   vehiculoId: id,
-  url: z.string().url().max(500),
-  publicId: z.string().min(1).max(300),
+  ruta: z.string().min(1).max(300),
   ancho: z.number().int().positive().max(20_000),
   alto: z.number().int().positive().max(20_000),
 });

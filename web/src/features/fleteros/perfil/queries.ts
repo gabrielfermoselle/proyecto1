@@ -1,6 +1,7 @@
 import "server-only";
 import type { PerfilParaOnboarding } from "@/domain/onboarding";
-import { fotosHabilitadas } from "@/features/uploads/cloudinary";
+import { urlPublica } from "@/features/uploads/storage";
+import { configPublicaSupabase } from "@/lib/supabase";
 import { prisma } from "@/lib/prisma";
 
 /** Perfil completo del fletero para el onboarding y la página de perfil. Siempre por su `fleteroId`. */
@@ -33,7 +34,7 @@ export async function getPerfilFletero(fleteroId: string) {
           capacidadKg: true,
           volumenM3: true,
           activo: true,
-          fotos: { orderBy: { createdAt: "asc" }, select: { id: true, url: true, ancho: true, alto: true } },
+          fotos: { orderBy: { createdAt: "asc" }, select: { id: true, ruta: true, ancho: true, alto: true } },
         },
       },
     },
@@ -45,7 +46,11 @@ export async function getPerfilFletero(fleteroId: string) {
     precioPorM3: perfil.precioPorM3.toNumber(),
     precioPorAyudante: perfil.precioPorAyudante.toNumber(),
   };
-  const vehiculos = perfil.vehiculos.map((v) => ({ ...v, volumenM3: v.volumenM3.toNumber() }));
+  const vehiculos = perfil.vehiculos.map((v) => ({
+    ...v,
+    volumenM3: v.volumenM3.toNumber(),
+    fotos: v.fotos.map(({ ruta, ...f }) => ({ ...f, url: urlPublica(ruta) ?? "" })),
+  }));
 
   const progreso: PerfilParaOnboarding = {
     dni: perfil.dni,
@@ -75,7 +80,8 @@ export async function getPerfilFletero(fleteroId: string) {
     vehiculos,
     disponible: perfil.disponible,
     onboardingCompleto: perfil.onboardingCompletadoEn !== null,
-    fotosHabilitadas: fotosHabilitadas(),
+    /** Configuración para subir fotos desde el navegador; null si Storage no está configurado. */
+    storage: configPublicaSupabase(),
     progreso,
   };
 }

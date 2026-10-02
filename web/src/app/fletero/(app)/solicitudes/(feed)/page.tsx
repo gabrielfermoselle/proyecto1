@@ -39,6 +39,11 @@ export default async function SolicitudesPage({
       <PageHeader
         title="Solicitudes"
         description={`Pedidos a menos de ${feed.perfil.radioKm} km de tu base que entran en tus vehículos.`}
+        actions={
+          <Button asChild variant="outline" size="sm" className="md:hidden">
+            <Link href="/fletero/presupuestos">Mis presupuestos</Link>
+          </Button>
+        }
       />
 
       {!feed.perfil.disponible ? (

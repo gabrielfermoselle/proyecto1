@@ -2,9 +2,13 @@
 // tienen que coincidir exactamente con los enums de la base. Si alguien agrega un valor
 // en un lado y no en el otro, `npm run typecheck` falla acá.
 import type {
+  EstadoInicialItem,
   EstadoPresupuesto,
+  EstadoReclamo,
   EtapaFlete,
+  FaseControl,
   FranjaHoraria,
+  ResultadoControl,
   Rol,
   TipoFlete,
   TipoVehiculo,
@@ -22,4 +26,8 @@ export type _Verificaciones = [
   Afirmar<Iguales<FranjaHoraria, Catalogos.FranjaHoraria>>,
   Afirmar<Iguales<EtapaFlete, Catalogos.EtapaFlete>>,
   Afirmar<Iguales<EstadoPresupuesto, Catalogos.EstadoPresupuesto>>,
+  Afirmar<Iguales<EstadoInicialItem, Catalogos.EstadoInicialItem>>,
+  Afirmar<Iguales<FaseControl, Catalogos.FaseControl>>,
+  Afirmar<Iguales<ResultadoControl, Catalogos.ResultadoControl>>,
+  Afirmar<Iguales<EstadoReclamo, Catalogos.EstadoReclamo>>,
 ];

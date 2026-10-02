@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { primerPasoPendiente, PASOS_ONBOARDING, pasosCompletos } from "@/domain/onboarding";
-import { eliminarImagen, esImagenPropia, firmarSubida } from "@/features/uploads/cloudinary";
+import {
+  BUCKET_PUBLICO,
+  eliminarArchivos,
+  prepararSubida,
+  rutaSubidaValida,
+  urlPublica,
+} from "@/features/uploads/storage";
 import { ActionError, createFleteroAction, esViolacionUnica } from "@/lib/action";
 import { prisma } from "@/lib/prisma";
 import { getPerfilFletero } from "./queries";
@@ -23,7 +29,7 @@ import {
 
 const MAX_VEHICULOS = 10;
 const MAX_FOTOS_POR_VEHICULO = 6;
-const carpetaFotos = (fleteroId: string) => `fletes/vehiculos/${fleteroId}`;
+const carpetaFotos = (fleteroId: string) => `vehiculos/${fleteroId}`;
 
 const PATENTE_EN_USO = "Esa patente ya está registrada en la plataforma.";
 const VEHICULO_NO_ENCONTRADO = "No encontramos ese vehículo.";
@@ -146,7 +152,7 @@ export const guardarDisponibilidad = createFleteroAction({
   },
 });
 
-// --- Fotos de vehículos (requieren Cloudinary configurado) ---
+// --- Fotos de vehículos (requieren Supabase Storage configurado; bucket público) ---
 
 async function assertVehiculoPropio(vehiculoId: string, fleteroId: string) {
   const vehiculo = await prisma.vehiculo.findFirst({
@@ -164,7 +170,7 @@ export const firmarSubidaFotoVehiculo = createFleteroAction({
     const fotos = await assertVehiculoPropio(vehiculoId, fleteroId);
     if (fotos >= MAX_FOTOS_POR_VEHICULO)
       throw new ActionError(`Podés subir hasta ${MAX_FOTOS_POR_VEHICULO} fotos.`);
-    const subida = firmarSubida(carpetaFotos(fleteroId));
+    const subida = await prepararSubida(BUCKET_PUBLICO, carpetaFotos(fleteroId));
     if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
     return subida;
   },
@@ -173,18 +179,18 @@ export const firmarSubidaFotoVehiculo = createFleteroAction({
 export const agregarFotoVehiculo = createFleteroAction({
   schema: fotoVehiculoSchema,
   requiereOnboarding: false,
-  handler: async ({ vehiculoId, url, publicId, ancho, alto }, { fleteroId }) => {
+  handler: async ({ vehiculoId, ruta, ancho, alto }, { fleteroId }) => {
     const fotos = await assertVehiculoPropio(vehiculoId, fleteroId);
     if (fotos >= MAX_FOTOS_POR_VEHICULO)
       throw new ActionError(`Podés subir hasta ${MAX_FOTOS_POR_VEHICULO} fotos.`);
-    if (!esImagenPropia(url, publicId, carpetaFotos(fleteroId)))
+    if (!(await rutaSubidaValida(BUCKET_PUBLICO, ruta, carpetaFotos(fleteroId))))
       throw new ActionError("La foto no es válida.");
     const foto = await prisma.foto.create({
-      data: { vehiculoId, url, publicId, ancho, alto },
-      select: { id: true, url: true, ancho: true, alto: true },
+      data: { vehiculoId, ruta, ancho, alto },
+      select: { id: true, ruta: true, ancho: true, alto: true },
     });
     refrescar();
-    return foto;
+    return { ...foto, url: urlPublica(foto.ruta) };
   },
 });
 
@@ -194,11 +200,11 @@ export const eliminarFotoVehiculo = createFleteroAction({
   handler: async ({ fotoId }, { fleteroId }) => {
     const foto = await prisma.foto.findFirst({
       where: { id: fotoId, vehiculo: { fleteroId } },
-      select: { id: true, publicId: true },
+      select: { id: true, ruta: true },
     });
     if (!foto) throw new ActionError("No encontramos esa foto.");
     await prisma.foto.delete({ where: { id: foto.id } });
-    await eliminarImagen(foto.publicId);
+    await eliminarArchivos(BUCKET_PUBLICO, [foto.ruta]);
     refrescar();
     return null;
   },

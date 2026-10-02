@@ -1,4 +1,12 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, Lock, PauseCircle, Truck } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  Lock,
+  MessagesSquare,
+  PauseCircle,
+  Truck,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -61,6 +69,15 @@ export default async function SolicitudFleteroPage({ params }: { params: Promise
             : `${s.presupuestosRecibidos} presupuesto(s) recibidos`}
         </p>
       </header>
+
+      {s.conversacionId ? (
+        <Button asChild variant="secondary" className="justify-self-start">
+          <Link href={`/fletero/mensajes/${s.conversacionId}`}>
+            <MessagesSquare aria-hidden="true" />
+            Chat con {s.cliente}
+          </Link>
+        </Button>
+      ) : null}
 
       {s.fleteId ? (
         <Alert variant="success">

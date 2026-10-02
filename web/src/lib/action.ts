@@ -85,6 +85,22 @@ export function createPublicAction<S extends z.ZodTypeAny, T>(config: {
   return async (raw: z.input<S>): Promise<ActionResult<T>> => ejecutar(config.schema, raw, config.handler);
 }
 
+/** Server Action del cliente: inyecta su `clienteId`. */
+export function createClienteAction<S extends z.ZodTypeAny, T>(config: {
+  schema: S;
+  handler: (input: z.output<S>, ctx: { usuario: UsuarioActual; clienteId: string }) => Promise<T>;
+}) {
+  return createAction({
+    schema: config.schema,
+    roles: ["CLIENTE"],
+    handler: async (input, { usuario }) => {
+      const perfil = usuario.clienteProfile;
+      if (!perfil) throw new ActionError("No encontramos tu perfil de cliente.");
+      return config.handler(input, { usuario, clienteId: perfil.id });
+    },
+  });
+}
+
 /**
  * Server Action del fletero: inyecta su `fleteroId`. Por defecto exige el onboarding completo;
  * las acciones del propio onboarding pasan `requiereOnboarding: false`.
