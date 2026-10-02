@@ -125,9 +125,17 @@ export function InventarioControl({ fleteId, fase, items, fotosHabilitadas }: In
               control?.observacion || control?.fotos.length || tonoResultado(control!.resultado) !== "ok",
             );
           const tono = resultado ? tonoResultado(resultado) : null;
-          const previo = fase === "DESCARGA" ? item.carga : fase === "RECEPCION" ? item.descarga : null;
-          const mostrarPrevio =
-            previo && (fase === "RECEPCION" || previo.observacion || previo.fotos.length > 0);
+          // Lo que ya se registró antes, para comparar: al descargar, la carga; al recibir, la carga
+          // (si tuvo observación, p. ej. un rayón previo) y la descarga.
+          const conDetalle = (c: ItemDto["carga"]) => Boolean(c && (c.observacion || c.fotos.length > 0));
+          const previos = [
+            fase !== "CARGA" && conDetalle(item.carga)
+              ? { etiqueta: "Al cargar", control: item.carga! }
+              : null,
+            fase === "RECEPCION" && item.descarga
+              ? { etiqueta: "Al descargar", control: item.descarga }
+              : null,
+          ].filter((x) => x !== null);
           const mostrarRegistrado =
             control &&
             resultado === control.resultado &&
@@ -187,13 +195,14 @@ export function InventarioControl({ fleteId, fase, items, fotosHabilitadas }: In
                 </div>
               </div>
 
-              {mostrarPrevio && previo ? (
+              {previos.map((p) => (
                 <DetalleControl
-                  etiqueta={fase === "DESCARGA" ? "Al cargar" : "Al descargar"}
-                  control={previo}
+                  key={p.etiqueta}
+                  etiqueta={p.etiqueta}
+                  control={p.control}
                   item={item.nombre}
                 />
-              ) : null}
+              ))}
               {mostrarRegistrado && control ? (
                 <DetalleControl etiqueta="Registrado" control={control} item={item.nombre} />
               ) : null}

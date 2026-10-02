@@ -12,19 +12,23 @@ npm run db:seed             # BORRA todo y carga los datos de demo de Tucumán
 npm run dev
 ```
 
+Para producción, ver [DEPLOY.md](DEPLOY.md).
+
 Usuarios de demo (contraseña `Demo1234`): `ana@demo.test` (cliente), `carlos@demo.test` (fletero),
 `admin@demo.test` (admin), `diego@demo.test` (fletero con onboarding pendiente). La lista completa
 se imprime al final del seed.
 
 ## Scripts
 
-| Script               | Qué hace                                                          |
-| -------------------- | ----------------------------------------------------------------- |
-| `npm run typecheck`  | `tsc` con `strict`, `noUncheckedIndexedAccess` y `exactOptional…` |
-| `npm run lint`       | ESLint (el dominio no puede importar Prisma, Next ni `lib/`)      |
-| `npm test`           | Tests unitarios del dominio (Vitest)                              |
-| `npm run db:migrate` | Crea una migración nueva en desarrollo                            |
-| `npm run db:studio`  | Prisma Studio                                                     |
+| Script                          | Qué hace                                                          |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `npm run typecheck`             | `tsc` con `strict`, `noUncheckedIndexedAccess` y `exactOptional…` |
+| `npm run lint`                  | ESLint (el dominio no puede importar Prisma, Next ni `lib/`)      |
+| `npm test`                      | Todos los tests: unitarios y de integración con base real         |
+| `npx vitest run --project unit` | Solo los unitarios (dominio, SQL con PGlite)                      |
+| `npx vitest run --project db`   | Acciones con Prisma contra PGlite + PostGIS por TCP               |
+| `npm run db:migrate`            | Crea una migración nueva en desarrollo                            |
+| `npm run db:studio`             | Prisma Studio                                                     |
 
 ## Arquitectura
 
@@ -52,3 +56,11 @@ src/app/           rutas: (auth), cliente/, fletero/, admin/, panel/
   comprobante PDF sale de `/api/fletes/[id]/comprobante` (`@react-pdf/renderer`).
 - **Supabase (opcional)**: Realtime para el chat y el seguimiento en vivo, y Storage para las fotos.
   Sin las variables `SUPABASE_*`, todo funciona con consultas periódicas y sin carga de fotos.
+- **Áreas**: el cliente publica solicitudes, compara presupuestos y sigue sus fletes; el fletero
+  presupuesta y opera el flete desde el celular; el admin gestiona cuentas, verifica fleteros y
+  resuelve reclamos.
+- **Mantenimiento diario** (`features/mantenimiento`, cron en `vercel.json`): vence solicitudes,
+  avisa por fletes demorados, borra fotos abandonadas (cada subida firmada queda registrada como
+  pendiente hasta que se adjunta) y limpia el limitador.
+- **Tests de integración** (`*.db.test.ts`): `test/db/global-setup.ts` levanta PGlite + PostGIS con
+  todas las migraciones y lo expone por TCP; la sesión de NextAuth se simula en `test/db/sesion.ts`.

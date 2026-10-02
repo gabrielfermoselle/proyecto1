@@ -15,3 +15,8 @@ export const MapaPuntos = dynamic(() => import("./mapa-puntos").then((m) => m.Ma
   ssr: false,
   loading: () => <Skeleton className="h-[60vh] min-h-80 w-full" />,
 });
+
+export const MapaPunto = dynamic(() => import("./mapa-punto").then((m) => m.MapaPunto), {
+  ssr: false,
+  loading: () => <Skeleton className="h-56 w-full sm:h-64" />,
+});

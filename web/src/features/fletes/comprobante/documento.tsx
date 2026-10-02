@@ -257,6 +257,9 @@ function Comprobante({ f, emitido }: { f: FleteDetalle; emitido: Date }) {
                   )}
                 </Text>
                 <Text style={s.suave}>{t(`«${item.reclamo!.descripcion}»`)}</Text>
+                {item.reclamo!.resolucion ? (
+                  <Text>{t(`Resolución: ${item.reclamo!.resolucion}`)}</Text>
+                ) : null}
               </View>
             ))}
           </View>

@@ -44,7 +44,14 @@ export interface ItemDto {
   carga: ControlDto | null;
   descarga: ControlDto | null;
   recepcion: ControlDto | null;
-  reclamo: { descripcion: string; estado: string; fecha: Date; fotos: FotoDto[] } | null;
+  reclamo: {
+    descripcion: string;
+    estado: string;
+    fecha: Date;
+    fotos: FotoDto[];
+    resolucion: string | null;
+    resueltoEn: Date | null;
+  } | null;
 }
 
 interface FotoFila {
@@ -126,7 +133,15 @@ export async function getFleteDetalle(
         },
       },
       reclamos: {
-        select: { itemId: true, descripcion: true, estado: true, createdAt: true, fotos: SELECT_FOTO },
+        select: {
+          itemId: true,
+          descripcion: true,
+          estado: true,
+          createdAt: true,
+          resolucion: true,
+          resueltoEn: true,
+          fotos: SELECT_FOTO,
+        },
       },
       solicitud: {
         select: {
@@ -208,6 +223,8 @@ export async function getFleteDetalle(
             estado: reclamo.estado,
             fecha: reclamo.createdAt,
             fotos: fotos(reclamo.fotos),
+            resolucion: reclamo.resolucion,
+            resueltoEn: reclamo.resueltoEn,
           }
         : null,
     };

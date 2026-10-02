@@ -40,6 +40,12 @@ export function InventarioLectura({ items, titulo = "Inventario" }: { items: Ite
                   {item.reclamo.fotos.length > 0 ? (
                     <GaleriaFotos fotos={item.reclamo.fotos} descripcion={`${item.nombre}, reclamo`} />
                   ) : null}
+                  {item.reclamo.resolucion ? (
+                    <p className="rounded-md bg-card p-2 text-foreground">
+                      <span className="font-semibold">Resolución: </span>
+                      {item.reclamo.resolucion}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               {!algo ? <p className="text-sm text-muted-foreground">Todavía no se cargó.</p> : null}

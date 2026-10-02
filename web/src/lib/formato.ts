@@ -24,11 +24,13 @@ const diaLargo = new Intl.DateTimeFormat("es-AR", {
   month: "long",
   timeZone: "UTC",
 });
+// En Argentina se usa el reloj de 24 h; el ICU de es-AR, según la versión, usa "p. m.".
 const fechaHora = new Intl.DateTimeFormat("es-AR", {
   day: "numeric",
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
+  hourCycle: "h23",
   timeZone: ZONA,
 });
 const fechaCorta = new Intl.DateTimeFormat("es-AR", {
@@ -75,5 +77,10 @@ export function formatearDiaAbsoluto(fechaIso: string): string {
   return diaCorto.format(diaDesdeIso(fechaIso)).replace(/\./g, "");
 }
 
-const hora = new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: ZONA });
+const hora = new Intl.DateTimeFormat("es-AR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: ZONA,
+});
 export const formatearHora = (instante: Date) => hora.format(instante);

@@ -20,6 +20,8 @@ const envSchema = z
     SUPABASE_ANON_KEY: opcional,
     SUPABASE_SERVICE_ROLE_KEY: opcional,
     SUPABASE_JWT_SECRET: opcional,
+    // Lo manda Vercel Cron en Authorization. Sin él, el mantenimiento diario no se puede disparar.
+    CRON_SECRET: opcional.pipe(z.string().min(16).optional()),
   })
   .refine(
     (e) => {

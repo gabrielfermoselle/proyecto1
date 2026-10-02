@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ACTOR_DE_FASE, FASE_DE_ETAPA } from "@/domain/ciclo-flete";
+import { redondear } from "@/domain/geo";
 import { perfilChat } from "@/features/chat/acceso";
 import { BUCKET_PRIVADO, prepararSubida, rutaSubidaValida } from "@/features/uploads/storage";
 import { ActionError, createAction, esViolacionUnica } from "@/lib/action";
@@ -169,8 +170,20 @@ export const calificarFlete = createAction({
     if (!flete) throw new ActionError("No encontramos ese flete.");
     if (flete.etapa !== "CERRADO") throw new ActionError("Vas a poder calificar cuando cierres el flete.");
     try {
-      await prisma.calificacion.create({
-        data: { fleteId, clienteId: actor.perfilId, fleteroId: flete.fleteroId, puntaje, comentario },
+      await prisma.$transaction(async (tx) => {
+        await tx.calificacion.create({
+          data: { fleteId, clienteId: actor.perfilId, fleteroId: flete.fleteroId, puntaje, comentario },
+        });
+        // El promedio vive desnormalizado en el perfil (feed, búsqueda y perfil público lo leen).
+        const { _avg, _count } = await tx.calificacion.aggregate({
+          where: { fleteroId: flete.fleteroId },
+          _avg: { puntaje: true },
+          _count: true,
+        });
+        await tx.fleteroProfile.update({
+          where: { id: flete.fleteroId },
+          data: { ratingPromedio: redondear(_avg.puntaje ?? 0, 2), cantidadCalificaciones: _count },
+        });
       });
     } catch (error) {
       if (esViolacionUnica(error)) throw new ActionError("Ya calificaste este flete.");

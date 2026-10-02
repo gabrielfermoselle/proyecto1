@@ -125,28 +125,29 @@ enum EstadoReclamo {
 }
 
 model User {
-  id             String             @id @default(cuid())
-  email          String             @unique
-  passwordHash   String
-  nombre         String             @db.VarChar(60)
-  apellido       String             @db.VarChar(60)
+  id                String             @id @default(cuid())
+  email             String             @unique
+  passwordHash      String
+  nombre            String             @db.VarChar(60)
+  apellido          String             @db.VarChar(60)
   /// Nunca se expone a la otra parte: la coordinación es por el chat.
-  telefono       String?            @db.VarChar(20)
-  avatarUrl      String?
-  rol            Rol
-  activo         Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  clienteProfile ClienteProfile?
-  fleteroProfile FleteroProfile?
-  mensajes       Mensaje[]
-  cambiosEstado  EstadoFlete[]
-  notificaciones Notificacion[]
-  propuestas     PropuestaHorario[] @relation("PropuestaPor")
-  respuestas     PropuestaHorario[] @relation("RespondidaPor")
-  controles      ControlItem[]
-  reclamos       Reclamo[]
-  conformidades  Conformidad[]
+  telefono          String?            @db.VarChar(20)
+  avatarUrl         String?
+  rol               Rol
+  activo            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  clienteProfile    ClienteProfile?
+  fleteroProfile    FleteroProfile?
+  mensajes          Mensaje[]
+  cambiosEstado     EstadoFlete[]
+  notificaciones    Notificacion[]
+  propuestas        PropuestaHorario[] @relation("PropuestaPor")
+  respuestas        PropuestaHorario[] @relation("RespondidaPor")
+  controles         ControlItem[]
+  reclamos          Reclamo[]          @relation("ReclamoAutor")
+  reclamosResueltos Reclamo[]          @relation("ReclamoResueltoPor")
+  conformidades     Conformidad[]
 
   @@map("users")
 }
@@ -417,20 +418,24 @@ model ControlItem {
   @@map("controles_item")
 }
 
-/// Reclamo del cliente sobre un ítem al recibir. Su resolución queda fuera de este módulo.
+/// Reclamo del cliente sobre un ítem al recibir. Lo resuelve un administrador.
 model Reclamo {
-  id          String         @id @default(cuid())
-  itemId      String         @unique
-  item        ItemInventario @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  fleteId     String
-  flete       Flete          @relation(fields: [fleteId], references: [id], onDelete: Cascade)
-  autorId     String
-  autor       User           @relation(fields: [autorId], references: [id])
-  descripcion String         @db.VarChar(500)
-  estado      EstadoReclamo  @default(ABIERTO)
-  createdAt   DateTime       @default(now())
-  resueltoEn  DateTime?
-  fotos       Foto[]
+  id            String         @id @default(cuid())
+  itemId        String         @unique
+  item          ItemInventario @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  fleteId       String
+  flete         Flete          @relation(fields: [fleteId], references: [id], onDelete: Cascade)
+  autorId       String
+  autor         User           @relation("ReclamoAutor", fields: [autorId], references: [id])
+  descripcion   String         @db.VarChar(500)
+  estado        EstadoReclamo  @default(ABIERTO)
+  createdAt     DateTime       @default(now())
+  resueltoEn    DateTime?
+  /// Lo que decidió el administrador; lo ven el cliente y el fletero.
+  resolucion    String?        @db.VarChar(500)
+  resueltoPorId String?
+  resueltoPor   User?          @relation("ReclamoResueltoPor", fields: [resueltoPorId], references: [id], onDelete: SetNull)
+  fotos         Foto[]
 
   @@index([fleteId])
   @@map("reclamos")
@@ -538,6 +543,17 @@ model Notificacion {
   @@unique([userId, clave])
   @@index([userId, leidaEn, updatedAt])
   @@map("notificaciones")
+}
+
+/// Subida firmada que todavía no se adjuntó a nada. El mantenimiento diario borra los archivos
+/// de las que quedaron abandonadas (se pidió la URL y nunca se guardó la foto).
+model SubidaPendiente {
+  ruta      String   @id @db.VarChar(300)
+  bucket    String   @db.VarChar(40)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("subidas_pendientes")
 }
 
 /// Limitador de envíos por ventana fija. Funciona con varias instancias serverless sin Redis.

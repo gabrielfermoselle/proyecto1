@@ -1,9 +1,10 @@
-import { ChevronRight, Truck } from "lucide-react";
+import { ChevronRight, Plus, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ETIQUETA_ETAPA, FRANJA } from "@/domain/catalogos";
 import { esEtapaActiva } from "@/domain/ciclo-flete";
 import { hrefFlete } from "@/features/fletes/rutas";
@@ -61,12 +62,20 @@ export default async function ClienteInicioPage() {
       <PageHeader
         title={`Hola, ${usuario.nombre}`}
         description="Acá seguís tus fletes: en qué etapa están, el inventario y la recepción."
+        actions={
+          <Button asChild>
+            <Link href="/cliente/solicitudes/nueva">
+              <Plus aria-hidden="true" />
+              Publicar un flete
+            </Link>
+          </Button>
+        }
       />
       {fletes.length === 0 ? (
         <EmptyState
           icon={<Truck />}
           title="Todavía no tenés fletes"
-          description="Cuando aceptes el presupuesto de un fletero, vas a poder seguir el flete desde acá."
+          description="Publicá qué necesitás trasladar: cuando aceptes el presupuesto de un fletero, lo seguís desde acá."
         />
       ) : null}
       {enCurso.length > 0 ? (

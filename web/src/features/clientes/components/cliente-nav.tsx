@@ -1,10 +1,9 @@
 "use client";
 
-import { MessagesSquare, Truck } from "lucide-react";
+import { ClipboardList, MessagesSquare, Search, Truck } from "lucide-react";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
 import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
 
-// El módulo de clientes suma acá "Mis solicitudes" y "Buscar fleteros".
 const secciones = (): SeccionNav[] => [
   {
     href: "/cliente",
@@ -15,12 +14,26 @@ const secciones = (): SeccionNav[] => [
     enInferior: true,
   },
   {
+    href: "/cliente/solicitudes",
+    label: "Solicitudes",
+    Icono: ClipboardList,
+    prefijos: ["/cliente/solicitudes"],
+    enInferior: true,
+  },
+  {
     href: "/cliente/mensajes",
     label: "Mensajes",
     Icono: MessagesSquare,
     prefijos: ["/cliente/mensajes"],
     enInferior: true,
     extra: <NoLeidosBadge />,
+  },
+  {
+    href: "/cliente/fleteros",
+    label: "Fleteros",
+    Icono: Search,
+    prefijos: ["/cliente/fleteros"],
+    enInferior: true,
   },
 ];
 

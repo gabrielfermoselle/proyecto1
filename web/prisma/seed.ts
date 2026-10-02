@@ -725,6 +725,7 @@ async function notificacion(
 async function limpiar() {
   await prisma.$transaction([
     prisma.limiteTasa.deleteMany(),
+    prisma.subidaPendiente.deleteMany(),
     prisma.notificacion.deleteMany(),
     prisma.calificacion.deleteMany(),
     prisma.conformidad.deleteMany(),
