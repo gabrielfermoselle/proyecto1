@@ -13,6 +13,12 @@ export interface Limite {
 const MUY_RAPIDO = "Estás enviando muy rápido. Esperá un momento y probá de nuevo.";
 
 export const LIMITES = {
+  registros: (ip: string): Limite => ({
+    clave: `auth:registro:${ip}`,
+    maximo: 5,
+    ventanaSegundos: 3600,
+    mensaje: "Se crearon muchas cuentas desde esta conexión. Probá más tarde.",
+  }),
   mensajesPorConversacion: (userId: string, conversacionId: string): Limite => ({
     clave: `chat:msg:${userId}:${conversacionId}`,
     maximo: 20,

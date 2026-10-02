@@ -9,7 +9,7 @@ export interface SeccionNav {
   href: string;
   label: string;
   Icono: LucideIcon;
-  /** Rutas que marcan la sección como activa; vacío = solo `href` exacto. */
+  /** Rutas que, además de `href` exacto, marcan la sección como activa. */
   prefijos: readonly string[];
   /** Si aparece en la barra inferior del celular (que tiene lugar para 5). */
   enInferior: boolean;
@@ -18,7 +18,7 @@ export interface SeccionNav {
 }
 
 function estaActiva(pathname: string, seccion: SeccionNav) {
-  if (seccion.prefijos.length === 0) return pathname === seccion.href;
+  if (pathname === seccion.href) return true;
   return seccion.prefijos.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

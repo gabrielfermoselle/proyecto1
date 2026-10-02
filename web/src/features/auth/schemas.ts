@@ -61,3 +61,6 @@ export const registroSchema = z
 export type LoginInput = z.input<typeof loginSchema>;
 export type RegistroInput = z.input<typeof registroSchema>;
 export type RegistroDatos = z.output<typeof registroSchema>;
+
+/** Lo que recibe el formulario de login cuando se superan los intentos (NextAuth lo pasa en `error`). */
+export const ERROR_DEMASIADOS_INTENTOS = "DEMASIADOS_INTENTOS";

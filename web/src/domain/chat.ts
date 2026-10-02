@@ -1,6 +1,7 @@
 // Reglas del chat entre cliente y fletero. Puro: lo usan las acciones, las queries y la UI.
 
 import type { EstadoPresupuesto, EtapaFlete } from "./catalogos";
+import { esEtapaActiva } from "./ciclo-flete";
 
 // ---------------------------------------------------------------------------
 // Estado de la conversación
@@ -24,12 +25,10 @@ export interface DatosEstadoConversacion {
   fleteEtapa: EtapaFlete | null;
 }
 
-const ETAPAS_EN_CURSO: readonly EtapaFlete[] = ["CONFIRMADO", "CARGADO", "EN_TRANSITO", "ENTREGADO"];
-
 export function estadoConversacion(d: DatosEstadoConversacion, ahora: Date = new Date()): EstadoConversacion {
   if (d.fleteEtapa === "CANCELADO") return "BLOQUEADA";
-  if (d.fleteEtapa && ETAPAS_EN_CURSO.includes(d.fleteEtapa)) return "ACTIVA";
-  if (d.fleteEtapa === "COMPLETADO") return "CERRADA";
+  if (d.fleteEtapa && esEtapaActiva(d.fleteEtapa)) return "ACTIVA";
+  if (d.fleteEtapa === "CERRADO") return "CERRADA";
   const negociando =
     d.solicitudEstado === "ABIERTA" &&
     d.presupuesto?.estado === "PENDIENTE" &&

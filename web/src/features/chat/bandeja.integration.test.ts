@@ -36,7 +36,7 @@ beforeAll(async () => {
       ('p2','s1','f-sole','v2',1200,1200,'2026-10-04','RECHAZADO',now()),
       ('p3','s2','f-carlos','v1',900,900,'2026-10-05','PENDIENTE',now());
     insert into fletes (id,"solicitudId","presupuestoId","clienteId","fleteroId","vehiculoId","precioAcordado",etapa,"updatedAt") values
-      ('fl1','s1','p1','c-ana','f-carlos','v1',1000,'CARGADO',now());
+      ('fl1','s1','p1','c-ana','f-carlos','v1',1000,'CARGANDO',now());
     insert into conversaciones (id,"solicitudId","fleteroId","clienteId","ultimaActividadEn","leidoHastaCliente","leidoHastaFletero") values
       ('k-ana-carlos','s1','f-carlos','c-ana','2026-10-01 12:00','2026-10-01 10:00','2026-10-01 12:00'),
       ('k-ana-sole','s1','f-sole','c-ana','2026-10-01 09:00',null,null),
@@ -75,7 +75,7 @@ describe("bandeja de Ana (cliente)", () => {
     expect(carlos).toMatchObject({
       ultimoTipo: "SISTEMA",
       ultimoEvento: "CARGA_REGISTRADA",
-      fleteEtapa: "CARGADO",
+      fleteEtapa: "CARGANDO",
     });
     expect(sole).toMatchObject({
       fleteEtapa: null,

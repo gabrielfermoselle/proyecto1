@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma, TipoNotificacion } from "@prisma/client";
 import { notificar } from "@/features/notificaciones/servidor";
 import { formatearPesos, nombrePublico } from "@/lib/formato";
+import { hrefFlete } from "@/features/fletes/rutas";
 import { prisma } from "@/lib/prisma";
 import { publicar, type Publicacion } from "@/lib/supabase";
 import { hrefConversacion } from "./acceso";
@@ -32,6 +33,8 @@ const NOTIFICACION: {
     para: (d: DatosEvento<E>) => RolChat;
     tipo: TipoNotificacion;
     titulo: (p: Partes, d: DatosEvento<E>) => string;
+    /** Lleva a la página del flete en lugar del chat (los avisos de la operación). */
+    aFlete?: true;
   };
 } = {
   PRESUPUESTO_ENVIADO: {
@@ -53,14 +56,52 @@ const NOTIFICACION: {
     para: () => "FLETERO",
     tipo: "FLETE",
     titulo: (p) => `¡${p.cliente} aceptó tu presupuesto!`,
+    aFlete: true,
   },
-  CARGA_REGISTRADA: { para: () => "CLIENTE", tipo: "FLETE", titulo: (p) => `${p.fletero} cargó tus cosas` },
-  EN_VIAJE: { para: () => "CLIENTE", tipo: "FLETE", titulo: (p) => `${p.fletero} va en camino al destino` },
+  EN_CAMINO_A_ORIGEN: {
+    para: () => "CLIENTE",
+    tipo: "FLETE",
+    titulo: (p) => `${p.fletero} salió a buscar tu carga`,
+    aFlete: true,
+  },
+  LLEGADA_ORIGEN: {
+    para: () => "CLIENTE",
+    tipo: "FLETE",
+    titulo: (p) => `${p.fletero} llegó y está cargando`,
+    aFlete: true,
+  },
+  CARGA_REGISTRADA: {
+    para: () => "CLIENTE",
+    tipo: "FLETE",
+    titulo: (p) => `${p.fletero} cargó tus cosas y va al destino`,
+    aFlete: true,
+  },
+  LLEGADA_DESTINO: {
+    para: () => "CLIENTE",
+    tipo: "FLETE",
+    titulo: (p) => `${p.fletero} llegó al destino`,
+    aFlete: true,
+  },
   DESCARGA_REGISTRADA: {
     para: () => "CLIENTE",
     tipo: "FLETE",
-    titulo: (p) => `${p.fletero} registró la entrega: confirmá la recepción`,
+    titulo: (p) => `${p.fletero} registró la entrega: revisá y confirmá la recepción`,
+    aFlete: true,
   },
+  RECLAMO_ABIERTO: {
+    para: () => "FLETERO",
+    tipo: "FLETE",
+    titulo: (p, d) => `${p.cliente} abrió un reclamo por «${d.item}»`,
+    aFlete: true,
+  },
+  FLETE_CERRADO: {
+    para: () => "FLETERO",
+    tipo: "FLETE",
+    titulo: (p, d) =>
+      d.reclamos ? `${p.cliente} cerró el flete con reclamos` : `${p.cliente} confirmó la recepción`,
+    aFlete: true,
+  },
+  EN_VIAJE: { para: () => "CLIENTE", tipo: "FLETE", titulo: (p) => `${p.fletero} va en camino al destino` },
   RECEPCION_CONFIRMADA: {
     para: () => "FLETERO",
     tipo: "FLETE",
@@ -147,14 +188,21 @@ export async function registrarEvento<E extends EventoChat>(
     para: (d: unknown) => RolChat;
     tipo: TipoNotificacion;
     titulo: (p: Partes, d: unknown) => string;
+    aFlete?: true;
   };
   const destinatario = opciones.notificarA ?? config.para(e.datos);
+  const flete = config.aFlete
+    ? await tx.flete.findFirst({
+        where: { solicitudId: e.solicitudId, fleteroId: e.fleteroId },
+        select: { id: true },
+      })
+    : null;
   const avisos = await notificar(tx, {
     userId: destinatario === "CLIENTE" ? solicitud.cliente.userId : fletero.userId,
     tipo: config.tipo,
     titulo: config.titulo(partes, e.datos),
     cuerpo: solicitud.titulo,
-    href: hrefConversacion(destinatario, conversacion.id),
+    href: flete ? hrefFlete(destinatario, flete.id) : hrefConversacion(destinatario, conversacion.id),
   });
 
   // Los mensajes de sistema no tienen datos de contacto ni fotos: no hace falta ocultar ni firmar.

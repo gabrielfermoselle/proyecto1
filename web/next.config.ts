@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
     // Solo imágenes de Supabase Storage (públicas y URLs firmadas); nada de hosts arbitrarios.
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/**" }],
   },
+  // @react-pdf/renderer trae WebAssembly (yoga) y fuentes estándar: se usa tal cual desde node_modules.
+  serverExternalPackages: ["@react-pdf/renderer"],
   experimental: {
     serverActions: { bodySizeLimit: "1mb" },
   },

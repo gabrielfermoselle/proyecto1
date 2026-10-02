@@ -20,10 +20,30 @@ describe("textoEvento", () => {
       FLETE_CONFIRMADO: { monto: 1000, fecha: "2026-10-09", franja: "TARDE" },
       FLETE_CANCELADO: { motivo: "x", por: "CLIENTE" },
       FECHA_ACORDADA: { fecha: "2026-10-09", franja: "TARDE", aplicada: false },
+      RECLAMO_ABIERTO: { item: "Heladera" },
+      FLETE_CERRADO: { reclamos: 0 },
     };
     for (const evento of Object.keys(ESQUEMAS_EVENTO)) {
       expect(textoEvento(evento, ejemplos[evento] ?? {}), evento).not.toBe("Actualización del flete.");
     }
+  });
+
+  it("la carga y la descarga resumen el inventario; los mensajes viejos sin conteos se siguen leyendo", () => {
+    expect(textoEvento("CARGA_REGISTRADA", { cargados: 5, noCargados: 1, conObservacion: 2 })).toBe(
+      "Carga registrada: se cargaron 5 ítems (1 ítem sin cargar, 2 ítems con observaciones). El fletero salió hacia el destino.",
+    );
+    expect(textoEvento("CARGA_REGISTRADA", {})).toBe(
+      "Carga registrada: el fletero cargó todo lo de la lista.",
+    );
+    expect(textoEvento("DESCARGA_REGISTRADA", { entregados: 3, conDano: 1, faltantes: 0 })).toBe(
+      "Descarga registrada: se entregaron 3 ítems, 1 ítem con daño. Falta que el cliente revise y confirme la recepción.",
+    );
+    expect(textoEvento("FLETE_CERRADO", { reclamos: 1 })).toBe(
+      "El cliente confirmó la recepción y cerró el flete. Quedó registrado 1 reclamo.",
+    );
+    expect(textoEvento("DESCARGA_REGISTRADA", { entregados: 1, conDano: 0, faltantes: 2 })).toBe(
+      "Descarga registrada: se entregó 1 ítem, 2 ítems faltantes. Falta que el cliente revise y confirme la recepción.",
+    );
   });
 
   it("con un evento desconocido o datos inválidos usa un texto genérico", () => {

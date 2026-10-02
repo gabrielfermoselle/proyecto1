@@ -32,24 +32,65 @@ export const FRANJA: Record<FranjaHoraria, { etiqueta: string; desde: number; ha
   FLEXIBLE: { etiqueta: "Horario flexible", desde: 8, hasta: 20 },
 };
 
+/** Etapas que se guardan en el flete (existe desde que el cliente acepta un presupuesto). */
 export const ETAPAS_FLETE = [
   "CONFIRMADO",
-  "CARGADO",
-  "EN_TRANSITO",
+  "EN_CAMINO_A_ORIGEN",
+  "CARGANDO",
+  "EN_TRASLADO",
+  "DESCARGANDO",
   "ENTREGADO",
-  "COMPLETADO",
+  "CERRADO",
   "CANCELADO",
 ] as const;
 export type EtapaFlete = (typeof ETAPAS_FLETE)[number];
 
 export const ETIQUETA_ETAPA: Record<EtapaFlete, string> = {
   CONFIRMADO: "Confirmado",
-  CARGADO: "Cargado",
-  EN_TRANSITO: "En viaje",
+  EN_CAMINO_A_ORIGEN: "En camino al origen",
+  CARGANDO: "Cargando",
+  EN_TRASLADO: "En traslado",
+  DESCARGANDO: "Descargando",
   ENTREGADO: "Entregado",
-  COMPLETADO: "Completado",
+  CERRADO: "Cerrado",
   CANCELADO: "Cancelado",
 };
+
+export const ESTADOS_INICIALES_ITEM = ["BUENO", "CON_MARCAS", "DANADO"] as const;
+export type EstadoInicialItem = (typeof ESTADOS_INICIALES_ITEM)[number];
+
+export const ETIQUETA_ESTADO_INICIAL: Record<EstadoInicialItem, string> = {
+  BUENO: "En buen estado",
+  CON_MARCAS: "Con marcas de uso",
+  DANADO: "Con daños previos",
+};
+
+export const FASES_CONTROL = ["CARGA", "DESCARGA", "RECEPCION"] as const;
+export type FaseControl = (typeof FASES_CONTROL)[number];
+
+export const RESULTADOS_CONTROL = [
+  "CARGADO",
+  "NO_CARGADO",
+  "ENTREGADO",
+  "CON_DANO",
+  "FALTANTE",
+  "CONFORME",
+  "RECLAMO",
+] as const;
+export type ResultadoControl = (typeof RESULTADOS_CONTROL)[number];
+
+export const ETIQUETA_RESULTADO: Record<ResultadoControl, string> = {
+  CARGADO: "Cargado",
+  NO_CARGADO: "No se cargó",
+  ENTREGADO: "Entregado",
+  CON_DANO: "Entregado con daño",
+  FALTANTE: "Faltante",
+  CONFORME: "Recibido conforme",
+  RECLAMO: "Con reclamo",
+};
+
+export const ESTADOS_RECLAMO = ["ABIERTO", "RESUELTO"] as const;
+export type EstadoReclamo = (typeof ESTADOS_RECLAMO)[number];
 
 export const ESTADOS_PRESUPUESTO = ["PENDIENTE", "ACEPTADO", "RECHAZADO", "RETIRADO"] as const;
 export type EstadoPresupuesto = (typeof ESTADOS_PRESUPUESTO)[number];

@@ -41,3 +41,14 @@ src/app/           rutas: (auth), cliente/, fletero/, admin/, panel/
   Action vuelve a verificar contra la base (`requireRol`, `createAction`).
 - **Geo**: `baseGeo` y `origenGeo` son columnas `GENERATED` a partir de lat/lng, con índice GIST.
   En el schema llevan `@default(dbgenerated())` para que Prisma no intente modificarlas.
+- **Ciclo del flete**: `domain/ciclo-flete.ts` define las etapas (SOLICITADO → PRESUPUESTADO →
+  CONFIRMADO → EN_CAMINO_A_ORIGEN → CARGANDO → EN_TRASLADO → DESCARGANDO → ENTREGADO → CERRADO, más
+  CANCELADO), quién mueve cada una y sus condiciones. Las dos primeras se derivan de la solicitud;
+  desde CONFIRMADO la etapa se guarda en el flete. Todo cambio pasa por `features/fletes/servicio.ts`:
+  una transacción que bloquea el flete, revalida con el dominio, guarda el historial (con la
+  ubicación opcional del fletero), deja el mensaje en el chat y avisa en vivo después del commit.
+- **Inventario digital**: un control por ítem y fase (check-in al cargar, check-out al descargar,
+  recepción del cliente), con observación y foto opcionales, reclamos y firmas de conformidad. El
+  comprobante PDF sale de `/api/fletes/[id]/comprobante` (`@react-pdf/renderer`).
+- **Supabase (opcional)**: Realtime para el chat y el seguimiento en vivo, y Storage para las fotos.
+  Sin las variables `SUPABASE_*`, todo funciona con consultas periódicas y sin carga de fotos.

@@ -45,7 +45,14 @@ describe("estadoConversacion", () => {
   });
 
   it("queda activa con un flete en curso, aunque el presupuesto ya esté aceptado", () => {
-    for (const etapa of ["CONFIRMADO", "CARGADO", "EN_TRANSITO", "ENTREGADO"] as const) {
+    for (const etapa of [
+      "CONFIRMADO",
+      "EN_CAMINO_A_ORIGEN",
+      "CARGANDO",
+      "EN_TRASLADO",
+      "DESCARGANDO",
+      "ENTREGADO",
+    ] as const) {
       expect(
         estadoConversacion(
           {
@@ -63,9 +70,9 @@ describe("estadoConversacion", () => {
     expect(
       estadoConversacion({ ...base, solicitudEstado: "CANCELADA", fleteEtapa: "CANCELADO" }, AHORA),
     ).toBe("BLOQUEADA");
-    expect(
-      estadoConversacion({ ...base, solicitudEstado: "ADJUDICADA", fleteEtapa: "COMPLETADO" }, AHORA),
-    ).toBe("CERRADA");
+    expect(estadoConversacion({ ...base, solicitudEstado: "ADJUDICADA", fleteEtapa: "CERRADO" }, AHORA)).toBe(
+      "CERRADA",
+    );
   });
 
   it("solo se escribe en negociación o con el flete activo", () => {
@@ -78,7 +85,7 @@ describe("estadoConversacion", () => {
   it("las propuestas de fecha valen en negociación o con el flete confirmado (antes de cargar)", () => {
     expect(admitePropuestas("NEGOCIACION", null)).toBe(true);
     expect(admitePropuestas("ACTIVA", "CONFIRMADO")).toBe(true);
-    expect(admitePropuestas("ACTIVA", "CARGADO")).toBe(false);
+    expect(admitePropuestas("ACTIVA", "CARGANDO")).toBe(false);
   });
 });
 
@@ -86,7 +93,7 @@ describe("contactoVisible", () => {
   it("solo con un flete acordado y no cancelado", () => {
     expect(contactoVisible(null)).toBe(false);
     expect(contactoVisible("CONFIRMADO")).toBe(true);
-    expect(contactoVisible("COMPLETADO")).toBe(true);
+    expect(contactoVisible("CERRADO")).toBe(true);
     expect(contactoVisible("CANCELADO")).toBe(false);
   });
 });

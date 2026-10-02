@@ -1,15 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FRANJA } from "@/domain/catalogos";
-import { puedeCancelar } from "@/domain/maquina-estados";
+import { puedeCancelar } from "@/domain/ciclo-flete";
 import type { MetaConversacion } from "@/features/chat/queries";
+import { cancelarFlete } from "@/features/fletes/actions";
+import { hrefFlete } from "@/features/fletes/rutas";
 import { formatearDia, formatearPesos } from "@/lib/formato";
-import { cancelarFleteCliente, confirmarRecepcion } from "../fletes/actions";
 import { aceptarPresupuesto } from "../presupuestos/actions";
 
 type Resultado = { ok: true } | { ok: false; error: string };
@@ -24,7 +26,8 @@ function AvisoError({ mensaje }: { mensaje: string | null }) {
 
 /**
  * Acciones del cliente sobre el flete, a mano dentro del chat: aceptar el presupuesto mientras
- * se negocia, cancelar antes de la carga y confirmar la recepción cuando el fletero entregó.
+ * se negocia, cancelar antes de la carga e ir a revisar la recepción cuando el fletero entregó
+ * (la recepción es ítem por ítem, en la página de seguimiento).
  */
 export function AccionesChatCliente({
   meta,
@@ -55,8 +58,12 @@ export function AccionesChatCliente({
   const { presupuesto, flete } = meta;
   const puedeAceptar = meta.estado === "NEGOCIACION" && presupuesto?.estado === "PENDIENTE";
   const puedeConfirmar = meta.estado === "ACTIVA" && flete?.etapa === "ENTREGADO";
+  // En CARGANDO depende de lo cargado: esa cancelación se ofrece en el seguimiento, con el inventario.
   const puedeCancelarFlete =
-    meta.estado === "ACTIVA" && flete !== null && puedeCancelar(flete.etapa, "CLIENTE");
+    meta.estado === "ACTIVA" &&
+    flete !== null &&
+    flete.etapa !== "CARGANDO" &&
+    puedeCancelar(flete.etapa, "CLIENTE");
   if (!puedeAceptar && !puedeConfirmar && !puedeCancelarFlete) return null;
 
   const cuando = meta.fechaAcordada ?? meta.fechaActual;
@@ -90,19 +97,9 @@ export function AccionesChatCliente({
       ) : null}
 
       {puedeConfirmar && flete ? (
-        <ConfirmDialog
-          title="¿Recibiste todo?"
-          description="Confirmalo solo si ya tenés todas tus cosas en destino. Después vas a poder calificar al fletero."
-          confirmLabel="Sí, recibí todo"
-          onConfirm={() => ejecutar(() => confirmarRecepcion({ fleteId: flete.id }))}
-          trigger={(abrir) => (
-            <Button type="button" size="sm" onClick={abrirLimpio(abrir)} className="max-sm:flex-1">
-              Confirmar recepción
-            </Button>
-          )}
-        >
-          <AvisoError mensaje={error} />
-        </ConfirmDialog>
+        <Button asChild size="sm" className="max-sm:flex-1">
+          <Link href={hrefFlete("CLIENTE", flete.id)}>Revisar y confirmar la recepción</Link>
+        </Button>
       ) : null}
 
       {puedeCancelarFlete && flete ? (
@@ -112,7 +109,7 @@ export function AccionesChatCliente({
           confirmLabel="Cancelar el flete"
           variant="destructive"
           confirmDisabled={motivo.trim().length < 10}
-          onConfirm={() => ejecutar(() => cancelarFleteCliente({ fleteId: flete.id, motivo }))}
+          onConfirm={() => ejecutar(() => cancelarFlete({ fleteId: flete.id, motivo }))}
           trigger={(abrir) => (
             <Button
               type="button"

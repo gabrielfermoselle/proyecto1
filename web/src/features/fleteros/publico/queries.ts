@@ -44,7 +44,7 @@ export const getPerfilPublico = cache(async (fleteroId: string, pagina = 1) => {
   if (!perfil) return null;
 
   const [completados, distribucion, resenas] = await Promise.all([
-    prisma.flete.count({ where: { fleteroId, etapa: "COMPLETADO" } }),
+    prisma.flete.count({ where: { fleteroId, etapa: "CERRADO" } }),
     prisma.calificacion.groupBy({ by: ["puntaje"], where: { fleteroId }, _count: true }),
     prisma.calificacion.findMany({
       where: { fleteroId },

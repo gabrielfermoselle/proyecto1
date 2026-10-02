@@ -8,8 +8,10 @@ import {
   ocultarContacto,
   type EstadoConversacion,
 } from "@/domain/chat";
+import { ETAPAS_ACTIVAS } from "@/domain/ciclo-flete";
 import { fechaIsoDeDia } from "@/domain/fechas";
 import { getTurnosActivos } from "@/features/fleteros/fletes/queries";
+import { hrefFlete, topicFlete } from "@/features/fletes/rutas";
 import { urlsFirmadas } from "@/features/uploads/storage";
 import { nombrePublico } from "@/lib/formato";
 import { prisma } from "@/lib/prisma";
@@ -216,11 +218,10 @@ export async function getMetaConversacion(ctx: ContextoChat): Promise<MetaConver
       : null,
     flete: ctx.fleteId && ctx.fleteEtapa ? { id: ctx.fleteId, etapa: ctx.fleteEtapa } : null,
     fechaAcordada: acordada ? { fecha: fechaIsoDeDia(acordada.fecha), franja: acordada.franja } : null,
-    hrefDetalle:
-      ctx.miRol === "FLETERO"
-        ? ctx.fleteId
-          ? `/fletero/fletes/${ctx.fleteId}`
-          : `/fletero/solicitudes/${ctx.solicitudId}`
+    hrefDetalle: ctx.fleteId
+      ? hrefFlete(ctx.miRol, ctx.fleteId)
+      : ctx.miRol === "FLETERO"
+        ? `/fletero/solicitudes/${ctx.solicitudId}`
         : null,
     conflictos,
   };
@@ -238,16 +239,31 @@ export async function getVistaConversacion(conversacionId: string, usuario: Usua
 // ---------------------------------------------------------------------------
 
 const MAXIMO_CANALES = 80;
+const MAXIMO_FLETES = 20;
 
-/** Canal personal + conversaciones recientes del usuario (el token de Realtime lleva esta lista). */
+/** Canal personal, conversaciones recientes y fletes en curso (el token de Realtime lleva esta lista). */
 export async function topicsRealtime(usuario: UsuarioActual): Promise<string[]> {
   const perfil = perfilChat(usuario);
   if (!perfil) return [];
-  const conversaciones = await prisma.conversacion.findMany({
-    where: perfil.rol === "CLIENTE" ? { clienteId: perfil.perfilId } : { fleteroId: perfil.perfilId },
-    orderBy: { ultimaActividadEn: "desc" },
-    take: MAXIMO_CANALES,
-    select: { id: true },
-  });
-  return [`usuario:${usuario.id}`, ...conversaciones.map((c) => `conversacion:${c.id}`)];
+  const delUsuario =
+    perfil.rol === "CLIENTE" ? { clienteId: perfil.perfilId } : { fleteroId: perfil.perfilId };
+  const [conversaciones, fletes] = await Promise.all([
+    prisma.conversacion.findMany({
+      where: delUsuario,
+      orderBy: { ultimaActividadEn: "desc" },
+      take: MAXIMO_CANALES,
+      select: { id: true },
+    }),
+    // Seguimiento en vivo: solo los fletes en curso.
+    prisma.flete.findMany({
+      where: { ...delUsuario, etapa: { in: [...ETAPAS_ACTIVAS] } },
+      take: MAXIMO_FLETES,
+      select: { id: true },
+    }),
+  ]);
+  return [
+    `usuario:${usuario.id}`,
+    ...conversaciones.map((c) => `conversacion:${c.id}`),
+    ...fletes.map((f) => topicFlete(f.id)),
+  ];
 }

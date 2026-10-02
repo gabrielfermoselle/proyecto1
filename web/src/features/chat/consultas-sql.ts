@@ -1,7 +1,7 @@
 // Consultas SQL del chat que Prisma no expresa bien (no leídos contra la marca de lectura de cada
 // fila, último mensaje con LATERAL). Parametrizadas y sin conexión: el test las corre con PGlite.
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type EtapaFlete } from "@prisma/client";
 
 export type LadoBandeja = "CLIENTE" | "FLETERO";
 
@@ -23,7 +23,7 @@ export interface FilaBandeja {
   presupuestoEstado: "PENDIENTE" | "ACEPTADO" | "RECHAZADO" | "RETIRADO" | null;
   presupuestoValidoHasta: Date | null;
   /** Etapa del flete de ESTE par (null si no hay o es con otro fletero). */
-  fleteEtapa: "CONFIRMADO" | "CARGADO" | "EN_TRANSITO" | "ENTREGADO" | "COMPLETADO" | "CANCELADO" | null;
+  fleteEtapa: EtapaFlete | null;
   noLeidos: number;
   ultimoTipo: "TEXTO" | "IMAGEN" | "SISTEMA" | "PROPUESTA" | null;
   ultimoContenido: string | null;

@@ -3,6 +3,7 @@
 import type { FranjaHoraria } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { resumenInventario, validarTransicion } from "@/domain/ciclo-flete";
 import { fechaIsoDeDia } from "@/domain/fechas";
 import { conEventos } from "@/features/chat/eventos";
 import { ActionError, createClienteAction } from "@/lib/action";
@@ -41,6 +42,13 @@ export const aceptarPresupuesto = createClienteAction({
         data: { estado: "ACEPTADO" },
       });
       if (count === 0) throw new ActionError("Ese presupuesto venció o el fletero lo retiró.");
+      // La solicitud está abierta y tiene este presupuesto pendiente: PRESUPUESTADO → CONFIRMADO.
+      const validacion = validarTransicion("PRESUPUESTADO", "CONFIRMADO", "CLIENTE", {
+        inventario: resumenInventario([]),
+        conformidad: false,
+        motivo: null,
+      });
+      if (!validacion.ok) throw new ActionError(validacion.motivo);
 
       // La última fecha que las partes aceptaron en el chat y todavía no se aplicó.
       const acordada = await tx.propuestaHorario.findFirst({

@@ -10,7 +10,7 @@ import type { z } from "zod";
 import { FormField } from "@/components/shared/form-field";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { Alert } from "@/components/ui/alert";
-import { loginSchema, type LoginInput } from "../schemas";
+import { ERROR_DEMASIADOS_INTENTOS, loginSchema, type LoginInput } from "../schemas";
 import { rutaDePanel } from "../rutas";
 
 export function LoginForm({ callbackUrl }: { callbackUrl?: string | undefined }) {
@@ -27,7 +27,11 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string | undefined })
     try {
       const respuesta = await signIn("credentials", { ...datos, redirect: false });
       if (!respuesta?.ok) {
-        setError("El email o la contraseña no son correctos.");
+        setError(
+          respuesta?.error === ERROR_DEMASIADOS_INTENTOS
+            ? "Hubo demasiados intentos con este email. Esperá unos minutos y probá de nuevo."
+            : "El email o la contraseña no son correctos.",
+        );
         return;
       }
       router.replace(rutaDePanel(callbackUrl));

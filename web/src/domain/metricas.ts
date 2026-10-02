@@ -1,12 +1,13 @@
 // Métricas del panel del fletero, calculadas sobre filas ya filtradas por fletero.
 
 import type { EstadoPresupuesto, EtapaFlete } from "./catalogos";
+import { esEtapaActiva } from "./ciclo-flete";
 import { mesAr } from "./fechas";
 
 export interface FleteParaMetricas {
   etapa: EtapaFlete;
   precioAcordado: number;
-  /** Cuándo el cliente confirmó la recepción (solo en COMPLETADO). */
+  /** Cuándo el cliente confirmó la recepción y cerró el flete (solo en CERRADO). */
   completadoEn: Date | null;
 }
 
@@ -21,8 +22,6 @@ export interface Metricas {
   presupuestosDecididos: number;
   gananciasPorMes: { mes: string; total: number }[];
 }
-
-const EN_CURSO: readonly EtapaFlete[] = ["CONFIRMADO", "CARGADO", "EN_TRANSITO", "ENTREGADO"];
 
 /** Los `cantidad` meses que terminan en el de `ahora` (inclusive), del más viejo al más nuevo. */
 function ultimosMeses(ahora: Date, cantidad: number): string[] {
@@ -46,8 +45,8 @@ export function calcularMetricas(
   let fletesEnCurso = 0;
 
   for (const flete of fletes) {
-    if (EN_CURSO.includes(flete.etapa)) fletesEnCurso += 1;
-    if (flete.etapa !== "COMPLETADO" || !flete.completadoEn) continue;
+    if (esEtapaActiva(flete.etapa)) fletesEnCurso += 1;
+    if (flete.etapa !== "CERRADO" || !flete.completadoEn) continue;
     fletesCompletados += 1;
     gananciasTotales += flete.precioAcordado;
     const mes = mesAr(flete.completadoEn);

@@ -6,7 +6,7 @@ import { MapContainer, TileLayer } from "react-leaflet";
 import type { Coordenadas } from "@/domain/geo";
 import { cn } from "@/lib/utils";
 
-export type VariantePin = "origen" | "destino" | "base" | "aprox";
+export type VariantePin = "origen" | "destino" | "base" | "aprox" | "fletero";
 
 const cachePines = new Map<VariantePin, L.DivIcon>();
 

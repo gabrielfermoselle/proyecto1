@@ -20,7 +20,9 @@ import { resumirCarga, type ItemCarga } from "../src/domain/carga";
 import { haversineKm, redondear, type Coordenadas } from "../src/domain/geo";
 import { precioSugerido, type Tarifas } from "../src/domain/precio";
 import { fechaIsoDeDia } from "../src/domain/fechas";
+import { resumenInventario, textoConformidad } from "../src/domain/ciclo-flete";
 import type { DatosEvento, EventoChat } from "../src/features/chat/eventos-catalogo";
+import { aItemControlado } from "../src/features/fletes/inventario";
 
 if (process.env.NODE_ENV === "production") {
   console.error("El seed borra todos los datos: no se ejecuta con NODE_ENV=production.");
@@ -362,14 +364,54 @@ async function mensajeTexto(conversacionId: string, autorId: string, contenido: 
   await prisma.mensaje.create({ data: { conversacionId, autorId, contenido, createdAt: en } });
 }
 
-const ORDEN_ETAPAS: EtapaFlete[] = ["CONFIRMADO", "CARGADO", "EN_TRANSITO", "ENTREGADO", "COMPLETADO"];
+const ORDEN_ETAPAS: EtapaFlete[] = [
+  "CONFIRMADO",
+  "EN_CAMINO_A_ORIGEN",
+  "CARGANDO",
+  "EN_TRASLADO",
+  "DESCARGANDO",
+  "ENTREGADO",
+  "CERRADO",
+];
+const ETAPAS_DEL_CLIENTE: EtapaFlete[] = ["CONFIRMADO", "CERRADO", "CANCELADO"];
 
-/** Acepta un presupuesto, rechaza el resto y arma el flete con su historial hasta `etapa`. */
+/** Dónde estaba el fletero al llegar a cada etapa (lo que compartiría su navegador). */
+function ubicacionDe(etapa: EtapaFlete, s: SolicitudSeed) {
+  const cerca = (l: Coordenadas, delta: number) => ({
+    lat: l.lat + delta,
+    lng: l.lng - delta,
+    precisionM: 25,
+  });
+  switch (etapa) {
+    case "EN_CAMINO_A_ORIGEN":
+      return cerca(s.origen, 0.02);
+    case "CARGANDO":
+    case "EN_TRASLADO":
+      return cerca(s.origen, 0.0004);
+    case "DESCARGANDO":
+    case "ENTREGADO":
+      return cerca(s.destino, 0.0004);
+    default:
+      return null;
+  }
+}
+
+/**
+ * Acepta un presupuesto, rechaza el resto y arma el flete con su historial hasta `etapa`, con el
+ * inventario controlado de forma coherente (a medias si está cargando o descargando ahora).
+ * `incidencias`: observación al cargar el 1.er ítem, daño al descargar el 2.º y reclamo del cliente.
+ */
 async function adjudicar(
   solicitud: Solicitud,
   fletero: Fletero,
   etapa: EtapaFlete,
-  opciones: { ajuste?: number; mensaje?: string; competidores?: Fletero[]; notaCancelacion?: string } = {},
+  opciones: {
+    ajuste?: number;
+    mensaje?: string;
+    competidores?: Fletero[];
+    notaCancelacion?: string;
+    incidencias?: boolean;
+  } = {},
 ) {
   const perdedores: string[] = [];
   for (const competidor of opciones.competidores ?? []) {
@@ -388,22 +430,33 @@ async function adjudicar(
   const alcanzadas: EtapaFlete[] = cancelado
     ? ["CONFIRMADO"]
     : ORDEN_ETAPAS.slice(0, ORDEN_ETAPAS.indexOf(etapa) + 1);
-  const autorDe = (e: EtapaFlete) =>
-    e === "CONFIRMADO" || e === "COMPLETADO" || e === "CANCELADO" ? cliente.userId : fletero.userId;
+  const llego = (e: EtapaFlete) => alcanzadas.includes(e);
   const confirmadoHace = creadaHaceDias - 1;
 
-  const historial = alcanzadas.map((e, i) => ({
-    etapa: e,
-    autorId: autorDe(e),
-    createdAt: hace(Math.max(confirmadoHace - i * 0.05, 0), 2 - i * 0.3),
-  }));
+  const historial = alcanzadas.map((e, i) => {
+    const ubicacion = ubicacionDe(e, solicitud.seed);
+    return {
+      etapa: e,
+      autorId: ETAPAS_DEL_CLIENTE.includes(e) ? cliente.userId : fletero.userId,
+      createdAt: hace(Math.max(confirmadoHace - i * 0.04, 0), 2 - i * 0.25),
+      lat: ubicacion?.lat ?? null,
+      lng: ubicacion?.lng ?? null,
+      precisionM: ubicacion?.precisionM ?? null,
+      nota: null as string | null,
+    };
+  });
   if (cancelado) {
     historial.push({
       etapa: "CANCELADO",
       autorId: cliente.userId,
       createdAt: hace(Math.max(confirmadoHace - 0.5, 0)),
+      lat: null,
+      lng: null,
+      precisionM: null,
+      nota: opciones.notaCancelacion ?? null,
     });
   }
+  const en = (e: EtapaFlete) => historial.find((h) => h.etapa === e)!.createdAt;
 
   const flete = await prisma.flete.create({
     data: {
@@ -414,38 +467,191 @@ async function adjudicar(
       vehiculoId: fletero.vehiculoId,
       precioAcordado: ganador.monto,
       etapa,
-      recepcionConfirmadaEn: etapa === "COMPLETADO" ? historial.at(-1)!.createdAt : null,
+      recepcionConfirmadaEn: etapa === "CERRADO" ? en("CERRADO") : null,
       createdAt: hace(confirmadoHace),
-      historial: {
-        create: historial.map((h) => ({
-          ...h,
-          ...(h.etapa === "CANCELADO" && opciones.notaCancelacion ? { nota: opciones.notaCancelacion } : {}),
-        })),
-      },
+      historial: { create: historial },
     },
     select: { id: true },
   });
 
+  // Inventario controlado según la etapa.
+  const items = await prisma.itemInventario.findMany({
+    where: { solicitudId: solicitud.id },
+    orderBy: { orden: "asc" },
+    select: { id: true, nombre: true },
+  });
+  const controles: Prisma.ControlItemCreateManyInput[] = [];
+  const control = (
+    itemId: string,
+    fase: "CARGA" | "DESCARGA" | "RECEPCION",
+    resultado: Prisma.ControlItemCreateManyInput["resultado"],
+    autorId: string,
+    momento: Date,
+    observacion: string | null = null,
+  ) =>
+    controles.push({
+      itemId,
+      fleteId: flete.id,
+      fase,
+      resultado,
+      autorId,
+      observacion,
+      createdAt: momento,
+      updatedAt: momento,
+    });
+  const incidencia = (i: number, cual: number) => Boolean(opciones.incidencias) && i === cual;
+
+  if (llego("CARGANDO")) {
+    const cuantos = llego("EN_TRASLADO") ? items.length : Math.ceil(items.length / 2);
+    items
+      .slice(0, cuantos)
+      .forEach((it, i) =>
+        control(
+          it.id,
+          "CARGA",
+          "CARGADO",
+          fletero.userId,
+          minutosDespues(en("CARGANDO"), 5 + i * 4),
+          incidencia(i, 0) ? "Rayón previo en un lateral." : null,
+        ),
+      );
+  }
+  if (llego("DESCARGANDO")) {
+    const cuantos = llego("ENTREGADO") ? items.length : Math.floor(items.length / 2);
+    items
+      .slice(0, cuantos)
+      .forEach((it, i) =>
+        control(
+          it.id,
+          "DESCARGA",
+          incidencia(i, 1) ? "CON_DANO" : "ENTREGADO",
+          fletero.userId,
+          minutosDespues(en("DESCARGANDO"), 5 + i * 4),
+          incidencia(i, 1) ? "Se golpeó en el viaje: una esquina abollada." : null,
+        ),
+      );
+  }
+  if (llego("CERRADO")) {
+    items.forEach((it, i) =>
+      control(
+        it.id,
+        "RECEPCION",
+        incidencia(i, 1) ? "RECLAMO" : "CONFORME",
+        cliente.userId,
+        minutosDespues(en("CERRADO"), -10 + i),
+        incidencia(i, 1) ? "Llegó golpeada y con parte del contenido roto." : null,
+      ),
+    );
+  }
+  await prisma.controlItem.createMany({ data: controles });
+  const reclamado = opciones.incidencias && llego("CERRADO") ? items[1] : undefined;
+  if (reclamado) {
+    await prisma.reclamo.create({
+      data: {
+        itemId: reclamado.id,
+        fleteId: flete.id,
+        autorId: cliente.userId,
+        descripcion: "Llegó golpeada y con parte del contenido roto.",
+        createdAt: minutosDespues(en("CERRADO"), -9),
+      },
+    });
+  }
+
+  const resumen = resumenInventario(
+    items.map((it) =>
+      aItemControlado(
+        it.id,
+        controles
+          .filter((c) => c.itemId === it.id)
+          .map((c) => ({ fase: c.fase, resultado: c.resultado, observacion: c.observacion ?? null })),
+      ),
+    ),
+  );
+  if (llego("ENTREGADO")) {
+    await prisma.conformidad.create({
+      data: {
+        fleteId: flete.id,
+        rol: "FLETERO",
+        userId: fletero.userId,
+        texto: textoConformidad("FLETERO", resumen),
+        aceptadaEn: en("ENTREGADO"),
+      },
+    });
+  }
+  if (llego("CERRADO")) {
+    await prisma.conformidad.create({
+      data: {
+        fleteId: flete.id,
+        rol: "CLIENTE",
+        userId: cliente.userId,
+        texto: textoConformidad("CLIENTE", resumen),
+        aceptadaEn: en("CERRADO"),
+      },
+    });
+  }
+
   // Mensajes de sistema de cada etapa, como los deja la app.
+  const c = ganador.conversacionId;
   for (const h of historial) {
-    const evento = EVENTO_DE_ETAPA[h.etapa];
-    if (evento === "FLETE_CONFIRMADO") {
-      const { fecha, franja } = solicitud.seed;
-      await mensajeSistema(
-        ganador.conversacionId,
-        evento,
-        { monto: ganador.monto.toNumber(), fecha: fechaIsoDeDia(fecha), franja },
-        h.createdAt,
-      );
-    } else if (evento === "FLETE_CANCELADO") {
-      await mensajeSistema(
-        ganador.conversacionId,
-        evento,
-        { motivo: opciones.notaCancelacion ?? "Sin motivo", por: "CLIENTE" },
-        h.createdAt,
-      );
-    } else if (evento) {
-      await mensajeSistema(ganador.conversacionId, evento, {}, h.createdAt);
+    switch (h.etapa) {
+      case "CONFIRMADO": {
+        const { fecha, franja } = solicitud.seed;
+        await mensajeSistema(
+          c,
+          "FLETE_CONFIRMADO",
+          { monto: ganador.monto.toNumber(), fecha: fechaIsoDeDia(fecha), franja },
+          h.createdAt,
+        );
+        break;
+      }
+      case "EN_CAMINO_A_ORIGEN":
+        await mensajeSistema(c, "EN_CAMINO_A_ORIGEN", {}, h.createdAt);
+        break;
+      case "CARGANDO":
+        await mensajeSistema(c, "LLEGADA_ORIGEN", {}, h.createdAt);
+        break;
+      case "EN_TRASLADO":
+        await mensajeSistema(
+          c,
+          "CARGA_REGISTRADA",
+          {
+            cargados: resumen.cargados,
+            noCargados: resumen.noCargados,
+            conObservacion: resumen.conObservacionAlCargar,
+          },
+          h.createdAt,
+        );
+        break;
+      case "DESCARGANDO":
+        await mensajeSistema(c, "LLEGADA_DESTINO", {}, h.createdAt);
+        break;
+      case "ENTREGADO":
+        await mensajeSistema(
+          c,
+          "DESCARGA_REGISTRADA",
+          { entregados: resumen.entregados, conDano: resumen.conDano, faltantes: resumen.faltantes },
+          h.createdAt,
+        );
+        break;
+      case "CERRADO":
+        if (reclamado) {
+          await mensajeSistema(
+            c,
+            "RECLAMO_ABIERTO",
+            { item: reclamado.nombre },
+            minutosDespues(h.createdAt, -9),
+          );
+        }
+        await mensajeSistema(c, "FLETE_CERRADO", { reclamos: resumen.reclamos }, h.createdAt);
+        break;
+      case "CANCELADO":
+        await mensajeSistema(
+          c,
+          "FLETE_CANCELADO",
+          { motivo: opciones.notaCancelacion ?? "Sin motivo", por: "CLIENTE" },
+          h.createdAt,
+        );
+        break;
     }
   }
   const confirmadoEn = historial[0]!.createdAt;
@@ -453,30 +659,8 @@ async function adjudicar(
     await mensajeSistema(conversacionId, "PRESUPUESTO_NO_ELEGIDO", {}, confirmadoEn);
   }
 
-  // Control de inventario coherente con la etapa.
-  const cargado = alcanzadas.includes("CARGADO");
-  const descargado = alcanzadas.includes("ENTREGADO");
-  if (cargado) {
-    await prisma.itemInventario.updateMany({
-      where: { solicitudId: solicitud.id },
-      data: {
-        cargadoEn: historial.find((h) => h.etapa === "CARGADO")!.createdAt,
-        ...(descargado ? { descargadoEn: historial.find((h) => h.etapa === "ENTREGADO")!.createdAt } : {}),
-      },
-    });
-  }
-
   return { fleteId: flete.id, cliente, fletero, conversacionId: ganador.conversacionId };
 }
-
-const EVENTO_DE_ETAPA: Record<EtapaFlete, EventoChat> = {
-  CONFIRMADO: "FLETE_CONFIRMADO",
-  CARGADO: "CARGA_REGISTRADA",
-  EN_TRANSITO: "EN_VIAJE",
-  ENTREGADO: "DESCARGA_REGISTRADA",
-  COMPLETADO: "RECEPCION_CONFIRMADA",
-  CANCELADO: "FLETE_CANCELADO",
-};
 
 async function calificar(
   adjudicado: Awaited<ReturnType<typeof adjudicar>>,
@@ -543,6 +727,9 @@ async function limpiar() {
     prisma.limiteTasa.deleteMany(),
     prisma.notificacion.deleteMany(),
     prisma.calificacion.deleteMany(),
+    prisma.conformidad.deleteMany(),
+    prisma.reclamo.deleteMany(),
+    prisma.controlItem.deleteMany(),
     prisma.estadoFlete.deleteMany(),
     prisma.propuestaHorario.deleteMany(),
     prisma.mensaje.deleteMany(),
@@ -1137,7 +1324,7 @@ async function main() {
       "ADJUDICADA",
     ),
     ramon,
-    "CARGADO",
+    "CARGANDO",
   );
 
   await adjudicar(
@@ -1161,7 +1348,7 @@ async function main() {
       "ADJUDICADA",
     ),
     hector,
-    "EN_TRANSITO",
+    "EN_TRASLADO",
   );
 
   // Entregado: a la espera de que el cliente confirme la recepción y califique.
@@ -1189,8 +1376,12 @@ async function main() {
   );
 
   // --- Historial: completados (con y sin calificación) y cancelados ---
-  const completado = async (s: SolicitudSeed, fletero: Fletero, competidores: Fletero[] = []) =>
-    adjudicar(await crearSolicitud(s, "ADJUDICADA"), fletero, "COMPLETADO", { competidores });
+  const completado = async (
+    s: SolicitudSeed,
+    fletero: Fletero,
+    competidores: Fletero[] = [],
+    incidencias = false,
+  ) => adjudicar(await crearSolicitud(s, "ADJUDICADA"), fletero, "CERRADO", { competidores, incidencias });
 
   await calificar(
     await completado(
@@ -1280,9 +1471,10 @@ async function main() {
       },
       jose,
       [gustavo],
+      true,
     ),
     3,
-    "Llegó tarde y hubo que esperar, pero cuidaron todo.",
+    "Llegó tarde y una caja se golpeó en el viaje. Lo demás, bien.",
     29,
   );
 
