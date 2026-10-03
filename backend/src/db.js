@@ -133,6 +133,9 @@ function saveToFile() {
 
 export async function loadDB() {
   if (cache) return cache;
+  if (!isSupabaseConfigured && process.env.VERCEL) {
+    throw new Error("Faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en las variables de Vercel");
+  }
   if (isSupabaseConfigured) {
     try {
       cache = await loadFromSupabase();
