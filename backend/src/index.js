@@ -1,36 +1,14 @@
 import http from "http";
-import express from "express";
-import cors from "cors";
 import { Server } from "socket.io";
 import { nanoid } from "nanoid";
 
-import { db, saveDB, loadDB, pingDatabase } from "./db.js";
-import { asyncHandler } from "./helpers.js";
+import app, { ensureDB } from "./app.js";
+import { db, saveDB } from "./db.js";
 import { verifyToken } from "./auth.js";
 import { puedeChatear } from "./models/Solicitud.js";
-import authRoutes from "./routes/auth.js";
-import fleteroRoutes from "./routes/fleteros.js";
-import solicitudRoutes from "./routes/solicitudes.js";
-import mensajeRoutes from "./routes/mensajes.js";
-import resenaRoutes from "./routes/resenas.js";
 
 const PORT = process.env.PORT || 4000;
 const MAX_IMAGEN_CHAT = 2 * 1024 * 1024; // data URL comprimida en el cliente
-const app = express();
-
-app.use(cors());
-// Las fotos (solicitud, inventario, perfil) viajan como data URLs comprimidas.
-app.use(express.json({ limit: "20mb" }));
-
-app.get("/api/health", asyncHandler(async (_req, res) => {
-  const dbStatus = await pingDatabase();
-  res.json({ ok: dbStatus.ok, database: dbStatus.driver, error: dbStatus.error });
-}));
-app.use("/api/auth", authRoutes);
-app.use("/api/fleteros", fleteroRoutes);
-app.use("/api/solicitudes", solicitudRoutes);
-app.use("/api/mensajes", mensajeRoutes);
-app.use("/api/resenas", resenaRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" }, maxHttpBufferSize: 4e6 });
@@ -87,16 +65,8 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  if (err.type === "entity.too.large") {
-    return res.status(413).json({ error: "Los archivos adjuntos son demasiado pesados" });
-  }
-  res.status(500).json({ error: "Error interno del servidor" });
-});
-
 try {
-  await loadDB();
+  await ensureDB();
   server.listen(PORT, () => {
     console.log(`API + chat en http://localhost:${PORT}`);
   });
