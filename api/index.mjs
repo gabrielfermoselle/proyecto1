@@ -1,5 +1,7 @@
 import app from "../backend/src/app.js";
 
+const REWRITE_TARGETS = new Set(["/api", "/api/", "/api/index", "/index", "/"]);
+
 // Vercel a veces entrega /fleteros en vez de /api/fleteros. Express espera el prefijo /api.
 function apiUrl(req) {
   const raw = req.url || "/";
@@ -27,7 +29,21 @@ function apiUrl(req) {
   return base;
 }
 
+function requestUrl(req) {
+  const direct = apiUrl(req);
+  const pathOnly = direct.split("?")[0];
+  if (!REWRITE_TARGETS.has(pathOnly)) return direct;
+
+  const search = direct.includes("?") ? direct.slice(direct.indexOf("?")) : "";
+  const header = ["x-invoke-path", "x-forwarded-uri", "x-original-url", "x-vercel-original-url"]
+    .map((name) => req.headers?.[name])
+    .find((value) => typeof value === "string" && value.startsWith("/api/") && !value.startsWith("/api/index"));
+  if (!header) return direct;
+  const headerPath = header.split("?")[0];
+  return `${headerPath}${search}`;
+}
+
 export default function handler(req, res) {
-  req.url = apiUrl(req);
+  req.url = requestUrl(req);
   return app(req, res);
 }
