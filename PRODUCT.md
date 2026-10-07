@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-React + Vite + React Router + React-Leaflet + Socket.io-client (frontend); Node.js + Express + Socket.io, JWT + bcrypt auth (backend). Persistence in Supabase (Postgres + PostGIS) with a local JSON-file fallback for development.
+Next.js 15 (App Router) + React 19 + TypeScript, Tailwind + shadcn/ui, React-Leaflet (in `web/`). Server Actions + Prisma on PostgreSQL/PostGIS (Supabase), NextAuth (credentials, JWT) + bcrypt. Supabase Realtime for chat and live tracking, Supabase Storage for photos. Architecture in `docs/ARQUITECTURA.md`.
 
 ## Users
 
@@ -30,13 +30,13 @@ What it adds over asking around or posting in groups:
 
 ## Operating Context
 
-Core flow: client publishes request → nearby fleteros send quotes → client compares and chooses → freight confirmed → fletero registers loading → transfer → fletero registers unloading → client confirms reception and rates the fletero. States: publicada, confirmada, en_transito, entregada, completada, cancelada. Demo data is set in Gran San Miguel de Tucumán with one fletero per vehicle type.
+Core flow: client publishes request → nearby fleteros send quotes → client compares and chooses → freight confirmed → fletero registers loading → transfer → fletero registers unloading → client confirms reception and rates the fletero. Stages: SOLICITADO, PRESUPUESTADO, CONFIRMADO, EN_CAMINO_A_ORIGEN, CARGANDO, EN_TRASLADO, DESCARGANDO, ENTREGADO, CERRADO (+ CANCELADO). Demo data is set in Gran San Miguel de Tucumán.
 
 ## Capabilities and Constraints
 
 - Auth via JWT + bcrypt; roles cliente and fletero.
-- Proximity search (Haversine locally, PostGIS ST_DWithin/ST_Distance on Supabase).
-- Photos are compressed in the browser and stored as data URLs (to revisit: object storage).
+- Proximity via PostGIS (ST_DWithin/ST_Distance on GIST-indexed geography columns).
+- Photos are compressed in the browser and uploaded directly to Supabase Storage with signed URLs.
 - Specifications are intentionally generic for now: pricing rules, vehicle capacities, payments and notifications are still to be defined.
 
 ## Evidence on Hand
