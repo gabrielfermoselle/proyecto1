@@ -58,7 +58,20 @@ export const registroSchema = z
     path: ["confirmarPassword"],
   });
 
+export const cambioContrasenaSchema = z
+  .object({
+    actual: z.string().min(1, "Ingresá tu contraseña actual").max(72),
+    nueva: passwordSchema,
+    confirmar: z.string(),
+  })
+  .refine((d) => d.nueva === d.confirmar, { message: "Las contraseñas no coinciden", path: ["confirmar"] })
+  .refine((d) => d.nueva !== d.actual, {
+    message: "La nueva tiene que ser distinta de la actual",
+    path: ["nueva"],
+  });
+
 export type LoginInput = z.input<typeof loginSchema>;
+export type CambioContrasenaInput = z.input<typeof cambioContrasenaSchema>;
 export type RegistroInput = z.input<typeof registroSchema>;
 export type RegistroDatos = z.output<typeof registroSchema>;
 

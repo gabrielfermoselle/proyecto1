@@ -3,8 +3,9 @@ import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { error, ok } from "../../../test/db/fabrica";
-import { registrarUsuario } from "./actions";
+import { cargarUsuario, error, ok } from "../../../test/db/fabrica";
+import { comoUsuario } from "../../../test/db/sesion";
+import { cambiarContrasena, registrarUsuario } from "./actions";
 import { ERROR_DEMASIADOS_INTENTOS } from "./schemas";
 
 // Cada test usa una IP distinta: el límite de registros es por IP y la base es compartida.
@@ -158,5 +159,83 @@ describe("login (authorize de NextAuth)", () => {
     for (let i = 0; i < 10; i++) await authorize({ email, password: `mala${i}1234` });
 
     await expect(authorize({ email, password: "clave1234" })).rejects.toThrow(ERROR_DEMASIADOS_INTENTOS);
+  });
+});
+
+describe("cambiarContrasena", () => {
+  async function conClave(clave = "clave1234") {
+    const u = await prisma.user.create({
+      data: {
+        email: emailUnico(),
+        passwordHash: await bcrypt.hash(clave, 4),
+        nombre: "Rosa",
+        apellido: "Paz",
+        rol: "CLIENTE",
+        clienteProfile: { create: {} },
+      },
+      select: { id: true },
+    });
+    return cargarUsuario(u.id);
+  }
+  const cambio = (actual: string, nueva = "nueva12345") => ({ actual, nueva, confirmar: nueva });
+
+  it("con la contraseña actual correcta la cambia y marca el cambio (cierra las sesiones)", async () => {
+    const u = await conClave();
+    comoUsuario(u);
+    const antes = Date.now();
+
+    ok(await cambiarContrasena(cambio("clave1234")));
+
+    const guardado = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    expect(await bcrypt.compare("nueva12345", guardado.passwordHash)).toBe(true);
+    expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(false);
+    expect(guardado.credencialesCambiadasEn!.getTime()).toBeGreaterThanOrEqual(antes - 1000);
+  });
+
+  it("con la actual incorrecta no cambia nada y marca el campo", async () => {
+    const u = await conClave();
+    comoUsuario(u);
+
+    const r = await cambiarContrasena(cambio("otra98765"));
+    expect(campo(r, "actual")).toEqual(["La contraseña actual no es correcta."]);
+    const guardado = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(true);
+    expect(guardado.credencialesCambiadasEn).toBeNull();
+  });
+
+  it("aplica la política de contraseñas y no acepta repetir la actual", async () => {
+    comoUsuario(await conClave());
+
+    expect(campo(await cambiarContrasena(cambio("clave1234", "corta")), "nueva")).toBeDefined();
+    expect(campo(await cambiarContrasena(cambio("clave1234", "clave1234")), "nueva")).toEqual([
+      "La nueva tiene que ser distinta de la actual",
+    ]);
+    const r = await cambiarContrasena({ actual: "clave1234", nueva: "nueva12345", confirmar: "nueva54321" });
+    expect(campo(r, "confirmar")).toEqual(["Las contraseñas no coinciden"]);
+  });
+
+  it("frena el adivinado de la actual: más de 5 intentos en 15 minutos", async () => {
+    comoUsuario(await conClave());
+    for (let i = 0; i < 5; i++) await cambiarContrasena(cambio(`mala${i}1234`));
+
+    expect(error(await cambiarContrasena(cambio("clave1234")))).toMatch(/demasiados intentos/);
+  });
+});
+
+describe("sesión (JWT)", () => {
+  it("al iniciar sesión, el token guarda cuándo se autenticó y la sesión lo expone", async () => {
+    const callbacks = authOptions.callbacks as unknown as {
+      jwt: (p: { token: Record<string, unknown>; user?: unknown }) => Record<string, unknown>;
+      session: (p: { session: { user: Record<string, unknown> }; token: Record<string, unknown> }) => {
+        autenticadoEn?: number;
+      };
+    };
+    const antes = Date.now();
+    const token = callbacks.jwt({ token: {}, user: { id: "u1", rol: "CLIENTE" } });
+    expect(token.autenticadoEn).toBeGreaterThanOrEqual(antes);
+
+    // En los requests siguientes (sin `user`) el claim no cambia.
+    expect(callbacks.jwt({ token: { ...token } }).autenticadoEn).toBe(token.autenticadoEn);
+    expect(callbacks.session({ session: { user: {} }, token }).autenticadoEn).toBe(token.autenticadoEn);
   });
 });

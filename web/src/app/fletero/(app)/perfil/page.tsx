@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { SeccionCard } from "@/components/shared/seccion-card";
 import { Button } from "@/components/ui/button";
+import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
 import { DatosForm } from "@/features/fleteros/perfil/components/datos-form";
 import { DisponibilidadSwitch } from "@/features/fleteros/perfil/components/disponibilidad-switch";
 import { TarifasForm } from "@/features/fleteros/perfil/components/tarifas-form";
@@ -60,6 +61,13 @@ export default async function PerfilFleteroPage() {
         descripcion="Se usan para sugerirte el precio de cada presupuesto."
       >
         <TarifasForm inicial={perfil.tarifas} />
+      </SeccionCard>
+      <SeccionCard
+        id="contrasena"
+        titulo="Contraseña"
+        descripcion="Al cambiarla cerramos tu sesión en todos los dispositivos."
+      >
+        <CambiarContrasenaForm />
       </SeccionCard>
     </div>
   );

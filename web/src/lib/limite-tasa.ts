@@ -25,6 +25,13 @@ export const LIMITES = {
     ventanaSegundos: 3600,
     mensaje: "Se crearon muchas cuentas desde esta conexión. Probá más tarde.",
   }),
+  /** Adivinar la contraseña actual desde una sesión robada: mismo criterio que el login. */
+  cambiosContrasena: (userId: string): Limite => ({
+    clave: `auth:cambio:${userId}`,
+    maximo: 5,
+    ventanaSegundos: 15 * 60,
+    mensaje: "Hubo demasiados intentos. Esperá unos minutos y probá de nuevo.",
+  }),
   mensajesPorConversacion: (userId: string, conversacionId: string): Limite => ({
     clave: `chat:msg:${userId}:${conversacionId}`,
     maximo: 20,

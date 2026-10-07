@@ -68,12 +68,14 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.rol = user.rol;
+        token.autenticadoEn = Date.now();
       }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id;
       session.user.rol = token.rol;
+      if (token.autenticadoEn !== undefined) session.autenticadoEn = token.autenticadoEn;
       return session;
     },
   },

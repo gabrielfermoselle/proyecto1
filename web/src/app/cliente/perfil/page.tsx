@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { SeccionCard } from "@/components/shared/seccion-card";
+import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
 import { DatosClienteForm } from "@/features/clientes/perfil/components/datos-cliente-form";
 import { DireccionHabitualForm } from "@/features/clientes/perfil/components/direccion-habitual-form";
 import { getPerfilCliente } from "@/features/clientes/perfil/queries";
@@ -28,6 +29,13 @@ export default async function PerfilClientePage() {
         descripcion="Desde acá medimos la distancia a cada fletero en el buscador."
       >
         <DireccionHabitualForm inicial={perfil.direccion} />
+      </SeccionCard>
+      <SeccionCard
+        id="contrasena"
+        titulo="Contraseña"
+        descripcion="Al cambiarla cerramos tu sesión en todos los dispositivos."
+      >
+        <CambiarContrasenaForm />
       </SeccionCard>
     </div>
   );

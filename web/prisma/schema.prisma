@@ -135,6 +135,8 @@ model User {
   avatarUrl         String?
   rol               Rol
   activo            Boolean            @default(true)
+  /// Último cambio de contraseña: las sesiones iniciadas antes dejan de valer (ver domain/sesion.ts).
+  credencialesCambiadasEn DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   clienteProfile    ClienteProfile?
