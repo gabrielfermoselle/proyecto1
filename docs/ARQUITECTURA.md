@@ -84,10 +84,11 @@ se separa en **capas** con reglas de dependencia estrictas, y el código de nego
 
 | Módulo | Responsabilidad |
 |---|---|
-| `auth` | Registro, login, rutas por rol |
+| `auth` | Registro, login, cambiar y recuperar contraseña, rutas por rol |
+| `clientes/perfil` | Datos del cliente y dirección habitual |
 | `clientes/solicitudes` | Publicar, cancelar y ver solicitudes; fotos de la solicitud |
 | `clientes/presupuestos` | Comparar y aceptar presupuestos |
-| `clientes/fleteros` | Buscador de fleteros |
+| `clientes/fleteros` | Buscador de fleteros: cercanía, precio, calificación y precio estimado |
 | `fleteros/perfil` | Onboarding, datos, vehículos, zona, tarifas, disponibilidad |
 | `fleteros/solicitudes` | Feed de solicitudes cercanas y compatibles |
 | `fleteros/presupuestos` | Enviar y retirar presupuestos |
@@ -132,13 +133,15 @@ web/
 ├── src/
 │   ├── app/                         FRONTEND · rutas (App Router). Cada carpeta es una URL
 │   │   ├── page.tsx                 landing pública
-│   │   ├── (auth)/login, registro   formularios de acceso (grupo sin prefijo en la URL)
+│   │   ├── (auth)/login, registro,  formularios de acceso (grupo sin prefijo en la URL)
+│   │   │   recuperar/[token]        recuperar la contraseña con el link del email
 │   │   ├── panel/                   redirige al área del rol
 │   │   ├── fleteros/[id]/           perfil público de un fletero
 │   │   ├── cliente/                 ÁREA CLIENTE
 │   │   │   ├── solicitudes/         listado, nueva, detalle con presupuestos recibidos
 │   │   │   ├── fletes/[id]/         seguimiento del flete, recepción, calificación
-│   │   │   ├── fleteros/            buscador
+│   │   │   ├── fleteros/            buscador (cercanía, precio, calificación)
+│   │   │   ├── perfil/              datos, dirección habitual y contraseña
 │   │   │   └── mensajes/            bandeja y conversación
 │   │   ├── fletero/                 ÁREA FLETERO
 │   │   │   ├── onboarding/[paso]/   alta guiada: datos, zona, vehículo, tarifas
@@ -182,13 +185,15 @@ web/
 │   │   ├── auth.ts, session.ts      NextAuth, usuario actual, requireRol / requireFletero
 │   │   ├── action.ts                createAction y variantes: sesión + rol + Zod + errores
 │   │   ├── limite-tasa.ts           limitador de envíos (en Postgres, sin Redis)
+│   │   ├── log.ts, request-id.ts    logs JSON con id de request
+│   │   ├── correo.ts                emails con Resend (o consola/archivo sin clave)
 │   │   ├── supabase.ts, jwt.ts      Realtime: publicar y firmar tokens por usuario
 │   │   └── api.ts, formato.ts, geolocalizacion.ts, utils.ts
 │   │
-│   └── middleware.ts                primera barrera por rol (Edge)
+│   └── middleware.ts                id de request en todas las rutas y primera barrera por rol (Edge)
 │
 ├── test/                            infraestructura de tests (PGlite, sesión simulada, servidor e2e)
-├── e2e/                             recorridos Playwright (registro, flete completo, navegación, a11y)
+├── e2e/                             recorridos Playwright (registro, flete, buscador, contraseñas, a11y…)
 ├── .env.example                     variables necesarias (ver sección 7)
 ├── vercel.json                      cron diario
 └── DEPLOY.md                        guía de puesta en producción
@@ -237,8 +242,9 @@ reclamo (lo garantiza un `CHECK num_nonnulls(...) = 1`).
 
 | Tabla | Propósito | Campos clave |
 |---|---|---|
-| `users` | Cuenta y rol | `email` único, `passwordHash`, `rol` (CLIENTE/FLETERO/ADMIN), `activo` |
-| `cliente_profiles` | Perfil del cliente | `userId` único, dirección habitual |
+| `users` | Cuenta y rol | `email` único, `passwordHash`, `rol` (CLIENTE/FLETERO/ADMIN), `activo`, `credencialesCambiadasEn` (invalida sesiones anteriores) |
+| `cliente_profiles` | Perfil del cliente | `userId` único, dirección habitual (lat/lng): punto por defecto del buscador |
+| `tokens_recuperacion` | Recuperar contraseña | `tokenHash` (SHA-256, único), `expiraEn` (30 min), `usadoEn` (un solo uso) |
 | `fletero_profiles` | Perfil, zona y tarifas del fletero | `baseLat/baseLng` → **`baseGeo`** (geography), `radioCoberturaKm` (1–100), `precioMinimo/PorKm/PorM3/PorAyudante`, `disponible`, `verificado`, `onboardingCompletadoEn`, `ratingPromedio` y `cantidadCalificaciones` (desnormalizados) |
 | `vehiculos` | Vehículos del fletero | `tipo`, `patente` única, `capacidadKg`, `volumenM3`, `activo` |
 | `solicitudes` | Pedido de flete | origen y destino (lat/lng, piso, ascensor), **`origenGeo`**, `distanciaKm`, `pesoTotalKg`, `volumenTotalM3`, `fecha`, `franja`, `ayudantesRequeridos`, `estado` (ABIERTA/ADJUDICADA/CANCELADA/VENCIDA) |
@@ -318,9 +324,11 @@ Para documentarlas, la tabla incluye el **equivalente REST** de cada operación.
 | GET | `/api/chat/:id/mensajes?despues=<cursor>` | participantes | Mensajes nuevos + estado de la conversación (reconexión o sondeo) |
 | GET | `/api/notificaciones` | autenticado | Avisos del usuario |
 | GET | `/api/fletes/:id/comprobante` | participantes | Comprobante PDF del flete |
-| GET | `/api/cron/mantenimiento` | Vercel Cron (`Bearer CRON_SECRET`) | Vence solicitudes, avisa fletes demorados, borra fotos abandonadas |
+| GET | `/api/cron/mantenimiento` | Vercel Cron (`Bearer CRON_SECRET`) | Vence solicitudes, avisa fletes demorados, borra fotos abandonadas y tokens de recuperación viejos |
+| GET | `/cliente/fleteros?ref&solicitud&lat&lng&dir&radio&vehiculo&precioMax&rating&orden&todos` | cliente | Buscador (página con formulario GET: los filtros quedan en la URL) |
 
-Todas las respuestas JSON llevan `Cache-Control: private, no-store`.
+Todas las respuestas JSON llevan `Cache-Control: private, no-store`, y toda respuesta lleva el
+header `x-request-id` (ver sección 7, *Logs*).
 
 ### Operaciones por módulo (Server Actions)
 
@@ -329,6 +337,16 @@ Todas las respuestas JSON llevan `Cache-Control: private, no-store`.
 | Acción | Equivalente REST | Rol |
 |---|---|---|
 | `registrarUsuario` | `POST /auth/register` | público (máx. 5 registros por hora por IP) |
+| `cambiarContrasena` | `PUT /me/contrasena` (exige la actual; máx. 5 intentos cada 15 min) | autenticado |
+| `solicitarRecuperacion` | `POST /auth/recuperar` (misma respuesta exista o no la cuenta) | público (10/h por IP, 3/h por email) |
+| `restablecerContrasena` | `POST /auth/recuperar/:token` | público, con token de un solo uso |
+
+**Cliente — perfil** (`features/clientes/perfil/actions.ts`)
+
+| Acción | Equivalente REST |
+|---|---|
+| `guardarDatosCliente` | `PUT /clientes/me` |
+| `guardarDireccionHabitual` | `PUT /clientes/me/direccion` |
 
 **Fletero — perfil** (`features/fleteros/perfil/actions.ts`)
 
@@ -433,14 +451,24 @@ deja suscribirse a esos canales.
 - **Límite de intentos**: 10 por email cada 15 minutos.
 - Política de contraseña: 8 a 72 caracteres (el límite de bcrypt), con al menos una letra y un número.
 - El rol `ADMIN` no se puede elegir al registrarse.
+- **Cerrar sesiones al cambiar la contraseña**: el JWT no tiene estado, así que el token guarda
+  cuándo se inició sesión (`autenticadoEn`) y el usuario, cuándo cambió sus credenciales
+  (`credencialesCambiadasEn`). `getUsuarioActual` rechaza los tokens anteriores al cambio
+  (`domain/sesion.ts`): cambiar o recuperar la contraseña cierra la sesión en todos los dispositivos.
+- **Recuperar contraseña**: link por email (Resend) con un token aleatorio de 256 bits, de un solo
+  uso y válido 30 minutos. En la base se guarda solo su SHA-256; un link nuevo anula los anteriores
+  y el token se marca usado dentro de la misma transacción que cambia la contraseña. El link se arma
+  con `NEXTAUTH_URL` (nunca con el header `Host`, que controla quien hace el pedido) y la página no
+  envía *referrer*.
 
 ### Autorización en tres capas
 
-1. **Middleware (Edge)**: rutas `/cliente/*`, `/fletero/*` y `/admin/*`. Sin sesión redirige a
-   `/login`; con un rol equivocado, a su propia área.
-2. **Página o layout**: `requireRol(...)` / `requireFletero()` vuelven a leer el usuario **desde
-   la base**. Si un admin lo desactiva o le cambia el rol, aplica en el siguiente request, aunque
-   el JWT siga vigente.
+1. **Middleware (Edge)**: corre en todas las rutas para asignar el id de request; en
+   `/cliente/*`, `/fletero/*` y `/admin/*` además exige sesión (si no hay, redirige a `/login`) y
+   manda a cada rol a su propia área.
+2. **Página o layout**: `requireRol(...)`, `requireCliente()` y `requireFletero()` vuelven a leer
+   el usuario **desde la base**. Si un admin lo desactiva, le cambia el rol o el usuario cambió su
+   contraseña, aplica en el siguiente request, aunque el JWT siga vigente.
 3. **Acción**: `createAction({ roles })`, `createClienteAction` y `createFleteroAction` exigen
    sesión y rol, e inyectan el `clienteId` o `fleteroId`. **Toda consulta filtra por ese id**
    (por ejemplo `where: { id, solicitud: { clienteId } }`), así que no se puede operar sobre
@@ -574,6 +602,23 @@ Navegador                        Servidor (Server Action)            Supabase St
 
   `ST_DWithin` sobre `geography` usa el índice GIST y trabaja en metros. El acceso al detalle y
   al envío de presupuestos vuelve a verificar el radio en el servidor.
+- **Cercanía (buscador del cliente)**: `features/clientes/fleteros/consultas-sql.ts`. El punto de
+  referencia es la **dirección habitual** (por defecto), el **origen de una solicitud abierta
+  propia** o una **dirección escrita** en el momento (validada dentro de la región).
+
+  ```sql
+  WHERE onboarding completo AND usuario activo [AND disponible]
+    AND EXISTS (vehículo activo [del tipo pedido] [donde entra la carga de la solicitud])
+    [AND "precioMinimo" <= tope] [AND rating >= mínimo]
+    AND ST_DWithin("baseGeo", punto, "radioCoberturaKm" * 1000)   -- "que lleguen a ese punto"
+        -- o ST_DWithin("baseGeo", punto, km * 1000)               -- "hasta N km"
+  ORDER BY ST_Distance("baseGeo", punto) | precio estimado | rating | reseñas
+  ```
+
+  Con una solicitud de referencia se muestra el **precio estimado** de cada fletero (calculado
+  con `domain/precio`) y se puede ordenar por él. En SQL se ordena con la misma fórmula sin el
+  redondeo, y un test verifica que el orden coincide con el del dominio. Si la solicitud no es del
+  cliente o no está abierta, se ignora: no revela el origen ni la carga de solicitudes ajenas.
 - **Distancia del trayecto**: Haversine (`domain/geo.ts`) entre origen y destino, calculada en el
   servidor al guardar. Para el **precio sugerido** se multiplica por **1,3** (factor de recorrido
   urbano estimado para el Gran Tucumán).
@@ -617,6 +662,9 @@ app no levanta y muestra un mensaje claro.
 | `NEXTAUTH_SECRET` | sí (≥ 32 caracteres) | Firma de la sesión |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` | las cuatro o ninguna | Realtime y Storage. Sin ellas, chat por sondeo y sin fotos |
 | `CRON_SECRET` | para el cron (≥ 16) | Autoriza `/api/cron/mantenimiento` |
+| `RESEND_API_KEY` | no | Emails de recuperar contraseña. Sin ella: en desarrollo el link sale por consola; en producción no se envía (y el link nunca se escribe en los logs) |
+| `CORREO_REMITENTE` | no | Remitente con dominio verificado en Resend (sin él, Resend solo entrega a la cuenta dueña) |
+| `CORREO_ARCHIVO` | solo tests | Los e2e guardan los emails en un archivo para leer el link |
 
 `.env` nunca se versiona. `.env.example` documenta cada variable. La `service_role` key y los
 secretos **solo existen en el servidor**: al navegador llegan únicamente la URL y la anon key de
@@ -629,17 +677,24 @@ Supabase, y un token de Realtime por usuario.
 | Validación (Zod) | `{ ok:false, error:"Revisá los datos marcados.", fieldErrors }`: el formulario marca cada campo |
 | Negocio esperado | `throw new ActionError("mensaje")`: el mensaje llega tal cual al usuario |
 | Único violado (Prisma `P2002`) | Mensaje amigable ("Ya existe un registro con esos datos" o uno específico) |
-| Inesperado | Se registra con `console.error("[action] …")` y el usuario ve un mensaje genérico. Nunca se exponen detalles internos |
+| Inesperado | Se registra como `action.error_inesperado` (con el id del request) y el usuario ve un mensaje genérico. Nunca se exponen detalles internos |
 | Route handlers | JSON `{ error }` con status `401` o `404` (`lib/api.ts`) |
-| Páginas | `redirect` si no hay sesión o el rol no corresponde; `error.tsx` en el área del fletero (*pendiente*: sumarlo en cliente y admin) |
-| Servicios externos (Realtime, Storage) | Un fallo **no rompe** la operación: queda registrado y el dato ya está en la base |
+| Páginas | `redirect` si no hay sesión o el rol no corresponde. Cada área (cliente, fletero y admin) tiene su `error.tsx` (`ErrorSeccion`): se muestra dentro del layout, ofrece reintentar o volver al inicio, y muestra el *digest* de Next para encontrar el error en los logs |
+| Servicios externos (Realtime, Storage, Resend) | Un fallo **no rompe** la operación: queda registrado y el dato ya está en la base |
 
 ### Logs
 
-- Prefijo por subsistema: `[action]`, `[realtime]`, `[storage]`, `[cron]`.
-- Se usan `console.warn` y `console.error`, que Vercel recolecta por deploy y función (*Runtime Logs*).
-- No se registran contraseñas, tokens ni contenido de mensajes.
-- *Mejora pendiente*: logs estructurados en JSON con un id por request (ver sección 9).
+- **JSON, una línea por evento** (`src/lib/log.ts`):
+  `{"nivel":"warn","evento":"cron.no_autorizado","momento":"2026-10-07T19:23:03.071Z","requestId":"…"}`.
+  Nombres de evento `subsistema.suceso`: `action.error_inesperado`, `cron.mantenimiento`,
+  `realtime.publicar_fallo`, `storage.borrar_fallo`, `correo.enviado`, `auth.login_bloqueado`…
+- **Id de request**: el middleware asigna `x-request-id` a cada request (reusa uno entrante solo si
+  tiene un formato seguro, para que nadie inyecte texto en los logs), lo pasa al servidor y lo
+  devuelve en la respuesta. `logDelRequest()` lo agrega a cada línea.
+- Vercel recolecta la salida por deploy y función (*Runtime Logs*), y ahí se filtra por `evento`
+  o `requestId`.
+- **Nunca** se registran contraseñas, tokens, hashes, secretos ni contenido de mensajes: el logger
+  oculta esas claves en cualquier nivel de anidamiento. Tampoco se registran emails.
 
 ### Estilo de código
 
@@ -654,9 +709,12 @@ TypeScript `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`,
 
 | Nivel | Herramienta | Qué cubre | Comando |
 |---|---|---|---|
-| Unitario | Vitest | `domain/` completo (ciclo del flete, precio, geo, compatibilidad, chat, fechas, roles), SQL generado | `npx vitest run --project unit` |
-| Integración | Vitest + **PGlite + PostGIS** (o Postgres real con `TEST_DATABASE_URL`) | Server Actions contra una base con todas las migraciones: auth, solicitudes, presupuestos, **concurrencia de aceptación**, fletes, chat, admin, mantenimiento, **matriz de autorización** | `npx vitest run --project db` |
-| End-to-end | Playwright + axe | Ciclo completo de un flete con dos navegadores, registro, acceso por rol, navegación y **accesibilidad WCAG 2.1 AA**, en escritorio y móvil (Pixel 7) | `npm run test:e2e` |
+| Unitario | Vitest | `domain/` completo (ciclo del flete, precio, geo, compatibilidad, chat, fechas, roles, sesión), SQL del feed y del buscador contra PGlite + PostGIS, parámetros de URL, logger y componentes de UI | `npx vitest run --project unit` |
+| Integración | Vitest + **PGlite + PostGIS** (o Postgres real con `TEST_DATABASE_URL`) | Server Actions contra una base con todas las migraciones: auth (registro, login, cambio y recuperación de contraseña), perfiles, buscador, solicitudes, presupuestos, **concurrencia de aceptación**, fletes, chat, admin, mantenimiento, correo, **matriz de autorización** | `npx vitest run --project db` |
+| End-to-end | Playwright + axe | Ciclo completo de un flete con dos navegadores, buscador, cambio y recuperación de contraseña (con el link del email), registro, acceso por rol, `x-request-id` y **accesibilidad WCAG 2.1 AA**, en escritorio y móvil (Pixel 7) | `npm run test:e2e` |
+
+Estado al cierre del sprint 8: **394 unitarios, 241 de integración (30 solo corren con Postgres
+real, en CI) y 116 e2e en verde**.
 | Estático | `tsc`, ESLint | Tipos y reglas de capas | `npm run typecheck` · `npm run lint` |
 
 ### Integración continua (`.github/workflows/web.yml`)
@@ -733,21 +791,35 @@ etapa.
 Panel admin (usuarios, verificación, reclamos), cron diario, tests de integración y e2e con
 accesibilidad, guía de deploy.
 
-### Sprint 7 — Brechas frente al enunciado ⬜
+### Sprint 7 — Brechas frente al enunciado ✅
 | Ítem | Estado | Detalle |
 |---|---|---|
-| Búsqueda de fleteros **por cercanía** | ⬜ | El buscador del cliente (`features/clientes/fleteros/queries.ts`) filtra por vehículo y disponibilidad, pero **no por distancia**. Falta: punto de referencia (dirección del cliente o el origen de una solicitud), `ST_DWithin` + `ST_Distance` y orden por distancia |
-| Filtro por **precio** | ⬜ | Falta filtrar u ordenar por tarifa (precio mínimo, o precio estimado para un trayecto dado) |
-| Filtro por **calificación mínima** | 🔶 | Hoy solo se *ordena* por calificación. Falta el filtro `rating ≥ N` |
-| Perfil del **cliente** | ⬜ | No hay pantalla para editar nombre, teléfono o dirección habitual del cliente |
-| **Cambiar y recuperar contraseña** | ⬜ | No existe. Requiere un servicio de email (por ejemplo Resend) y tokens de un solo uso |
+| Perfil del **cliente** | ✅ | `/cliente/perfil`: nombre, apellido, teléfono opcional y **dirección habitual** con mapa |
+| Búsqueda de fleteros **por cercanía** | ✅ | Desde la dirección habitual, el origen de una solicitud o una dirección escrita; "que lleguen a ese punto" (radio del fletero) o hasta N km; orden por distancia (PostGIS sobre GIST) |
+| Filtro por **precio** | ✅ | Tope de precio mínimo siempre; con una solicitud de referencia, **precio estimado** por fletero y orden por ese precio |
+| Filtro por **calificación mínima** | ✅ | 3, 4 o 4,5 estrellas o más (sin calificaciones no pasa el filtro) |
+| **Cambiar contraseña** | ✅ | Exige la actual, limita intentos y **cierra todas las sesiones** |
+| **Recuperar contraseña** | ✅ | Email con Resend, token de un solo uso, 30 minutos, solo el hash en la base |
 
-### Sprint 8 — Cierre y presentación ⬜
-Logs estructurados con id de request, revisión de seguridad final, datos de demo para la
-defensa, capturas y video del recorrido, y actualización de este documento.
+### Sprint 8 — Cierre y presentación ✅ (salvo lo marcado)
+| Ítem | Estado | Detalle |
+|---|---|---|
+| Limpieza del repositorio | ✅ | Se quitó la app anterior (Express + React); queda solo `web/` |
+| Pantallas de error | ✅ | `error.tsx` en las áreas de cliente, fletero y admin |
+| Logs estructurados | ✅ | JSON con id de request (`x-request-id`) y datos sensibles ocultos |
+| Datos de demo | ✅ | Cuentas para cada caso (incluida una sin dirección y otra para la demo de contraseñas) y guion en [`docs/DEMO.md`](DEMO.md) |
+| Este documento | ✅ | Actualizado con lo implementado |
+| Deploy de preview y checklist de `DEPLOY.md` | ⬜ | Pendiente: requiere acceso a Vercel (variables nuevas `RESEND_API_KEY` y `CORREO_REMITENTE`, migraciones `cambio_contrasena` y `recuperacion_contrasena`) |
+| Capturas y video del recorrido | ⬜ | Para la presentación, siguiendo `docs/DEMO.md` |
+
+**Deuda técnica conocida** (documentada en los tests):
+- Se puede dar de baja un vehículo comprometido en un presupuesto pendiente
+  (`it.fails` en `perfil.db.test.ts`).
+- Dos claves foráneas hacia `vehiculos` no tienen índice propio (`invariantes-base.db.test.ts`).
+- `npm audit` informa vulnerabilidades en dependencias (revisar antes de producción).
 
 ### Fuera de alcance (trabajo futuro)
 - **Pagos dentro de la app** (por ejemplo Mercado Pago, con retención hasta la confirmación de
   recepción).
-- Notificaciones por email, push o WhatsApp.
+- Notificaciones por email (más allá de recuperar la contraseña), push o WhatsApp.
 - Ruteo real por calles (OSRM) en lugar del factor 1,3.
