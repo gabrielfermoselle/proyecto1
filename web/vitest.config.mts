@@ -5,6 +5,8 @@ const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
 
 export default defineConfig({
   resolve: { alias },
+  // tsconfig deja el JSX sin transformar (lo compila Next); en los tests lo transforma oxc.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
     projects: [
