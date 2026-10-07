@@ -6,18 +6,9 @@ const ToastContext = createContext(null);
 const AUTO_DISMISS_MS = 5000;
 
 const KIND_STYLE = {
-  error: {
-    icon: "✕",
-    classes: "border-[var(--danger)]/30 bg-[var(--danger-bg)] text-[var(--danger)]"
-  },
-  success: {
-    icon: "✓",
-    classes: "border-[var(--success)]/30 bg-[var(--success-bg)] text-[var(--success)]"
-  },
-  info: {
-    icon: "i",
-    classes: "border-[var(--teal)]/30 bg-[var(--teal)]/10 text-[var(--teal)]"
-  }
+  error: { icon: "✕", classes: "border-[var(--danger)] text-[var(--danger)]" },
+  success: { icon: "✓", classes: "border-[var(--line-strong)]" },
+  info: { icon: "i", classes: "border-[var(--line-strong)]" }
 };
 
 export function ToastProvider({ children }) {
@@ -65,11 +56,10 @@ export function ToastProvider({ children }) {
               <div
                 key={t.id}
                 role={t.kind === "error" ? "alert" : "status"}
-                className={`toast-in pointer-events-auto flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-sm sm:w-80 ${style.classes}`}
-                style={{ background: "var(--paper)" }}
+                className={`toast-in pointer-events-auto flex w-full items-start gap-3 rounded border bg-white px-4 py-3 text-sm sm:w-80 ${style.classes}`}
               >
-                <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-bold" style={{ background: "currentColor" }}>
-                  <span style={{ color: "var(--paper)" }}>{style.icon}</span>
+                <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center text-[11px] font-bold" aria-hidden="true">
+                  {style.icon}
                 </span>
                 <span className="flex-1 leading-snug">{t.message}</span>
                 <button

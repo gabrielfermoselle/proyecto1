@@ -87,7 +87,7 @@ export default function MapView({
               [route.origen.lat, route.origen.lng],
               [route.destino.lat, route.destino.lng]
             ]}
-            pathOptions={{ color: "#7a1f1f", weight: 3, dashArray: "6 8" }}
+            pathOptions={{ color: "#111111", weight: 3, dashArray: "6 8" }}
           />
         )}
 
@@ -100,7 +100,7 @@ export default function MapView({
               <Circle
                 center={[me.lat, me.lng]}
                 radius={pickCoverageKm * 1000}
-                pathOptions={{ color: "#d9a52c", fillColor: "#d9a52c", fillOpacity: 0.12 }}
+                pathOptions={{ color: "#6b6b6b", fillColor: "#6b6b6b", fillOpacity: 0.08 }}
               />
             )}
           </>

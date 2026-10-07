@@ -3,3 +3,6 @@ backend/data/db.json
 dist/
 .env
 *.log
+
+# caché local del detector de diseño (impeccable)
+.impeccable/hook.cache.json
