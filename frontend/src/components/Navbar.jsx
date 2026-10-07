@@ -5,11 +5,7 @@ import ConfirmDialog from "./ConfirmDialog.jsx";
 import { HamburgerIcon, CloseIcon } from "./Icons.jsx";
 
 const linkCls = ({ isActive }) =>
-  `block rounded-full px-4 py-2.5 text-[15px] font-semibold tracking-wide transition-colors ${
-    isActive
-      ? "bg-[var(--gold)] text-[var(--ground)]"
-      : "text-[var(--muted-on-dark)] hover:bg-white/10 hover:text-[var(--gold-bright)]"
-  }`;
+  `block px-3 py-2 text-[15px] ${isActive ? "font-semibold underline underline-offset-4" : "hover:underline"}`;
 
 export default function Navbar() {
   const { usuario, rol, logout } = useAuth();
@@ -80,7 +76,7 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="sticky top-0 z-[500] border-b-[3px] border-[var(--gold)] bg-[var(--ground)] shadow-[0_6px_18px_rgba(0,0,0,0.25)]">
+    <nav className="sticky top-0 z-[500] bg-[var(--ink-bg)] text-[var(--on-ink)]">
       <div className="mx-auto flex max-w-[1160px] items-center gap-3 px-4 py-3 sm:px-5">
         <NavLink to="/" className="brand flex-1" onClick={() => setMenuOpen(false)}>
           <span className="dot">⇄</span> Fletes Tucumán
@@ -91,11 +87,11 @@ export default function Navbar() {
           {navItems}
           {usuario && (
             <>
-              <span className="muted px-2 text-sm">{usuario.nombre}</span>
+              <span className="px-2 text-sm text-[var(--on-ink-muted)]">{usuario.nombre}</span>
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
-                className="rounded-full px-4 py-2.5 text-[15px] font-semibold text-[var(--muted-on-dark)] transition-colors hover:bg-white/10 hover:text-[var(--gold-bright)]"
+                className="px-3 py-2 text-[15px] hover:underline"
               >
                 Salir
               </button>
@@ -106,7 +102,7 @@ export default function Navbar() {
         {/* Botón hamburguesa — visible por default en mobile/tablet chico */}
         <button
           type="button"
-          className="flex h-11 w-11 flex-none items-center justify-center rounded-full text-[var(--gold-bright)] transition-colors hover:bg-white/10 md:hidden"
+          className="flex h-11 w-11 flex-none items-center justify-center md:hidden"
           aria-label="Abrir menú"
           aria-expanded={menuOpen}
           aria-controls="mobile-nav-drawer"
@@ -132,17 +128,15 @@ export default function Navbar() {
           role="dialog"
           aria-modal="true"
           aria-label="Menú"
-          className={`absolute right-0 top-0 flex h-full w-[82vw] max-w-[320px] flex-col gap-1 bg-[var(--ground)] px-4 pb-6 pt-4 shadow-2xl transition-transform duration-300 ease-out ${
+          className={`absolute right-0 top-0 flex h-full w-[82vw] max-w-[320px] flex-col gap-1 bg-[var(--ink-bg)] px-4 pb-6 pt-4 text-[var(--on-ink)] transition-transform duration-300 ease-out ${
             menuOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-[2px] text-[var(--muted-on-dark)]">
-              Menú
-            </span>
+            <span className="text-sm font-semibold">Menú</span>
             <button
               type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--gold-bright)] transition-colors hover:bg-white/10"
+              className="flex h-10 w-10 items-center justify-center"
               aria-label="Cerrar menú"
               onClick={() => setMenuOpen(false)}
             >
@@ -153,14 +147,14 @@ export default function Navbar() {
           <div className="flex flex-col gap-1">{navItems}</div>
 
           {usuario && (
-            <div className="mt-4 border-t border-white/10 pt-4">
-              <div className="px-4 pb-2 text-sm text-[var(--muted-on-dark)]">
-                Sesión: <span className="font-semibold text-[var(--gold-bright)]">{usuario.nombre}</span>
+            <div className="mt-4 border-t border-[var(--ink-line)] pt-4">
+              <div className="px-3 pb-2 text-sm text-[var(--on-ink-muted)]">
+                Sesión: <span className="font-semibold">{usuario.nombre}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
-                className="block w-full rounded-full px-4 py-2.5 text-left text-[15px] font-semibold text-[var(--muted-on-dark)] transition-colors hover:bg-white/10 hover:text-[var(--gold-bright)]"
+                className="block w-full px-3 py-2 text-left text-[15px] hover:underline"
               >
                 Salir
               </button>

@@ -1,7 +1,7 @@
 // Bloques de carga (skeleton) reutilizables, mobile-first, con animate-pulse de Tailwind.
 
 export function SkeletonBlock({ className = "" }) {
-  return <div className={`animate-pulse rounded bg-[var(--paper-line)] ${className}`} />;
+  return <div className={`animate-pulse rounded bg-[var(--line)] ${className}`} />;
 }
 
 export function SkeletonText({ lines = 1, className = "" }) {
@@ -17,7 +17,7 @@ export function SkeletonText({ lines = 1, className = "" }) {
 // Fila de solicitud (MisSolicitudes / MisFletes).
 export function SkeletonJobRow() {
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--paper-line)] py-4 last:border-none sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-b border-[var(--line)] py-4 last:border-none sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <SkeletonBlock className="h-2.5 w-2.5 flex-none rounded-full" />
         <div className="flex flex-col gap-2">

@@ -1,0 +1,95 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/web.yml"]
+  pull_request:
+    paths: ["web/**", ".github/workflows/web.yml"]
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  # Rápido y sin base: lo primero que tiene que dar verde.
+  calidad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx vitest run --project unit
+
+  # Server Actions contra un Postgres + PostGIS de verdad (no PGlite): así también corren los
+  # tests de concurrencia y de errores de la base que PGlite no reproduce (`conPostgresReal`).
+  integracion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fletes_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fletes_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx vitest run --project db
+
+  # La app compilada para producción, con PGlite + el seed de demo, en Chromium de escritorio y móvil.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build
+        # lib/env valida al importarse: el build necesita valores con forma válida (no se conecta).
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://build:build@localhost:5432/build
+          DIRECT_URL: postgresql://build:build@localhost:5432/build
+          NEXTAUTH_SECRET: secreto-solo-para-compilar-con-32-caracteres
+      - run: npx playwright test
+        env:
+          E2E_PROD: "1"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
