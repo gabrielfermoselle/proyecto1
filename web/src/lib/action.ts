@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import type { Rol } from "@/domain/roles";
 import { getUsuarioActual, type UsuarioActual } from "./session";
+import { logDelRequest } from "./log";
 
 import type { ActionResult, FieldErrors } from "./action-result";
 
@@ -54,7 +55,7 @@ async function ejecutar<S extends z.ZodTypeAny, T>(
     if (esViolacionUnica(error)) {
       return { ok: false, error: "Ya existe un registro con esos datos." };
     }
-    console.error("[action] error inesperado", error);
+    (await logDelRequest()).error("action.error_inesperado", { error });
     return { ok: false, error: MENSAJE_INESPERADO };
   }
 }

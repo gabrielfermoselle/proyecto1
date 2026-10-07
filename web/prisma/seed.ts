@@ -725,6 +725,7 @@ async function notificacion(
 async function limpiar() {
   await prisma.$transaction([
     prisma.limiteTasa.deleteMany(),
+    prisma.tokenRecuperacion.deleteMany(),
     prisma.subidaPendiente.deleteMany(),
     prisma.notificacion.deleteMany(),
     prisma.calificacion.deleteMany(),
@@ -818,6 +819,19 @@ async function main() {
     "3814701566",
     LUGARES.villaCarmela,
   );
+
+  // Clienta recién registrada, sin dirección habitual: el buscador le pide que la cargue y
+  // muestra a los fleteros sin distancia.
+  await prisma.user.create({
+    data: {
+      ...datosUsuario({ nombre: "Paula", apellido: "Ibarra", email: "paula@demo.test", telefono: "" }),
+      rol: "CLIENTE",
+      clienteProfile: { create: {} },
+    },
+  });
+  // Cuenta para mostrar "cambiar contraseña" y "¿Olvidaste tu contraseña?" en la defensa sin
+  // cerrar las sesiones de las cuentas del recorrido principal.
+  await crearCliente("Rocío", "Medina", "rocio@demo.test", "3816009988", LUGARES.parque);
 
   // --- Fleteros: todos los tipos de vehículo, repartidos por el Gran Tucumán ---
   const T = (
@@ -1642,6 +1656,7 @@ main()
     console.log(
       "  Clientes: ana, luis, valeria, martin, carolina, jorge, florencia, sebastian  (@demo.test)",
     );
+    console.log("            paula (sin dirección habitual), rocio (para la demo de contraseñas)");
     console.log(
       "  Fleteros: carlos (camioneta), marta (moto), jose (camión), soledad (auto), ramon, gustavo,",
     );
@@ -1649,6 +1664,7 @@ main()
       "            lucia, dario (no disponible), hector, fernanda, nicolas, walter, pablo  (@demo.test)",
     );
     console.log("  Onboarding pendiente: diego@demo.test");
+    console.log("Guion de la demo: docs/DEMO.md (en la raíz del repositorio).");
   })
   .catch((error: unknown) => {
     console.error(error);

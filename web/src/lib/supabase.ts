@@ -2,6 +2,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "./env";
 import { firmarJwtHs256 } from "./jwt";
+import { log } from "./log";
 
 // Supabase se usa solo para Realtime y Storage (los datos van por Prisma). Todo es opcional:
 // sin configuración, las funciones devuelven null o no hacen nada y la app sigue funcionando.
@@ -65,9 +66,9 @@ export async function publicar(publicaciones: Publicacion[]): Promise<void> {
       },
       body: JSON.stringify({ messages: publicaciones.map((p) => ({ ...p, private: true })) }),
     });
-    if (!respuesta.ok) console.warn("[realtime] no se pudo publicar", respuesta.status);
+    if (!respuesta.ok) log.warn("realtime.publicar_fallo", { estado: respuesta.status, cantidad: publicaciones.length });
   } catch (error) {
-    console.warn("[realtime] no se pudo publicar", error);
+    log.warn("realtime.publicar_fallo", { error, cantidad: publicaciones.length });
   }
 }
 

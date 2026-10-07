@@ -118,6 +118,11 @@ const fotoInput = { ruta: `x/${randomUUID()}.jpg`, ancho: 10, alto: 10 };
 const MATRIZ: Record<string, Caso> = {
   // --- auth ---
   registrarUsuario: { roles: TODOS_LOS_ROLES, publica: true },
+  // Opera sobre la cuenta de la sesión: no recibe IDs.
+  cambiarContrasena: { roles: TODOS_LOS_ROLES },
+  // Públicas: la autorización es tener el email o el token de un solo uso.
+  solicitarRecuperacion: { roles: TODOS_LOS_ROLES, publica: true },
+  restablecerContrasena: { roles: TODOS_LOS_ROLES, publica: true },
 
   // --- solicitudes (cliente) ---
   crearSolicitud: { roles: ["CLIENTE"] },
@@ -141,6 +146,10 @@ const MATRIZ: Record<string, Caso> = {
     roles: ["CLIENTE"],
     ajeno: (m) => ({ como: m.otroCliente, input: { presupuestoId: m.presupuestoId } }),
   },
+
+  // --- perfil del cliente (operan sobre el perfil de la sesión) ---
+  guardarDatosCliente: { roles: ["CLIENTE"] },
+  guardarDireccionHabitual: { roles: ["CLIENTE"] },
 
   // --- presupuestos (fletero) ---
   enviarPresupuesto: {

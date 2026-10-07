@@ -46,6 +46,8 @@ Para tener un administrador, registrá una cuenta común y cambiale el rol desde
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key                                                 |
    | `SUPABASE_JWT_SECRET`       | Legacy JWT secret                                                |
    | `CRON_SECRET`               | `openssl rand -hex 32`                                           |
+   | `RESEND_API_KEY`            | Resend → API Keys (emails de recuperar contraseña)               |
+   | `CORREO_REMITENTE`          | `Fletes Tucumán <no-responder@tu-dominio>` (dominio verificado)  |
 
 3. Deploy. `web/vercel.json` programa el mantenimiento diario a las 06:00 UTC (03:00 en Tucumán):
    vence solicitudes, avisa por fletes demorados y borra fotos abandonadas. Vercel lo llama con
@@ -61,6 +63,7 @@ Con dos navegadores (uno como cliente y otro como fletero):
 - [ ] El cliente acepta. El fletero avanza las etapas desde el celular (permitir la ubicación) y el cliente ve el mapa y el inventario actualizarse solos.
 - [ ] Fotos en el check-in/check-out y en un reclamo; el cliente cierra con firma y califica.
 - [ ] Descargar el comprobante PDF.
+- [ ] **Email:** "¿Olvidaste tu contraseña?" con un email real: llega el link, permite elegir una nueva y no se puede usar dos veces.
 - [ ] Como admin: resolver el reclamo y verificar al fletero.
 - [ ] **Cron:** `curl -H "Authorization: Bearer $CRON_SECRET" https://<tu-dominio>/api/cron/mantenimiento`
       responde con los contadores; sin el header, 401.

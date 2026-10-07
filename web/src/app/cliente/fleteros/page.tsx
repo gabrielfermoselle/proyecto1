@@ -6,82 +6,72 @@ import { Estrellas } from "@/components/shared/estrellas";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { ETIQUETA_VEHICULO, TIPOS_VEHICULO, type TipoVehiculo } from "@/domain/catalogos";
-import { buscarFleteros, type OrdenFleteros } from "@/features/clientes/fleteros/queries";
-import { formatearRating } from "@/lib/formato";
-import { requireRol } from "@/lib/session";
+import { ETIQUETA_VEHICULO } from "@/domain/catalogos";
+import { FiltrosBuscador } from "@/features/clientes/fleteros/components/filtros-buscador";
+import { leerParametrosBuscador, radioDeUrl } from "@/features/clientes/fleteros/parametros";
+import {
+  buscarFleteros,
+  getSolicitudesAbiertas,
+  resolverReferencia,
+} from "@/features/clientes/fleteros/queries";
+import { getDireccionHabitual } from "@/features/clientes/perfil/queries";
+import { formatearKm, formatearPesos, formatearRating } from "@/lib/formato";
+import { requireCliente } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Fleteros" };
 
-type Props = { searchParams: Promise<{ vehiculo?: string; orden?: string; todos?: string }> };
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function FleterosPage({ searchParams }: Props) {
-  await requireRol("CLIENTE");
-  const q = await searchParams;
-  // Los filtros llegan por URL: se validan contra los catálogos, nunca se usan tal cual.
-  const tipoVehiculo = (TIPOS_VEHICULO as readonly string[]).includes(q.vehiculo ?? "")
-    ? (q.vehiculo as TipoVehiculo)
-    : null;
-  const orden: OrdenFleteros = q.orden === "experiencia" ? "experiencia" : "calificacion";
-  const soloDisponibles = q.todos !== "1";
-  const fleteros = await buscarFleteros({ tipoVehiculo, orden, soloDisponibles });
+  const { clienteId } = await requireCliente();
+  const valores = leerParametrosBuscador(await searchParams);
+
+  const [referencia, habitual, solicitudes] = await Promise.all([
+    resolverReferencia(clienteId, valores),
+    getDireccionHabitual(clienteId),
+    getSolicitudesAbiertas(clienteId),
+  ]);
+  const fleteros = await buscarFleteros({
+    referencia,
+    radio: radioDeUrl(valores.radio),
+    tipoVehiculo: valores.vehiculo ?? null,
+    soloDisponibles: valores.todos !== "1",
+    precioMaximo: valores.precioMax ?? null,
+    ratingMinimo: valores.rating ? Number(valores.rating) : null,
+    orden: valores.orden,
+  });
 
   return (
     <div className="grid gap-6">
       <PageHeader
         title="Fleteros"
-        description="Mirá quién trabaja en Tucumán. Para recibir presupuestos, publicá tu flete: les llega a los de tu zona."
+        description="Compará por cercanía, precio y calificación. Para recibir presupuestos, publicá tu flete: les llega a los de tu zona."
         actions={
           <Button asChild>
             <Link href="/cliente/solicitudes/nueva">Publicar un flete</Link>
           </Button>
         }
       />
-      <form
-        className="grid gap-3 rounded-lg border bg-card p-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end"
-        method="get"
-      >
-        <div className="grid gap-2">
-          <Label htmlFor="vehiculo">Vehículo</Label>
-          <Select id="vehiculo" name="vehiculo" defaultValue={tipoVehiculo ?? ""}>
-            <option value="">Cualquiera</option>
-            {TIPOS_VEHICULO.map((t) => (
-              <option key={t} value={t}>
-                {ETIQUETA_VEHICULO[t]}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="orden">Ordenar por</Label>
-          <Select id="orden" name="orden" defaultValue={orden}>
-            <option value="calificacion">Mejor calificados</option>
-            <option value="experiencia">Más reseñas</option>
-          </Select>
-        </div>
-        <label className="flex items-center gap-2 py-2.5 text-sm font-semibold">
-          <input
-            type="checkbox"
-            name="todos"
-            value="1"
-            defaultChecked={!soloDisponibles}
-            className="size-5 accent-[hsl(var(--primary))]"
-          />
-          Incluir en pausa
-        </label>
-        <Button type="submit" variant="outline">
-          <Search aria-hidden="true" />
-          Buscar
-        </Button>
-      </form>
+      <FiltrosBuscador
+        valores={valores}
+        referenciaAplicada={referencia.tipo}
+        direccionHabitual={habitual?.direccion ?? null}
+        solicitudes={solicitudes}
+      />
+
+      <p className="text-sm text-muted-foreground" aria-live="polite">
+        {fleteros.length === 0
+          ? null
+          : `${fleteros.length} ${fleteros.length === 1 ? "fletero" : "fleteros"}`}
+        {referencia.etiqueta && fleteros.length > 0 ? ` cerca de ${referencia.etiqueta}` : null}
+        {referencia.carga && fleteros.length > 0 ? ". El precio estimado sale de las tarifas de cada fletero." : null}
+      </p>
 
       {fleteros.length === 0 ? (
         <EmptyState
           icon={<Search />}
           title="No hay fleteros con esos filtros"
-          description="Probá con otro vehículo."
+          description="Probá con otra distancia, otro vehículo o sin tope de precio."
         />
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
@@ -115,7 +105,17 @@ export default async function FleterosPage({ searchParams }: Props) {
                       · {f.fletesCompletados} {f.fletesCompletados === 1 ? "flete" : "fletes"}
                     </span>
                   </p>
-                  {f.zona ? (
+                  {f.distanciaKm !== null ? (
+                    <p className="flex flex-wrap items-center gap-2 text-sm">
+                      <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span>A {formatearKm(f.distanciaKm)}</span>
+                      {f.cubreZona ? (
+                        <Badge variant="outline">Llega a tu punto</Badge>
+                      ) : (
+                        <Badge variant="muted">Fuera de su zona ({f.radioKm} km)</Badge>
+                      )}
+                    </p>
+                  ) : f.zona ? (
                     <p className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="size-4 shrink-0" aria-hidden="true" />
                       <span className="truncate">
@@ -123,6 +123,17 @@ export default async function FleterosPage({ searchParams }: Props) {
                       </span>
                     </p>
                   ) : null}
+                  <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
+                    {f.precioEstimado !== null ? (
+                      <span>
+                        <span className="text-muted-foreground">Estimado </span>
+                        <span className="font-heading text-base font-extrabold tabular-nums">
+                          {formatearPesos(f.precioEstimado)}
+                        </span>
+                      </span>
+                    ) : null}
+                    <span className="text-muted-foreground">Desde {formatearPesos(f.precioMinimo)}</span>
+                  </p>
                   <p className="flex flex-wrap gap-1 pt-1">
                     {[...new Set(f.vehiculos.map((v) => v.tipo))].map((t) => (
                       <Badge key={t} variant="outline">

@@ -1,5 +1,4 @@
 node_modules/
-backend/data/db.json
 dist/
 .env
 *.log

@@ -26,6 +26,7 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "portada", ruta: "/" },
     { nombre: "login", ruta: "/login" },
     { nombre: "registro", ruta: "/registro" },
+    { nombre: "recuperar contraseña", ruta: "/recuperar" },
   ],
   ana: [
     { nombre: "mis fletes", ruta: "/cliente" },
@@ -37,6 +38,7 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     },
     { nombre: "publicar solicitud", ruta: "/cliente/solicitudes/nueva" },
     { nombre: "buscar fleteros", ruta: "/cliente/fleteros" },
+    { nombre: "perfil del cliente", ruta: "/cliente/perfil" },
     { nombre: "perfil público de un fletero", ruta: "/cliente/fleteros", abrir: primerEnlace(/Carlos R\./) },
     { nombre: "chat", ruta: "/cliente/mensajes", abrir: primerEnlace(/Carlos R\./) },
     { nombre: "seguimiento del flete", ruta: "/cliente", abrir: primerEnlace(/Compra del mayorista/) },

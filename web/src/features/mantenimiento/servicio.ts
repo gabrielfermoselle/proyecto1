@@ -117,6 +117,15 @@ export async function limpiarLimitesDeTasa(ahora: Date = new Date()) {
   return prisma.$executeRaw(consultaLimpiar(new Date(ahora.getTime() - 24 * HORA_MS)));
 }
 
+/** Tokens de recuperación vencidos o usados hace más de un día: ya no sirven para nada. */
+export async function limpiarTokensRecuperacion(ahora: Date = new Date()) {
+  const limite = new Date(ahora.getTime() - 24 * HORA_MS);
+  const { count } = await prisma.tokenRecuperacion.deleteMany({
+    where: { OR: [{ expiraEn: { lt: limite } }, { usadoEn: { lt: limite } }] },
+  });
+  return count;
+}
+
 const aviso = (userId: string): Publicacion => ({
   topic: `usuario:${userId}`,
   event: "notificacion.creada",
@@ -129,5 +138,6 @@ export async function correrMantenimiento() {
   const fletesDemorados = await avisarFletesDemorados();
   const subidasBorradas = await limpiarSubidasAbandonadas();
   const limitesBorrados = await limpiarLimitesDeTasa();
-  return { solicitudesVencidas, fletesDemorados, subidasBorradas, limitesBorrados };
+  const tokensBorrados = await limpiarTokensRecuperacion();
+  return { solicitudesVencidas, fletesDemorados, subidasBorradas, limitesBorrados, tokensBorrados };
 }

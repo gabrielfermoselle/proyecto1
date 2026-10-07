@@ -40,11 +40,11 @@ async function fleteroNuevo() {
   return cargarUsuario(u.id);
 }
 
+// Formato AB123CD con las cuatro letras al azar (~450 millones de combinaciones): con menos, dos
+// tests chocaban de vez en cuando y la violación de único deja colgada la conexión de PGlite.
+const letra = () => String.fromCharCode(65 + Math.floor(Math.random() * 26));
 const patenteUnica = () =>
-  `AB${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}${randomUUID()
-    .slice(0, 2)
-    .toUpperCase()
-    .replace(/[^A-Z]/g, "Z")}`;
+  `${letra()}${letra()}${String(Math.floor(Math.random() * 1000)).padStart(3, "0")}${letra()}${letra()}`;
 
 const vehiculo = (patente = patenteUnica()) => ({
   tipo: "CAMIONETA" as const,

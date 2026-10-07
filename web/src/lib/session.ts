@@ -3,12 +3,14 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { AREA_POR_ROL, type Rol } from "@/domain/roles";
+import { sesionVigente } from "@/domain/sesion";
 import { authOptions } from "./auth";
 import { prisma } from "./prisma";
 
 /**
  * Usuario de la sesión, leído de la base (no solo del JWT): si un admin lo desactiva o le
- * cambia el rol, se aplica en el próximo request. `cache` evita repetir la query en un render.
+ * cambia el rol, se aplica en el próximo request; si cambió la contraseña, las sesiones
+ * anteriores dejan de valer. `cache` evita repetir la query en un render.
  */
 export const getUsuarioActual = cache(async () => {
   const session = await getServerSession(authOptions);
@@ -23,11 +25,14 @@ export const getUsuarioActual = cache(async () => {
       apellido: true,
       rol: true,
       activo: true,
+      credencialesCambiadasEn: true,
       clienteProfile: { select: { id: true } },
       fleteroProfile: { select: { id: true, onboardingCompletadoEn: true } },
     },
   });
-  return user?.activo ? user : null;
+  if (!user?.activo) return null;
+  const { credencialesCambiadasEn, ...usuario } = user;
+  return sesionVigente(session.autenticadoEn, credencialesCambiadasEn) ? usuario : null;
 });
 
 export type UsuarioActual = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
@@ -44,6 +49,14 @@ export async function requireRol(...roles: readonly Rol[]): Promise<UsuarioActua
   const usuario = await requireUsuario();
   if (!roles.includes(usuario.rol)) redirect(AREA_POR_ROL[usuario.rol]);
   return usuario;
+}
+
+/** Para el área del cliente. Devuelve su `clienteId`, que toda query debe usar como filtro. */
+export async function requireCliente() {
+  const usuario = await requireRol("CLIENTE");
+  const perfil = usuario.clienteProfile;
+  if (!perfil) throw new Error(`El usuario ${usuario.id} es CLIENTE pero no tiene perfil`);
+  return { usuario, clienteId: perfil.id };
 }
 
 /**

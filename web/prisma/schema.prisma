@@ -135,6 +135,8 @@ model User {
   avatarUrl         String?
   rol               Rol
   activo            Boolean            @default(true)
+  /// Último cambio de contraseña: las sesiones iniciadas antes dejan de valer (ver domain/sesion.ts).
+  credencialesCambiadasEn DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   clienteProfile    ClienteProfile?
@@ -148,8 +150,25 @@ model User {
   reclamos          Reclamo[]          @relation("ReclamoAutor")
   reclamosResueltos Reclamo[]          @relation("ReclamoResueltoPor")
   conformidades     Conformidad[]
+  tokensRecuperacion TokenRecuperacion[]
 
   @@map("users")
+}
+
+/// Recuperación de contraseña por email: de un solo uso y con vencimiento. Se guarda el hash
+/// SHA-256 del token, nunca el token: quien lea la base no puede usarlo.
+model TokenRecuperacion {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @db.VarChar(64)
+  expiraEn  DateTime
+  usadoEn   DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiraEn])
+  @@map("tokens_recuperacion")
 }
 
 model ClienteProfile {

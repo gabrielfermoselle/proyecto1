@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { correrMantenimiento } from "@/features/mantenimiento/servicio";
 import { json } from "@/lib/api";
 import { env } from "@/lib/env";
+import { logDelRequest } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,8 +18,13 @@ function autorizado(header: string | null): boolean {
 
 /** Mantenimiento diario. Lo dispara Vercel Cron (ver vercel.json) con `Authorization: Bearer <CRON_SECRET>`. */
 export async function GET(request: Request) {
-  if (!autorizado(request.headers.get("authorization"))) return json({ error: "No autorizado." }, 401);
+  const logger = await logDelRequest();
+  if (!autorizado(request.headers.get("authorization"))) {
+    logger.warn("cron.no_autorizado");
+    return json({ error: "No autorizado." }, 401);
+  }
+  const inicio = Date.now();
   const resultado = await correrMantenimiento();
-  console.info("[mantenimiento]", resultado);
+  logger.info("cron.mantenimiento", { ...resultado, duracionMs: Date.now() - inicio });
   return json(resultado);
 }

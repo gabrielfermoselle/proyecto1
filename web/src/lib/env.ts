@@ -22,6 +22,15 @@ const envSchema = z
     SUPABASE_JWT_SECRET: opcional,
     // Lo manda Vercel Cron en Authorization. Sin él, el mantenimiento diario no se puede disparar.
     CRON_SECRET: opcional.pipe(z.string().min(16).optional()),
+    // URL pública: arma los links de los emails (nunca se toma del header Host, que lo manda el
+    // navegador). En Vercel, sin NEXTAUTH_URL se usa la del deploy (VERCEL_URL).
+    NEXTAUTH_URL: opcional.pipe(z.string().url().optional()),
+    VERCEL_URL: opcional,
+    // Emails (recuperar contraseña) con Resend. Sin clave, el link se muestra en la consola
+    // (solo fuera de producción). CORREO_ARCHIVO lo usan los e2e para leer los emails enviados.
+    RESEND_API_KEY: opcional,
+    CORREO_REMITENTE: opcional,
+    CORREO_ARCHIVO: opcional,
   })
   .refine(
     (e) => {

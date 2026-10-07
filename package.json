@@ -1,19 +1,17 @@
 {
-  "name": "oficios-validados",
-  "version": "1.0.0",
+  "name": "fletes-tucuman",
   "private": true,
-  "description": "Plataforma de fletes de Tucumán: conecta clientes con fleteros (motos, autos, camionetas y camiones)",
+  "description": "Atajos para correr la app de web/ desde la raíz del repositorio",
   "scripts": {
-    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
-    "dev": "concurrently -n backend,frontend -c blue,green \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
-    "seed": "npm --prefix backend run seed",
-    "start": "npm --prefix backend start"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.0"
-  },
-  "dependencies": {
-    "@supabase/ssr": "^0.12.5",
-    "@supabase/supabase-js": "^2.112.4"
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix web run start",
+    "lint": "npm --prefix web run lint",
+    "typecheck": "npm --prefix web run typecheck",
+    "test": "npm --prefix web run test",
+    "test:e2e": "npm --prefix web run test:e2e",
+    "db:deploy": "npm --prefix web run db:deploy",
+    "db:seed": "npm --prefix web run db:seed",
+    "db:studio": "npm --prefix web run db:studio"
   }
 }
