@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { sesionDe } from "./utils";
+import { ingresar, sesionDe } from "./utils";
 
 // Buscador de fleteros del cliente: cercanía desde la dirección habitual, una solicitud como
 // referencia (precio estimado) y filtros que vacían la lista.
@@ -34,4 +34,21 @@ test("con una solicitud de referencia muestra el precio estimado y ordena por pr
 test("un tope de precio imposible deja la lista vacía", async ({ page }) => {
   await page.goto("/cliente/fleteros?precioMax=1&radio=todos");
   await expect(page.getByRole("heading", { name: "No hay fleteros con esos filtros" })).toBeVisible();
+});
+
+test.describe("sin dirección habitual", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("le pide cargarla y lista a los fleteros sin distancia", async ({ page }) => {
+    await ingresar(page, "paula@demo.test");
+    await expect(page).toHaveURL("/cliente");
+    await page.goto("/cliente/fleteros");
+    await expect(page.getByText("Todavía no cargaste tu dirección.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Cargala en tu perfil" })).toHaveAttribute(
+      "href",
+      "/cliente/perfil#direccion",
+    );
+    await expect(page.getByText(/^Desde \$/).first()).toBeVisible();
+    await expect(page.getByText(/^A [\d,]+ (km|m)$/)).toHaveCount(0);
+  });
 });
