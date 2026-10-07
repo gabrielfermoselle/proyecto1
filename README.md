@@ -24,10 +24,12 @@ llegue a destino.
 ## Inicio rápido
 
 ```bash
-cd web
-cp .env.example .env   # completar DATABASE_URL, DIRECT_URL y NEXTAUTH_SECRET
-npm install
+cp web/.env.example web/.env   # completar DATABASE_URL, DIRECT_URL y NEXTAUTH_SECRET
+npm --prefix web install
 npm run db:deploy
-npm run db:seed        # BORRA la base y carga los datos de demo
-npm run dev            # http://localhost:3000
+npm run db:seed                # BORRA la base y carga los datos de demo
+npm run dev                    # http://localhost:3000
 ```
+
+Los scripts de la raíz (`dev`, `build`, `test`, `test:e2e`, `lint`, `typecheck`, `db:*`) son
+atajos a los de `web/`: también se pueden correr desde adentro de `web/`.

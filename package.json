@@ -1,0 +1,17 @@
+{
+  "name": "fletes-tucuman",
+  "private": true,
+  "description": "Atajos para correr la app de web/ desde la raíz del repositorio",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix web run start",
+    "lint": "npm --prefix web run lint",
+    "typecheck": "npm --prefix web run typecheck",
+    "test": "npm --prefix web run test",
+    "test:e2e": "npm --prefix web run test:e2e",
+    "db:deploy": "npm --prefix web run db:deploy",
+    "db:seed": "npm --prefix web run db:seed",
+    "db:studio": "npm --prefix web run db:studio"
+  }
+}
