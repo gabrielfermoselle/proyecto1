@@ -46,6 +46,14 @@ export async function requireRol(...roles: readonly Rol[]): Promise<UsuarioActua
   return usuario;
 }
 
+/** Para el área del cliente. Devuelve su `clienteId`, que toda query debe usar como filtro. */
+export async function requireCliente() {
+  const usuario = await requireRol("CLIENTE");
+  const perfil = usuario.clienteProfile;
+  if (!perfil) throw new Error(`El usuario ${usuario.id} es CLIENTE pero no tiene perfil`);
+  return { usuario, clienteId: perfil.id };
+}
+
 /**
  * Para el área del fletero. Devuelve su `fleteroId`, que toda query debe usar como filtro.
  * Si el onboarding no está completo, manda a terminarlo (salvo en las páginas del onboarding).

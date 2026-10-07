@@ -142,6 +142,10 @@ const MATRIZ: Record<string, Caso> = {
     ajeno: (m) => ({ como: m.otroCliente, input: { presupuestoId: m.presupuestoId } }),
   },
 
+  // --- perfil del cliente (operan sobre el perfil de la sesión) ---
+  guardarDatosCliente: { roles: ["CLIENTE"] },
+  guardarDireccionHabitual: { roles: ["CLIENTE"] },
+
   // --- presupuestos (fletero) ---
   enviarPresupuesto: {
     roles: ["FLETERO"],

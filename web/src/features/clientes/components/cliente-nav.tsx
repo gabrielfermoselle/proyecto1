@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, MessagesSquare, Search, Truck } from "lucide-react";
+import { ClipboardList, MessagesSquare, Search, Truck, UserRound } from "lucide-react";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
 import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
 
@@ -33,6 +33,13 @@ const secciones = (): SeccionNav[] => [
     label: "Fleteros",
     Icono: Search,
     prefijos: ["/cliente/fleteros"],
+    enInferior: true,
+  },
+  {
+    href: "/cliente/perfil",
+    label: "Perfil",
+    Icono: UserRound,
+    prefijos: ["/cliente/perfil"],
     enInferior: true,
   },
 ];
