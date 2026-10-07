@@ -195,7 +195,6 @@ web/
 ├── test/                            infraestructura de tests (PGlite, sesión simulada, servidor e2e)
 ├── e2e/                             recorridos Playwright (registro, flete, buscador, contraseñas, a11y…)
 ├── .env.example                     variables necesarias (ver sección 7)
-├── vercel.json                      cron diario
 └── DEPLOY.md                        guía de puesta en producción
 ```
 
@@ -746,9 +745,10 @@ Detalle paso a paso en `web/DEPLOY.md`. En resumen:
    anotar las credenciales.
 2. **Migraciones**: `npm run db:deploy` (crea tablas, índices GIST, CHECKs, políticas de Realtime
    y buckets). **No** correr el seed en producción.
-3. **Vercel**: proyecto con **Root Directory `web`** y las variables de entorno de la sección 7.
+3. **Vercel**: proyecto con Root Directory en la raíz del repo (el `vercel.json` de la raíz compila `web/`)
+   y las variables de entorno de la sección 7.
    Cada push a `main` despliega a producción y cada PR genera un *preview*.
-4. **Cron**: `web/vercel.json` corre el mantenimiento a las 06:00 UTC (03:00 en Tucumán).
+4. **Cron**: `vercel.json` (raíz) corre el mantenimiento a las 06:00 UTC (03:00 en Tucumán).
 5. **Verificación**: checklist manual en `DEPLOY.md` (dos navegadores, Realtime, fotos, PDF,
    admin, cron).
 

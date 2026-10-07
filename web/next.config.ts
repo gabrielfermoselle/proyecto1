@@ -10,7 +10,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  // El repo raíz tiene su propio package-lock (app anterior): la raíz de esta app es web/.
+  // La app vive en web/ (el vercel.json de la raíz la compila desde ahí): el tracing arranca acá.
   outputFileTracingRoot: path.join(__dirname),
   images: {
     // Solo imágenes de Supabase Storage (públicas y URLs firmadas); nada de hosts arbitrarios.
