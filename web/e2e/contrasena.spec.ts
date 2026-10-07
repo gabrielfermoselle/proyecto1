@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { ARCHIVO_CORREOS } from "../test/e2e/correos";
 import { ingresar } from "./utils";
 
-// Cambio de contraseña con una cuenta nueva (no se toca ninguna cuenta del seed: sus sesiones
+// Cambio y recuperación de contraseña con una cuenta nueva (no se toca ninguna cuenta del seed: sus sesiones
 // guardadas las usan los demás e2e). El servidor limita a 5 registros por hora por IP.
 
 const email = `clave.${Date.now().toString(36)}@e2e.test`;
@@ -48,4 +50,50 @@ test("cambiar la contraseña cierra las sesiones abiertas y se entra con la nuev
   await expect(page.getByText("El email o la contraseña no son correctos.")).toBeVisible();
   await ingresar(page, email, NUEVA);
   await expect(page).toHaveURL("/cliente");
+});
+
+/** El link del último email enviado a `para` (el servidor de e2e los deja en un archivo). */
+function linkDelUltimoEmail(para: string): string {
+  const correos = readFileSync(ARCHIVO_CORREOS, "utf8")
+    .trim()
+    .split("\n")
+    .map((linea) => JSON.parse(linea) as { para: string; texto: string });
+  const texto = correos.filter((c) => c.para === para).at(-1)?.texto ?? "";
+  const link = texto.match(/https?:\/\/\S+\/recuperar\/\S+/)?.[0];
+  if (!link) throw new Error(`No llegó el email a ${para}`);
+  return new URL(link).pathname;
+}
+
+test("quien olvidó la contraseña elige una nueva con el link del email", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("link", { name: "¿Olvidaste tu contraseña?" }).click();
+  await page.getByLabel("Email de tu cuenta").fill(email);
+  await page.getByRole("button", { name: "Enviarme el link" }).click();
+  await expect(page.getByText(/te llega un email con un link/)).toBeVisible();
+
+  const link = linkDelUltimoEmail(email);
+  const FINAL = "Recuperada33";
+  await page.goto(link);
+  await page.getByLabel("Contraseña nueva").fill(FINAL);
+  await page.getByLabel("Repetí la nueva").fill(FINAL);
+  await page.getByRole("button", { name: "Guardar contraseña" }).click();
+  await expect(page).toHaveURL(/\/login\?aviso=recuperada/);
+
+  await ingresar(page, email, FINAL);
+  await expect(page).toHaveURL("/cliente");
+
+  // El link es de un solo uso.
+  const otra = await page.context().browser()!.newPage();
+  await otra.goto(link);
+  await otra.getByLabel("Contraseña nueva").fill("OtraMas444");
+  await otra.getByLabel("Repetí la nueva").fill("OtraMas444");
+  await otra.getByRole("button", { name: "Guardar contraseña" }).click();
+  await expect(otra.getByText("El link venció o ya se usó. Pedí uno nuevo.")).toBeVisible();
+});
+
+test("pedir un link para un email inexistente muestra el mismo mensaje", async ({ page }) => {
+  await page.goto("/recuperar");
+  await page.getByLabel("Email de tu cuenta").fill(`nadie.${Date.now()}@e2e.test`);
+  await page.getByRole("button", { name: "Enviarme el link" }).click();
+  await expect(page.getByText(/te llega un email con un link/)).toBeVisible();
 });

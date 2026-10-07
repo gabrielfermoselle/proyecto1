@@ -13,6 +13,7 @@ export const metadata: Metadata = { title: "Ingresar" };
 /** Avisos que llegan por URL después de un cambio de credenciales. Valores desconocidos se ignoran. */
 const AVISOS: Record<string, string> = {
   contrasena: "Cambiaste tu contraseña y cerramos tus sesiones. Ingresá con la nueva.",
+  recuperada: "Listo, guardamos tu contraseña nueva. Ingresá con ella.",
 };
 
 export default async function LoginPage({
@@ -38,6 +39,12 @@ export default async function LoginPage({
           </Alert>
         ) : null}
         <LoginForm callbackUrl={callbackUrl} />
+        <Link
+          href="/recuperar"
+          className="justify-self-center text-sm font-semibold text-primary underline-offset-4 hover:underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
       </CardContent>
       <CardFooter className="justify-center text-sm">
         <p>

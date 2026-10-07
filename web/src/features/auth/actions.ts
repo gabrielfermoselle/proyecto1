@@ -5,9 +5,11 @@ import { headers } from "next/headers";
 import { ROLES } from "@/domain/roles";
 import { ActionError, createAction, createPublicAction } from "@/lib/action";
 import { BCRYPT_COSTO } from "@/lib/auth";
+import { enviarCorreo, urlPublicaApp } from "@/lib/correo";
 import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
 import { prisma } from "@/lib/prisma";
-import { cambioContrasenaSchema, registroSchema } from "./schemas";
+import { correoRecuperacion, generarToken, hashToken, VIGENCIA_TOKEN_MS } from "./recuperacion";
+import { cambioContrasenaSchema, registroSchema, restablecerSchema, solicitudRecuperacionSchema } from "./schemas";
 
 const EMAIL_EN_USO = "Ya hay una cuenta con ese email. Probá iniciar sesión.";
 
@@ -63,6 +65,75 @@ export const cambiarContrasena = createAction({
     await prisma.user.update({
       where: { id: usuario.id },
       data: { passwordHash: await bcrypt.hash(nueva, BCRYPT_COSTO), credencialesCambiadasEn: new Date() },
+    });
+    return null;
+  },
+});
+
+async function ipDelRequest(): Promise<string> {
+  // En Vercel, x-forwarded-for lo arma la plataforma.
+  return (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "desconocida";
+}
+
+/**
+ * Pide un link para elegir una contraseña nueva. Responde siempre lo mismo, exista o no la
+ * cuenta (no revela qué emails están registrados). Un link nuevo anula los anteriores.
+ */
+export const solicitarRecuperacion = createPublicAction({
+  schema: solicitudRecuperacionSchema,
+  handler: async ({ email }) => {
+    await consumirLimite(LIMITES.recuperacionesPorIp(await ipDelRequest()), LIMITES.recuperacionesPorEmail(email));
+    const usuario = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, nombre: true, activo: true },
+    });
+    if (usuario?.activo) {
+      const { token, tokenHash } = generarToken();
+      const ahora = new Date();
+      await prisma.$transaction([
+        prisma.tokenRecuperacion.updateMany({
+          where: { userId: usuario.id, usadoEn: null },
+          data: { usadoEn: ahora },
+        }),
+        prisma.tokenRecuperacion.create({
+          data: { userId: usuario.id, tokenHash, expiraEn: new Date(ahora.getTime() + VIGENCIA_TOKEN_MS) },
+        }),
+      ]);
+      await enviarCorreo(
+        correoRecuperacion({ para: email, nombre: usuario.nombre, link: `${urlPublicaApp()}/recuperar/${token}` }),
+      );
+    }
+    return null;
+  },
+});
+
+const LINK_INVALIDO = "El link venció o ya se usó. Pedí uno nuevo.";
+
+/**
+ * Elige la contraseña nueva con el token del email. El token se marca usado en la misma
+ * transacción (dos envíos simultáneos no pueden usarlo dos veces) y se cierran las sesiones.
+ */
+export const restablecerContrasena = createPublicAction({
+  schema: restablecerSchema,
+  handler: async ({ token, nueva }) => {
+    await consumirLimite(LIMITES.restablecimientosPorIp(await ipDelRequest()));
+    const passwordHash = await bcrypt.hash(nueva, BCRYPT_COSTO);
+    const ahora = new Date();
+    await prisma.$transaction(async (tx) => {
+      const registro = await tx.tokenRecuperacion.findUnique({
+        where: { tokenHash: hashToken(token) },
+        select: { id: true, userId: true, user: { select: { activo: true } } },
+      });
+      if (!registro?.user.activo) throw new ActionError(LINK_INVALIDO);
+      const { count } = await tx.tokenRecuperacion.updateMany({
+        where: { id: registro.id, usadoEn: null, expiraEn: { gt: ahora } },
+        data: { usadoEn: ahora },
+      });
+      if (count === 0) throw new ActionError(LINK_INVALIDO);
+      await tx.user.update({
+        where: { id: registro.userId },
+        data: { passwordHash, credencialesCambiadasEn: ahora },
+      });
     });
     return null;
   },

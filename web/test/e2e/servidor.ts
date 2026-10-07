@@ -2,7 +2,9 @@
 // Lo arranca Playwright (webServer). Con E2E_PROD=1 usa `next start` sobre un build previo (CI);
 // si no, `next dev` (local, sin build).
 import { spawn, type SpawnOptions } from "node:child_process";
+import { rmSync } from "node:fs";
 import { levantarPglite } from "../db/pglite";
+import { ARCHIVO_CORREOS } from "./correos";
 
 const PUERTO = process.env.E2E_PUERTO ?? "3100";
 
@@ -32,7 +34,11 @@ async function main() {
     SUPABASE_ANON_KEY: "",
     SUPABASE_SERVICE_ROLE_KEY: "",
     SUPABASE_JWT_SECRET: "",
+    // Sin Resend: los emails van a un archivo que leen los tests.
+    RESEND_API_KEY: "",
+    CORREO_ARCHIVO: ARCHIVO_CORREOS,
   };
+  rmSync(ARCHIVO_CORREOS, { force: true });
 
   await esperar(npx(["tsx", "prisma/seed.ts"], { env: { ...env, NODE_ENV: "test" } }));
 

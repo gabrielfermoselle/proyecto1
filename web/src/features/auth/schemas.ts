@@ -70,7 +70,18 @@ export const cambioContrasenaSchema = z
     path: ["nueva"],
   });
 
+export const solicitudRecuperacionSchema = z.object({ email: emailSchema });
+
+/** El token viaja en el link: 32 bytes en base64url (43 caracteres). */
+export const tokenRecuperacionSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/, "El link no es válido.");
+
+export const restablecerSchema = z
+  .object({ token: tokenRecuperacionSchema, nueva: passwordSchema, confirmar: z.string() })
+  .refine((d) => d.nueva === d.confirmar, { message: "Las contraseñas no coinciden", path: ["confirmar"] });
+
 export type LoginInput = z.input<typeof loginSchema>;
+export type SolicitudRecuperacionInput = z.input<typeof solicitudRecuperacionSchema>;
+export type RestablecerInput = z.input<typeof restablecerSchema>;
 export type CambioContrasenaInput = z.input<typeof cambioContrasenaSchema>;
 export type RegistroInput = z.input<typeof registroSchema>;
 export type RegistroDatos = z.output<typeof registroSchema>;

@@ -26,6 +26,7 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "portada", ruta: "/" },
     { nombre: "login", ruta: "/login" },
     { nombre: "registro", ruta: "/registro" },
+    { nombre: "recuperar contraseña", ruta: "/recuperar" },
   ],
   ana: [
     { nombre: "mis fletes", ruta: "/cliente" },

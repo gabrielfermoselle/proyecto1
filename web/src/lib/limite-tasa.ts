@@ -32,6 +32,25 @@ export const LIMITES = {
     ventanaSegundos: 15 * 60,
     mensaje: "Hubo demasiados intentos. Esperá unos minutos y probá de nuevo.",
   }),
+  recuperacionesPorIp: (ip: string): Limite => ({
+    clave: `auth:recuperar:ip:${ip}`,
+    maximo: 10,
+    ventanaSegundos: 3600,
+    mensaje: "Se pidieron muchos links desde esta conexión. Probá más tarde.",
+  }),
+  /** No inundar la casilla de nadie: también aplica a emails que no existen (no revela nada). */
+  recuperacionesPorEmail: (email: string): Limite => ({
+    clave: `auth:recuperar:email:${email}`,
+    maximo: 3,
+    ventanaSegundos: 3600,
+    mensaje: "Ya te enviamos varios links. Revisá tu correo (y el spam) o probá en una hora.",
+  }),
+  restablecimientosPorIp: (ip: string): Limite => ({
+    clave: `auth:restablecer:ip:${ip}`,
+    maximo: 20,
+    ventanaSegundos: 3600,
+    mensaje: "Hubo demasiados intentos desde esta conexión. Probá más tarde.",
+  }),
   mensajesPorConversacion: (userId: string, conversacionId: string): Limite => ({
     clave: `chat:msg:${userId}:${conversacionId}`,
     maximo: 20,
