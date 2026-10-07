@@ -1,6 +1,7 @@
 import "server-only";
 import { appendFile } from "node:fs/promises";
 import { env } from "./env";
+import { log } from "./log";
 
 // Envío de emails. Con RESEND_API_KEY se usa la API HTTP de Resend (funciona en serverless,
 // sin SDK). Sin clave: en desarrollo el email se muestra en la consola; con CORREO_ARCHIVO se
@@ -42,10 +43,13 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
           html: correo.html,
         }),
       });
-      if (respuesta.ok) return true;
-      console.error("[correo] Resend rechazó el envío", respuesta.status, (await respuesta.text()).slice(0, 300));
+      if (respuesta.ok) {
+        log.info("correo.enviado", { asunto: correo.asunto });
+        return true;
+      }
+      log.error("correo.rechazado", { estado: respuesta.status, detalle: (await respuesta.text()).slice(0, 300) });
     } catch (error) {
-      console.error("[correo] no se pudo enviar", error);
+      log.error("correo.error", { error });
     }
     return false;
   }
@@ -60,6 +64,6 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
     return true;
   }
   // En producción el link no se escribe en los logs: quien los lea podría usarlo.
-  console.warn("[correo] falta RESEND_API_KEY: no se envió", correo.asunto);
+  log.warn("correo.sin_configurar", { asunto: correo.asunto });
   return false;
 }

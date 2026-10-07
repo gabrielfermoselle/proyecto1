@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { supabaseAdmin, supabaseHabilitado } from "@/lib/supabase";
 import { env } from "@/lib/env";
+import { log } from "@/lib/log";
 import { prisma } from "@/lib/prisma";
 
 // Fotos en Supabase Storage. El navegador sube directo con una URL firmada por el servidor;
@@ -65,7 +66,7 @@ export async function urlsFirmadas(rutas: string[]): Promise<Map<string, string>
     .from(BUCKET_PRIVADO)
     .createSignedUrls(rutas, DURACION_URL_FIRMADA_S);
   if (error) {
-    console.warn("[storage] no se pudieron firmar URLs", error.message);
+    log.warn("storage.firmar_fallo", { error });
     return urls;
   }
   for (const fila of data) if (fila.path && fila.signedUrl) urls.set(fila.path, fila.signedUrl);
@@ -77,5 +78,5 @@ export async function eliminarArchivos(bucket: Bucket, rutas: string[]): Promise
   const admin = supabaseAdmin();
   if (!admin || rutas.length === 0) return;
   const { error } = await admin.storage.from(bucket).remove(rutas);
-  if (error) console.warn("[storage] no se pudo borrar", rutas, error.message);
+  if (error) log.warn("storage.borrar_fallo", { bucket, cantidad: rutas.length, error });
 }

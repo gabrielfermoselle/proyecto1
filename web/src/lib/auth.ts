@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { ERROR_DEMASIADOS_INTENTOS, loginSchema } from "@/features/auth/schemas";
 import { env } from "./env";
 import { consultaConsumir, inicioVentana } from "./limite-tasa-sql";
+import { logDelRequest } from "./log";
 import { prisma } from "./prisma";
 
 /** Costo de bcrypt: ~250 ms por hash, suficiente contra fuerza bruta sin castigar el login. */
@@ -42,7 +43,11 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
-        if (await superaIntentosLogin(parsed.data.email)) throw new Error(ERROR_DEMASIADOS_INTENTOS);
+        if (await superaIntentosLogin(parsed.data.email)) {
+          // Sin el email (dato personal): el patrón se ve por requestId e IP en los logs de Vercel.
+          (await logDelRequest()).warn("auth.login_bloqueado");
+          throw new Error(ERROR_DEMASIADOS_INTENTOS);
+        }
 
         const user = await prisma.user.findUnique({
           where: { email: parsed.data.email },
