@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { finDelDiaAr, fechaIsoDeDia } from "@/domain/fechas";
-import { prisma } from "@/lib/prisma";
+import { numero } from "@/lib/db";
 import {
   crearCliente,
   crearFletero,
@@ -11,6 +11,7 @@ import {
   ok,
 } from "../../../../test/db/fabrica";
 import { comoUsuario } from "../../../../test/db/sesion";
+import { actualizar, contar, filas, insertar, uno } from "../../../../test/db/tabla";
 import { enviarPresupuesto, retirarPresupuesto } from "./actions";
 
 // enviarPresupuesto es la acción de plata de la plataforma: todo lo que importa (acceso,
@@ -36,9 +37,14 @@ async function escenario() {
 }
 
 async function presupuestoDe(solicitudId: string, fletero: Fletero) {
-  return prisma.presupuesto.findUniqueOrThrow({
-    where: { solicitudId_fleteroId: { solicitudId, fleteroId: fletero.fleteroProfile!.id } },
-  });
+  return uno<{
+    id: string;
+    estado: string;
+    monto: unknown;
+    montoSugerido: unknown;
+    incluyeAyudantes: number;
+    validoHasta: string;
+  }>("presupuestos", { solicitudId, fleteroId: fletero.fleteroProfile!.id });
 }
 
 describe("enviarPresupuesto", () => {
@@ -50,13 +56,22 @@ describe("enviarPresupuesto", () => {
 
     const p = await presupuestoDe(solicitud.id, fletero);
     expect(p.estado).toBe("PENDIENTE");
-    expect(p.monto.toNumber()).toBe(30_000);
+    expect(numero(p.monto)).toBe(30_000);
     expect(await eventosDelChat(solicitud.id, fletero.fleteroProfile!.id)).toEqual(["PRESUPUESTO_ENVIADO"]);
-    const textos = await prisma.mensaje.findMany({
-      where: { conversacion: { solicitudId: solicitud.id }, tipo: "TEXTO" },
-      select: { contenido: true, autorId: true },
-    });
-    expect(textos).toEqual([{ contenido: "Lo hago a la mañana", autorId: fletero.id }]);
+    const conversaciones = await filas<{ id: string }>("conversaciones", { solicitudId: solicitud.id });
+    const textos = (
+      await Promise.all(
+        conversaciones.map((c) =>
+          filas<{ contenido: string | null; autorId: string | null }>("mensajes", {
+            conversacionId: c.id,
+            tipo: "TEXTO",
+          }),
+        ),
+      )
+    ).flat();
+    expect(textos.map((m) => ({ contenido: m.contenido, autorId: m.autorId }))).toEqual([
+      { contenido: "Lo hago a la mañana", autorId: fletero.id },
+    ]);
   });
 
   it("calcula el precio sugerido en el servidor con las tarifas del fletero", async () => {
@@ -68,7 +83,7 @@ describe("enviarPresupuesto", () => {
     ok(await enviarPresupuesto({ ...base(fletero, solicitud.id), ayudantes: 2 }));
 
     const p = await presupuestoDe(solicitud.id, fletero);
-    expect(p.montoSugerido.toNumber()).toBe(20_000);
+    expect(numero(p.montoSugerido)).toBe(20_000);
     expect(p.incluyeAyudantes).toBe(2);
   });
 
@@ -81,7 +96,7 @@ describe("enviarPresupuesto", () => {
     ok(await enviarPresupuesto({ ...base(fletero, manana.id), validez: "7d" }));
 
     const p = await presupuestoDe(manana.id, fletero);
-    expect(p.validoHasta.getTime()).toBe(finDelDiaAr(fechaIsoDeDia(dia(1))).getTime());
+    expect(new Date(p.validoHasta).getTime()).toBe(finDelDiaAr(fechaIsoDeDia(dia(1))).getTime());
   });
 
   it("con validez de 24 h vence a las 24 h si el flete es más adelante", async () => {
@@ -91,7 +106,7 @@ describe("enviarPresupuesto", () => {
 
     ok(await enviarPresupuesto({ ...base(fletero, solicitud.id), validez: "24h" }));
 
-    const vence = (await presupuestoDe(solicitud.id, fletero)).validoHasta.getTime();
+    const vence = new Date((await presupuestoDe(solicitud.id, fletero)).validoHasta).getTime();
     expect(vence - antes).toBeGreaterThanOrEqual(24 * 3600 * 1000);
     expect(vence - antes).toBeLessThan(24 * 3600 * 1000 + 60_000);
   });
@@ -104,28 +119,26 @@ describe("enviarPresupuesto", () => {
     expect(error(await enviarPresupuesto({ ...base(fletero, solicitud.id), monto: 1_000 }))).toMatch(
       /Ya enviaste un presupuesto/,
     );
-    expect((await presupuestoDe(solicitud.id, fletero)).monto.toNumber()).toBe(30_000);
+    expect(numero((await presupuestoDe(solicitud.id, fletero)).monto)).toBe(30_000);
   });
 
   it("rechaza al fletero en pausa", async () => {
     const { fletero, solicitud } = await escenario();
-    await prisma.fleteroProfile.update({
-      where: { id: fletero.fleteroProfile!.id },
-      data: { disponible: false },
-    });
+    await actualizar("perfiles_fletero", { id: fletero.fleteroProfile!.id }, { disponible: false });
     comoUsuario(fletero);
 
     expect(error(await enviarPresupuesto(base(fletero, solicitud.id)))).toMatch(/Estás en pausa/);
-    expect(await prisma.presupuesto.count({ where: { solicitudId: solicitud.id } })).toBe(0);
+    expect(await contar("presupuestos", { solicitudId: solicitud.id })).toBe(0);
   });
 
   it("una solicitud fuera del radio de cobertura no existe para el fletero", async () => {
     const { fletero, solicitud } = await escenario();
     // Base en Concepción (~60 km del origen) con 10 km de radio.
-    await prisma.fleteroProfile.update({
-      where: { id: fletero.fleteroProfile!.id },
-      data: { baseLat: -27.3436, baseLng: -65.5925, radioCoberturaKm: 10 },
-    });
+    await actualizar(
+      "perfiles_fletero",
+      { id: fletero.fleteroProfile!.id },
+      { baseLat: -27.3436, baseLng: -65.5925, radioCoberturaKm: 10 },
+    );
     comoUsuario(fletero);
 
     expect(error(await enviarPresupuesto(base(fletero, solicitud.id)))).toMatch(
@@ -135,18 +148,15 @@ describe("enviarPresupuesto", () => {
 
   it("no acepta un vehículo que no puede llevar la carga", async () => {
     const { fletero, solicitud } = await escenario();
-    await prisma.solicitud.update({ where: { id: solicitud.id }, data: { pesoTotalKg: 300 } });
-    const moto = await prisma.vehiculo.create({
-      data: {
-        fleteroId: fletero.fleteroProfile!.id,
-        tipo: "MOTO",
-        marca: "Honda",
-        modelo: "Wave",
-        patente: `M${Date.now().toString().slice(-6)}`,
-        capacidadKg: 20,
-        volumenM3: 0.1,
-      },
-      select: { id: true },
+    await actualizar("solicitudes", { id: solicitud.id }, { pesoTotalKg: 300 });
+    const moto = await insertar<{ id: string }>("vehiculos", {
+      fleteroId: fletero.fleteroProfile!.id,
+      tipo: "MOTO",
+      marca: "Honda",
+      modelo: "Wave",
+      patente: `M${Date.now().toString().slice(-6)}`,
+      capacidadKg: 20,
+      volumenM3: 0.1,
     });
     comoUsuario(fletero);
 
@@ -167,7 +177,7 @@ describe("enviarPresupuesto", () => {
 
   it("no acepta un vehículo propio dado de baja", async () => {
     const { fletero, solicitud } = await escenario();
-    await prisma.vehiculo.update({ where: { id: fletero.vehiculoId }, data: { activo: false } });
+    await actualizar("vehiculos", { id: fletero.vehiculoId }, { activo: false });
     comoUsuario(fletero);
 
     expect(error(await enviarPresupuesto(base(fletero, solicitud.id)))).toMatch(/vehículos activos/);
@@ -204,15 +214,12 @@ describe("enviarPresupuesto", () => {
     const r = await enviarPresupuesto({ ...base(fletero, solicitud.id), monto });
     expect(r.ok).toBe(false);
     expect(r.ok ? [] : r.fieldErrors?.monto).toEqual([expect.stringMatching(mensaje)]);
-    expect(await prisma.presupuesto.count({ where: { solicitudId: solicitud.id } })).toBe(0);
+    expect(await contar("presupuestos", { solicitudId: solicitud.id })).toBe(0);
   });
 
   it("un fletero con el onboarding incompleto no puede presupuestar", async () => {
     const { fletero, solicitud } = await escenario();
-    await prisma.fleteroProfile.update({
-      where: { id: fletero.fleteroProfile!.id },
-      data: { onboardingCompletadoEn: null },
-    });
+    await actualizar("perfiles_fletero", { id: fletero.fleteroProfile!.id }, { onboardingCompletadoEn: null });
     comoUsuario({ ...fletero, fleteroProfile: { ...fletero.fleteroProfile!, onboardingCompletadoEn: null } });
 
     expect(error(await enviarPresupuesto(base(fletero, solicitud.id)))).toMatch(/Terminá de configurar/);

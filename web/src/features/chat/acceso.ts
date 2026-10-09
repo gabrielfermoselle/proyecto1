@@ -1,14 +1,17 @@
 import "server-only";
-import type { EstadoPresupuesto, EstadoSolicitud, EtapaFlete, FranjaHoraria } from "@prisma/client";
+import type { EstadoPresupuesto, EtapaFlete, FranjaHoraria } from "@/domain/catalogos";
 import { contactoVisible, estadoConversacion, type EstadoConversacion } from "@/domain/chat";
 import { fechaIsoDeDia } from "@/domain/fechas";
+import type { EstadoSolicitudPedido } from "@/domain/pedido";
+import { db, fallar, numero, relacion } from "@/lib/db";
 import { nombrePublico } from "@/lib/formato";
-import { prisma } from "@/lib/prisma";
 import type { UsuarioActual } from "@/lib/session";
 import type { RolChat } from "./dto";
 
 // Única puerta de entrada a una conversación: todo (páginas, endpoints, acciones) pasa por acá.
 // Si el usuario no es participante, la conversación "no existe" para él.
+
+type EstadoSolicitud = EstadoSolicitudPedido;
 
 export function perfilChat(usuario: UsuarioActual): { rol: RolChat; perfilId: string } | null {
   if (usuario.rol === "CLIENTE" && usuario.clienteProfile)
@@ -37,8 +40,28 @@ export interface ContextoChat {
   leidoHastaOtro: Date | null;
   solicitud: { fecha: string; franja: FranjaHoraria; estado: EstadoSolicitud };
   presupuesto: { id: string; monto: number; estado: EstadoPresupuesto; validoHasta: Date } | null;
-  /** Filtro de Prisma que restringe la conversación al participante (para updateMany). */
+  /** Restringe la conversación al participante (para actualizar la marca de lectura). */
   filtroParticipante: { id: string; clienteId: string } | { id: string; fleteroId: string };
+}
+
+interface UsuarioNombre {
+  nombre: string;
+  apellido: string;
+}
+
+interface PerfilChat {
+  userId: string;
+  user: UsuarioNombre | UsuarioNombre[] | null;
+}
+
+function comoFecha(valor: unknown): Date {
+  if (valor instanceof Date) return valor;
+  const texto = String(valor);
+  return new Date(/^\d{4}-\d{2}-\d{2}$/.test(texto) ? `${texto}T00:00:00.000Z` : texto);
+}
+
+function comoFechaONull(valor: unknown): Date | null {
+  return valor == null ? null : comoFecha(valor);
 }
 
 export async function getContextoChat(
@@ -52,73 +75,91 @@ export async function getContextoChat(
       ? { id: conversacionId, clienteId: perfil.perfilId }
       : { id: conversacionId, fleteroId: perfil.perfilId };
 
-  const c = await prisma.conversacion.findFirst({
-    where: filtroParticipante,
-    select: {
-      id: true,
-      solicitudId: true,
-      fleteroId: true,
-      clienteId: true,
-      leidoHastaCliente: true,
-      leidoHastaFletero: true,
-      solicitud: { select: { titulo: true, estado: true, fecha: true, franja: true } },
-      cliente: { select: { userId: true, user: { select: { nombre: true, apellido: true } } } },
-      fletero: { select: { userId: true, user: { select: { nombre: true, apellido: true } } } },
-    },
-  });
+  const { data: c, error } = await db()
+    .from("conversaciones")
+    .select(
+      `id, solicitudId, fleteroId, clienteId, leidoHastaCliente, leidoHastaFletero,
+       solicitud:solicitudes!conversaciones_solicitudId_fkey(titulo, estado, fecha, franja),
+       cliente:perfiles_cliente!conversaciones_clienteId_fkey(userId, user:usuarios!cliente_profiles_userId_fkey(nombre, apellido)),
+       fletero:perfiles_fletero!conversaciones_fleteroId_fkey(userId, user:usuarios!fletero_profiles_userId_fkey(nombre, apellido))`,
+    )
+    .match(filtroParticipante)
+    .maybeSingle();
+  fallar(error);
   if (!c) return null;
 
-  const [presupuesto, flete] = await Promise.all([
-    prisma.presupuesto.findUnique({
-      where: { solicitudId_fleteroId: { solicitudId: c.solicitudId, fleteroId: c.fleteroId } },
-      select: { id: true, monto: true, estado: true, validoHasta: true },
-    }),
-    prisma.flete.findUnique({
-      where: { solicitudId: c.solicitudId },
-      select: { id: true, etapa: true, fleteroId: true },
-    }),
+  const solicitud = relacion(
+    c.solicitud as
+      | { titulo: string; estado: EstadoSolicitud; fecha: string; franja: FranjaHoraria }
+      | { titulo: string; estado: EstadoSolicitud; fecha: string; franja: FranjaHoraria }[]
+      | null,
+  );
+  const cliente = relacion(c.cliente as PerfilChat | PerfilChat[] | null);
+  const fletero = relacion(c.fletero as PerfilChat | PerfilChat[] | null);
+  const clienteUser = relacion(cliente?.user);
+  const fleteroUser = relacion(fletero?.user);
+  if (!solicitud || !cliente || !fletero || !clienteUser || !fleteroUser) return null;
+
+  const [presupuestoRes, fleteRes] = await Promise.all([
+    db()
+      .from("presupuestos")
+      .select("id, monto, estado, validoHasta")
+      .eq("solicitudId", c.solicitudId as string)
+      .eq("fleteroId", c.fleteroId as string)
+      .maybeSingle(),
+    db().from("fletes").select("id, etapa, fleteroId").eq("solicitudId", c.solicitudId as string).maybeSingle(),
   ]);
+  fallar(presupuestoRes.error);
+  fallar(fleteRes.error);
+  const presupuesto = presupuestoRes.data;
+  const flete = fleteRes.data;
   // El flete de la solicitud cuenta solo si es con ESTE fletero.
   const fleteDelPar = flete?.fleteroId === c.fleteroId ? flete : null;
-  const fleteEtapa = fleteDelPar?.etapa ?? null;
+  const fleteEtapa = (fleteDelPar?.etapa as EtapaFlete | undefined) ?? null;
 
   const otroEsFletero = perfil.rol === "CLIENTE";
-  const otro = otroEsFletero ? c.fletero : c.cliente;
+  const otro = otroEsFletero ? fletero : cliente;
+  const otroUser = otroEsFletero ? fleteroUser : clienteUser;
 
   return {
-    conversacionId: c.id,
-    solicitudId: c.solicitudId,
-    fleteroId: c.fleteroId,
-    clienteId: c.clienteId,
-    titulo: c.solicitud.titulo,
+    conversacionId: c.id as string,
+    solicitudId: c.solicitudId as string,
+    fleteroId: c.fleteroId as string,
+    clienteId: c.clienteId as string,
+    titulo: solicitud.titulo,
     miRol: perfil.rol,
     miUserId: usuario.id,
     otro: {
       userId: otro.userId,
-      nombre: nombrePublico(otro.user.nombre, otro.user.apellido),
+      nombre: nombrePublico(otroUser.nombre, otroUser.apellido),
       rol: otroEsFletero ? "FLETERO" : "CLIENTE",
     },
     estado: estadoConversacion({
-      solicitudEstado: c.solicitud.estado,
-      presupuesto: presupuesto ? { estado: presupuesto.estado, validoHasta: presupuesto.validoHasta } : null,
+      solicitudEstado: solicitud.estado,
+      presupuesto: presupuesto
+        ? {
+            estado: presupuesto.estado as EstadoPresupuesto,
+            validoHasta: comoFecha(presupuesto.validoHasta),
+          }
+        : null,
       fleteEtapa,
     }),
-    fleteId: fleteDelPar?.id ?? null,
+    fleteId: (fleteDelPar?.id as string | undefined) ?? null,
     fleteEtapa,
     contactoVisible: contactoVisible(fleteEtapa),
-    leidoHastaMio: perfil.rol === "CLIENTE" ? c.leidoHastaCliente : c.leidoHastaFletero,
-    leidoHastaOtro: perfil.rol === "CLIENTE" ? c.leidoHastaFletero : c.leidoHastaCliente,
+    leidoHastaMio: comoFechaONull(perfil.rol === "CLIENTE" ? c.leidoHastaCliente : c.leidoHastaFletero),
+    leidoHastaOtro: comoFechaONull(perfil.rol === "CLIENTE" ? c.leidoHastaFletero : c.leidoHastaCliente),
     solicitud: {
-      fecha: fechaIsoDeDia(c.solicitud.fecha),
-      franja: c.solicitud.franja,
-      estado: c.solicitud.estado,
+      fecha: fechaIsoDeDia(comoFecha(solicitud.fecha)),
+      franja: solicitud.franja,
+      estado: solicitud.estado,
     },
     presupuesto: presupuesto
       ? {
-          id: presupuesto.id,
-          monto: presupuesto.monto.toNumber(),
-          estado: presupuesto.estado,
-          validoHasta: presupuesto.validoHasta,
+          id: presupuesto.id as string,
+          monto: numero(presupuesto.monto),
+          estado: presupuesto.estado as EstadoPresupuesto,
+          validoHasta: comoFecha(presupuesto.validoHasta),
         }
       : null,
     filtroParticipante,

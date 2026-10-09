@@ -4,9 +4,9 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { ERROR_DEMASIADOS_INTENTOS, loginSchema } from "@/features/auth/schemas";
 import { env } from "./env";
-import { consultaConsumir, inicioVentana } from "./limite-tasa-sql";
+import { consumirVentana, inicioVentana } from "./limite-tasa-sql";
 import { logDelRequest } from "./log";
-import { prisma } from "./prisma";
+import { db, fallar } from "./db";
 
 /** Costo de bcrypt: ~250 ms por hash, suficiente contra fuerza bruta sin castigar el login. */
 export const BCRYPT_COSTO = 12;
@@ -22,11 +22,8 @@ const HASH_SIMULADO = "$2b$12$HxdoX2erxIzZiaB2z.Enz.TDoLC48AgLDin9NQ2MscPXW3Y3E1
 const INTENTOS_LOGIN = { maximo: 10, ventanaSegundos: 15 * 60 };
 
 async function superaIntentosLogin(email: string): Promise<boolean> {
-  const ventana = inicioVentana(new Date(), INTENTOS_LOGIN.ventanaSegundos);
-  const [fila] = await prisma.$queryRaw<{ cantidad: number }[]>(
-    consultaConsumir(`auth:login:${email}`, ventana),
-  );
-  return (fila?.cantidad ?? 0) > INTENTOS_LOGIN.maximo;
+  const cantidad = await consumirVentana(`auth:login:${email}`, inicioVentana(new Date(), INTENTOS_LOGIN.ventanaSegundos));
+  return cantidad > INTENTOS_LOGIN.maximo;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -49,18 +46,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error(ERROR_DEMASIADOS_INTENTOS);
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email },
-          select: {
-            id: true,
-            email: true,
-            nombre: true,
-            apellido: true,
-            rol: true,
-            activo: true,
-            passwordHash: true,
-          },
-        });
+        const { data: user, error } = await db()
+          .from("usuarios")
+          .select("id, email, nombre, apellido, rol, activo, passwordHash")
+          .eq("email", parsed.data.email)
+          .maybeSingle();
+        fallar(error);
         const passwordOk = await bcrypt.compare(parsed.data.password, user?.passwordHash ?? HASH_SIMULADO);
         if (!user || !passwordOk || !user.activo) return null;
 

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { fechaIsoAr, sumarDias } from "@/domain/fechas";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
 import { cancelarFlete } from "@/features/fletes/actions";
-import { prisma } from "@/lib/prisma";
 import {
   crearAdmin,
   crearCliente,
@@ -15,6 +14,7 @@ import {
   presupuestar,
 } from "../../../test/db/fabrica";
 import { comoUsuario } from "../../../test/db/sesion";
+import { actualizar, filas, uno, unoONull } from "../../../test/db/tabla";
 import { enviarMensaje, marcarLeido, proponerHorario, responderPropuesta } from "./actions";
 
 // El chat es el único canal entre cliente y fletero: estos tests fijan quién puede escribir,
@@ -34,14 +34,16 @@ const texto = (conversacionId: string, t: string, clientId: string = randomUUID(
   texto: t,
 });
 
-const textosDe = (conversacionId: string) =>
-  prisma.mensaje
-    .findMany({
-      where: { conversacionId, tipo: "TEXTO" },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      select: { contenido: true, autorId: true },
-    })
-    .then((ms) => ms);
+const textosDe = async (conversacionId: string) => {
+  const ms = await filas<{ id: string; contenido: string | null; autorId: string | null; createdAt: string }>(
+    "mensajes",
+    { conversacionId, tipo: "TEXTO" },
+    { columna: "createdAt" },
+  );
+  return [...ms]
+    .sort((a, b) => (a.createdAt === b.createdAt ? (a.id < b.id ? -1 : 1) : 0))
+    .map(({ contenido, autorId }) => ({ contenido, autorId }));
+};
 
 describe("enviarMensaje: quién puede escribir", () => {
   it("cliente y fletero de la conversación pueden escribirse", async () => {
@@ -178,8 +180,10 @@ describe("marcarLeido", () => {
     ok(await marcarLeido({ conversacionId, hasta: ahora.toISOString() }));
     ok(await marcarLeido({ conversacionId, hasta: antes.toISOString() }));
 
-    const c = await prisma.conversacion.findUniqueOrThrow({ where: { id: conversacionId } });
-    expect(c.leidoHastaCliente?.getTime()).toBe(ahora.getTime());
+    const c = await uno<{ leidoHastaCliente: string | null; leidoHastaFletero: string | null }>("conversaciones", {
+      id: conversacionId,
+    });
+    expect(c.leidoHastaCliente ? new Date(c.leidoHastaCliente).getTime() : undefined).toBe(ahora.getTime());
     expect(c.leidoHastaFletero).toBeNull();
   });
 
@@ -211,12 +215,15 @@ describe("propuestas de horario", () => {
     fecha: enDias(dias),
     franja: "TARDE" as const,
   });
-  const propuestasDe = (conversacionId: string) =>
-    prisma.propuestaHorario.findMany({
-      where: { mensaje: { conversacionId } },
-      orderBy: { mensaje: { createdAt: "asc" } },
-      select: { id: true, estado: true },
-    });
+  const propuestasDe = async (conversacionId: string) => {
+    const mensajes = await filas<{ id: string }>("mensajes", { conversacionId }, { columna: "createdAt" });
+    const propuestas: { id: string; estado: string }[] = [];
+    for (const mensaje of mensajes) {
+      const p = await unoONull<{ id: string; estado: string }>("propuestas_horario", { mensajeId: mensaje.id });
+      if (p) propuestas.push(p);
+    }
+    return propuestas;
+  };
 
   it("en negociación: el fletero propone, el cliente acepta y queda acordada sin aplicarse", async () => {
     const { cliente, fletero, solicitud, conversacionId } = await negociacion();
@@ -231,7 +238,7 @@ describe("propuestas de horario", () => {
 
     expect(await eventosDelChat(solicitud.id, fletero.fleteroProfile!.id)).toContain("FECHA_ACORDADA");
     // La fecha de la solicitud no cambia hasta que el cliente acepte ese presupuesto.
-    const s = await prisma.solicitud.findUniqueOrThrow({ where: { id: solicitud.id } });
+    const s = await uno<{ franja: string }>("solicitudes", { id: solicitud.id });
     expect(s.franja).toBe("MANANA");
   });
 
@@ -245,8 +252,8 @@ describe("propuestas de horario", () => {
 
     ok(await aceptarPresupuesto({ presupuestoId }));
 
-    const s = await prisma.solicitud.findUniqueOrThrow({ where: { id: solicitud.id } });
-    expect(s.fecha.toISOString().slice(0, 10)).toBe(enDias(5));
+    const s = await uno<{ fecha: string; franja: string }>("solicitudes", { id: solicitud.id });
+    expect(new Date(s.fecha).toISOString().slice(0, 10)).toBe(enDias(5));
     expect(s.franja).toBe("TARDE");
   });
 
@@ -260,8 +267,8 @@ describe("propuestas de horario", () => {
     comoUsuario(fletero);
     ok(await responderPropuesta({ propuestaId: p!.id, aceptar: true }));
 
-    const s = await prisma.solicitud.findUniqueOrThrow({ where: { id: solicitud.id } });
-    expect(s.fecha.toISOString().slice(0, 10)).toBe(enDias(7));
+    const s = await uno<{ fecha: string }>("solicitudes", { id: solicitud.id });
+    expect(new Date(s.fecha).toISOString().slice(0, 10)).toBe(enDias(7));
   });
 
   it("nadie puede responder su propia propuesta", async () => {
@@ -329,7 +336,7 @@ describe("propuestas de horario", () => {
     const { cliente, fletero, presupuestoId, conversacionId } = await negociacion();
     comoUsuario(cliente);
     const { fleteId } = ok(await aceptarPresupuesto({ presupuestoId }));
-    await prisma.flete.update({ where: { id: fleteId }, data: { etapa: "EN_CAMINO_A_ORIGEN" } });
+    await actualizar("fletes", { id: fleteId }, { etapa: "EN_CAMINO_A_ORIGEN" });
 
     comoUsuario(fletero);
     expect(error(await proponerHorario(propuesta(conversacionId, 5)))).toMatch(/flete está en curso/);

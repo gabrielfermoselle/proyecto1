@@ -2,13 +2,18 @@
 // vivo). Es neutral respecto de quién lo mira: lleva el rol del autor y cada cliente decide si
 // es propio. El texto ya viene con los datos de contacto ocultos si corresponde.
 
-import type { EstadoPropuesta, FranjaHoraria, Rol, TipoMensaje } from "@prisma/client";
 import { ocultarContacto } from "@/domain/chat";
+import type { FranjaHoraria } from "@/domain/catalogos";
 import { fechaIsoDeDia } from "@/domain/fechas";
+import type { Rol } from "@/domain/roles";
 import { codificarCursor } from "./cursor";
 import { textoEvento } from "./eventos-catalogo";
 
 export type RolChat = Extract<Rol, "CLIENTE" | "FLETERO">;
+
+export type TipoMensaje = "TEXTO" | "IMAGEN" | "SISTEMA" | "PROPUESTA";
+
+export type EstadoPropuesta = "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "ANULADA";
 
 export interface PropuestaDto {
   id: string;
@@ -31,21 +36,19 @@ export interface MensajeDto {
   cursor: string;
 }
 
-/** Lo que hay que pedirle a Prisma para armar un MensajeDto. */
-export const SELECT_MENSAJE = {
-  id: true,
-  clientId: true,
-  tipo: true,
-  contenido: true,
-  evento: true,
-  datos: true,
-  createdAt: true,
-  autor: { select: { rol: true } },
-  fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
-  propuesta: {
-    select: { id: true, fecha: true, franja: true, estado: true, propuestaPor: { select: { rol: true } } },
-  },
-} as const;
+/**
+ * Columnas (y relaciones) que hay que cargar para armar un MensajeDto.
+ * Se pasa a `.select()` del cliente de Supabase.
+ */
+export const SELECT_MENSAJE = `
+  id, clientId, tipo, contenido, evento, datos, createdAt,
+  autor:usuarios!mensajes_autorId_fkey(rol),
+  fotos!fotos_mensajeId_fkey(id, ruta, ancho, alto),
+  propuesta:propuestas_horario!propuestas_horario_mensajeId_fkey(
+    id, fecha, franja, estado,
+    propuestaPor:usuarios!propuestas_horario_propuestaPorId_fkey(rol)
+  )
+`;
 
 export interface MensajeCrudo {
   id: string;
@@ -64,6 +67,79 @@ export interface MensajeCrudo {
     estado: EstadoPropuesta;
     propuestaPor: { rol: Rol };
   } | null;
+}
+
+interface FilaFoto {
+  id: string;
+  ruta: string;
+  ancho: number | null;
+  alto: number | null;
+}
+
+interface FilaPropuesta {
+  id: string;
+  fecha: string;
+  franja: FranjaHoraria;
+  estado: EstadoPropuesta;
+  propuestaPor: { rol: Rol } | { rol: Rol }[] | null;
+}
+
+interface FilaMensaje {
+  id: string;
+  clientId: string | null;
+  tipo: TipoMensaje;
+  contenido: string | null;
+  evento: string | null;
+  datos: unknown;
+  createdAt: string;
+  autor: { rol: Rol } | { rol: Rol }[] | null;
+  fotos: FilaFoto[] | FilaFoto | null;
+  propuesta: FilaPropuesta | FilaPropuesta[] | null;
+}
+
+function uno<T>(valor: T | T[] | null | undefined): T | null {
+  if (valor == null) return null;
+  return Array.isArray(valor) ? (valor[0] ?? null) : valor;
+}
+
+function varias<T>(valor: T | T[] | null | undefined): T[] {
+  if (valor == null) return [];
+  return Array.isArray(valor) ? valor : [valor];
+}
+
+/** Una columna `date` llega como YYYY-MM-DD: medianoche UTC, igual que Prisma. */
+function comoDia(valor: unknown): Date {
+  if (valor instanceof Date) return valor;
+  const texto = String(valor);
+  return new Date(/^\d{4}-\d{2}-\d{2}$/.test(texto) ? `${texto}T00:00:00.000Z` : texto);
+}
+
+/** Arma el MensajeCrudo que espera aMensajeDto a partir de la fila de PostgREST. */
+export function aMensajeCrudo(fila: unknown): MensajeCrudo {
+  const m = fila as FilaMensaje;
+  const propuesta = uno(m.propuesta);
+  const propuestaPor = propuesta ? uno(propuesta.propuestaPor) : null;
+  return {
+    id: m.id,
+    clientId: m.clientId,
+    tipo: m.tipo,
+    contenido: m.contenido,
+    evento: m.evento,
+    datos: m.datos,
+    createdAt: new Date(m.createdAt),
+    autor: uno(m.autor),
+    fotos: varias(m.fotos),
+    propuesta:
+      propuesta && propuestaPor
+        ? {
+            id: propuesta.id,
+            fecha: comoDia(propuesta.fecha),
+            franja: propuesta.franja,
+            estado: propuesta.estado,
+            propuestaPor,
+          }
+        : null,
+  };
 }
 
 const comoRolChat = (rol: Rol | undefined): RolChat | null =>

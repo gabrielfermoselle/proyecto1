@@ -7,14 +7,15 @@ import { diaDesdeIso } from "@/domain/fechas";
 import { notificar } from "@/features/notificaciones/servidor";
 import { BUCKET_PRIVADO, prepararSubida, rutaSubidaValida, urlsFirmadas } from "@/features/uploads/storage";
 import { ActionError, createAction, esViolacionUnica } from "@/lib/action";
+import { ahoraIso, db, fallar } from "@/lib/db";
 import { nombrePublico } from "@/lib/formato";
 import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
-import { prisma } from "@/lib/prisma";
 import type { UsuarioActual } from "@/lib/session";
 import { configPublicaSupabase, firmarTokenRealtime, publicar } from "@/lib/supabase";
 import { getContextoChat, hrefConversacion, type ContextoChat } from "./acceso";
-import { aMensajeDto, SELECT_MENSAJE, type MensajeDto } from "./dto";
+import { aMensajeDto, type MensajeDto } from "./dto";
 import { conEventos } from "./eventos";
+import { buscarMensaje } from "./mensaje-fila";
 import { emisorDesdeContexto, insertarMensaje, type ContenidoMensaje } from "./mensajes";
 import { topicsRealtime } from "./queries";
 import {
@@ -60,16 +61,20 @@ async function enviar(
   urlsFotos?: Map<string, string>,
 ): Promise<MensajeDto> {
   try {
-    const { mensaje, publicaciones } = await prisma.$transaction((tx) =>
-      insertarMensaje(tx, emisorDesdeContexto(ctx, usuario), contenido, urlsFotos),
+    const { mensaje, publicaciones } = await insertarMensaje(
+      db(),
+      emisorDesdeContexto(ctx, usuario),
+      contenido,
+      urlsFotos,
     );
     await publicar(publicaciones);
     return mensaje;
   } catch (error) {
     if (!esViolacionUnica(error) || !contenido.clientId) throw error;
-    const existente = await prisma.mensaje.findFirst({
-      where: { autorId: usuario.id, clientId: contenido.clientId, conversacionId: ctx.conversacionId },
-      select: SELECT_MENSAJE,
+    const existente = await buscarMensaje(db(), {
+      autorId: usuario.id,
+      clientId: contenido.clientId,
+      conversacionId: ctx.conversacionId,
     });
     if (!existente) throw error;
     return aMensajeDto(existente, ctx.contactoVisible, urlsFotos ?? new Map());
@@ -132,15 +137,34 @@ export const marcarLeido = createAction({
     const ctx = await contexto(conversacionId, usuario);
     const instante = new Date(Math.min(new Date(hasta).getTime(), Date.now()));
     const campo = ctx.miRol === "CLIENTE" ? "leidoHastaCliente" : "leidoHastaFletero";
-    const { count } = await prisma.conversacion.updateMany({
-      where: { ...ctx.filtroParticipante, OR: [{ [campo]: null }, { [campo]: { lt: instante } }] },
-      data: { [campo]: instante },
-    });
-    if (count > 0) {
-      await prisma.notificacion.updateMany({
-        where: { userId: usuario.id, clave: `chat:${conversacionId}`, leidaEn: null },
-        data: { leidaEn: new Date() },
-      });
+    const { data: actual, error: errorActual } = await db()
+      .from("conversaciones")
+      .select("leidoHastaCliente, leidoHastaFletero")
+      .match(ctx.filtroParticipante)
+      .maybeSingle();
+    fallar(errorActual);
+    const marca = (actual?.[campo] as string | null | undefined) ?? null;
+    const atrasa = marca != null && new Date(marca).getTime() >= instante.getTime();
+    let tocadas = 0;
+    if (actual && !atrasa) {
+      let q = db()
+        .from("conversaciones")
+        .update({ [campo]: instante.toISOString() })
+        .match(ctx.filtroParticipante);
+      q = marca == null ? q.is(campo, null) : q.lt(campo, instante.toISOString());
+      const { data, error } = await q.select("id");
+      fallar(error);
+      tocadas = data?.length ?? 0;
+    }
+    if (tocadas > 0) {
+      const leidaEn = ahoraIso();
+      const { error: errorAviso } = await db()
+        .from("notificaciones")
+        .update({ leidaEn, updatedAt: leidaEn })
+        .eq("userId", usuario.id)
+        .eq("clave", `chat:${conversacionId}`)
+        .is("leidaEn", null);
+      fallar(errorAviso);
       await publicar([
         {
           topic: `conversacion:${conversacionId}`,
@@ -165,17 +189,26 @@ export const proponerHorario = createAction({
     }
     await consumirLimite(LIMITES.propuestas(usuario.id));
     try {
-      const { mensaje, publicaciones } = await prisma.$transaction(async (tx) => {
-        await tx.propuestaHorario.updateMany({
-          where: { estado: "PENDIENTE", mensaje: { conversacionId } },
-          data: { estado: "ANULADA" },
-        });
-        return insertarMensaje(tx, emisorDesdeContexto(ctx, usuario), {
-          tipo: "PROPUESTA",
-          clientId,
-          fecha: diaDesdeIso(fecha),
-          franja,
-        });
+      const tx = db();
+      const { data: mensajes, error: errorMensajes } = await tx
+        .from("mensajes")
+        .select("id")
+        .eq("conversacionId", conversacionId);
+      fallar(errorMensajes);
+      const ids = (mensajes ?? []).map((m) => m.id as string);
+      if (ids.length > 0) {
+        const { error: errorAnula } = await tx
+          .from("propuestas_horario")
+          .update({ estado: "ANULADA" })
+          .in("mensajeId", ids)
+          .eq("estado", "PENDIENTE");
+        fallar(errorAnula);
+      }
+      const { mensaje, publicaciones } = await insertarMensaje(tx, emisorDesdeContexto(ctx, usuario), {
+        tipo: "PROPUESTA",
+        clientId,
+        fecha: diaDesdeIso(fecha),
+        franja,
       });
       await publicar(publicaciones);
       return mensaje;
@@ -195,18 +228,28 @@ export const responderPropuesta = createAction({
   schema: responderPropuestaSchema,
   roles: ROLES_CHAT,
   handler: async ({ propuestaId, aceptar }, { usuario }) => {
-    const propuesta = await prisma.propuestaHorario.findUnique({
-      where: { id: propuestaId },
-      select: {
-        estado: true,
-        fecha: true,
-        franja: true,
-        propuestaPorId: true,
-        mensaje: { select: { conversacionId: true } },
-      },
-    });
+    const { data: fila, error: errorPropuesta } = await db()
+      .from("propuestas_horario")
+      .select("estado, fecha, franja, propuestaPorId, mensaje:mensajes!propuestas_horario_mensajeId_fkey(conversacionId)")
+      .eq("id", propuestaId)
+      .maybeSingle();
+    fallar(errorPropuesta);
+    const mensajePropuesta = fila
+      ? (Array.isArray(fila.mensaje) ? fila.mensaje[0] : fila.mensaje)
+      : null;
+    const propuesta = fila
+      ? {
+          estado: fila.estado as string,
+          fecha: new Date(
+            /^\d{4}-\d{2}-\d{2}$/.test(String(fila.fecha)) ? `${fila.fecha}T00:00:00.000Z` : String(fila.fecha),
+          ),
+          franja: fila.franja as ContextoChat["solicitud"]["franja"],
+          propuestaPorId: fila.propuestaPorId as string,
+          conversacionId: (mensajePropuesta?.conversacionId as string | undefined) ?? null,
+        }
+      : null;
     // Si no es participante, la propuesta "no existe" para él.
-    const ctx = propuesta ? await getContextoChat(propuesta.mensaje.conversacionId, usuario) : null;
+    const ctx = propuesta?.conversacionId ? await getContextoChat(propuesta.conversacionId, usuario) : null;
     if (!propuesta || !ctx) throw new ActionError("No encontramos esa propuesta.");
     if (propuesta.propuestaPorId === usuario.id)
       throw new ActionError("No podés responder tu propia propuesta.");
@@ -218,24 +261,41 @@ export const responderPropuesta = createAction({
 
     const estado: "ACEPTADA" | "RECHAZADA" = aceptar ? "ACEPTADA" : "RECHAZADA";
     await conEventos(async (tx, { emitir, publicarDespues }) => {
-      const { count } = await tx.propuestaHorario.updateMany({
-        where: { id: propuestaId, estado: "PENDIENTE" },
-        data: { estado, respondidaPorId: usuario.id, respondidaEn: new Date() },
-      });
-      if (count === 0) throw new ActionError("Esa propuesta ya fue respondida o reemplazada.");
+      const respondidaEn = ahoraIso();
+      const { data: tocadas, error: errorEstado } = await tx
+        .from("propuestas_horario")
+        .update({ estado, respondidaPorId: usuario.id, respondidaEn })
+        .eq("id", propuestaId)
+        .eq("estado", "PENDIENTE")
+        .select("id");
+      fallar(errorEstado);
+      if (!tocadas?.length) throw new ActionError("Esa propuesta ya fue respondida o reemplazada.");
 
       if (aceptar) {
-        // Con el flete confirmado (y todavía sin cargar) se aplica ya; se re-verifica en la transacción.
-        const fleteConfirmado = await tx.flete.findFirst({
-          where: { solicitudId: ctx.solicitudId, fleteroId: ctx.fleteroId, etapa: "CONFIRMADO" },
-          select: { id: true },
-        });
+        // Con el flete confirmado (y todavía sin cargar) se aplica ya.
+        const { data: fleteConfirmado, error: errorFlete } = await tx
+          .from("fletes")
+          .select("id")
+          .eq("solicitudId", ctx.solicitudId)
+          .eq("fleteroId", ctx.fleteroId)
+          .eq("etapa", "CONFIRMADO")
+          .maybeSingle();
+        fallar(errorFlete);
         if (fleteConfirmado) {
-          await tx.solicitud.update({
-            where: { id: ctx.solicitudId },
-            data: { fecha: propuesta.fecha, franja: propuesta.franja },
-          });
-          await tx.propuestaHorario.update({ where: { id: propuestaId }, data: { aplicadaEn: new Date() } });
+          const { error: errorSolicitud } = await tx
+            .from("solicitudes")
+            .update({
+              fecha: propuesta.fecha.toISOString().slice(0, 10),
+              franja: propuesta.franja,
+              updatedAt: respondidaEn,
+            })
+            .eq("id", ctx.solicitudId);
+          fallar(errorSolicitud);
+          const { error: errorAplicada } = await tx
+            .from("propuestas_horario")
+            .update({ aplicadaEn: respondidaEn })
+            .eq("id", propuestaId);
+          fallar(errorAplicada);
         }
         await emitir(
           {

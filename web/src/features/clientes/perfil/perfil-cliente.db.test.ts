@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { prisma } from "@/lib/prisma";
 import { crearCliente, crearFletero, error, ok } from "../../../../test/db/fabrica";
+import { uno } from "../../../../test/db/tabla";
 import { comoUsuario } from "../../../../test/db/sesion";
 import { guardarDatosCliente, guardarDireccionHabitual } from "./actions";
 import { getDireccionHabitual, getPerfilCliente } from "./queries";
@@ -16,7 +16,7 @@ describe("datos del cliente", () => {
 
     ok(await guardarDatosCliente({ nombre: "Lucía", apellido: "Pérez", telefono: "381 411-2222" }));
 
-    const u = await prisma.user.findUniqueOrThrow({ where: { id: c.id } });
+    const u = await uno("usuarios", { id: c.id });
     expect(u).toMatchObject({ nombre: "Lucía", apellido: "Pérez", telefono: "3814112222" });
   });
 
@@ -26,7 +26,7 @@ describe("datos del cliente", () => {
 
     ok(await guardarDatosCliente({ nombre: "Ana", apellido: "Prueba", telefono: "" }));
 
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: c.id } })).telefono).toBeNull();
+    expect((await uno<{ telefono: string | null }>("usuarios", { id: c.id })).telefono).toBeNull();
   });
 
   it.each([

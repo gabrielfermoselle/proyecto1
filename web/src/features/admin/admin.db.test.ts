@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { prisma } from "@/lib/prisma";
 import { crearAdmin, crearCliente, crearFletero, crearSolicitud, error, ok } from "../../../test/db/fabrica";
 import { comoUsuario } from "../../../test/db/sesion";
+import { actualizar, filas, insertar, uno } from "../../../test/db/tabla";
 import { cambiarEstadoUsuario, resolverReclamo, verificarFletero } from "./actions";
 
 /** Un reclamo abierto sobre un flete entregado (armado directo en la base). */
@@ -9,30 +9,29 @@ async function reclamoAbierto() {
   const cliente = await crearCliente();
   const fletero = await crearFletero();
   const s = await crearSolicitud(cliente, { items: 1, estado: "ADJUDICADA" });
-  const presupuesto = await prisma.presupuesto.create({
-    data: {
-      solicitudId: s.id,
-      fleteroId: fletero.fleteroProfile!.id,
-      vehiculoId: fletero.vehiculoId,
-      monto: 1000,
-      montoSugerido: 1000,
-      validoHasta: new Date(),
-      estado: "ACEPTADO",
-    },
+  const presupuesto = await insertar<{ id: string }>("presupuestos", {
+    solicitudId: s.id,
+    fleteroId: fletero.fleteroProfile!.id,
+    vehiculoId: fletero.vehiculoId,
+    monto: 1000,
+    montoSugerido: 1000,
+    validoHasta: new Date(),
+    estado: "ACEPTADO",
   });
-  const flete = await prisma.flete.create({
-    data: {
-      solicitudId: s.id,
-      presupuestoId: presupuesto.id,
-      clienteId: cliente.clienteProfile!.id,
-      fleteroId: fletero.fleteroProfile!.id,
-      vehiculoId: fletero.vehiculoId,
-      precioAcordado: 1000,
-      etapa: "CERRADO",
-    },
+  const flete = await insertar<{ id: string }>("fletes", {
+    solicitudId: s.id,
+    presupuestoId: presupuesto.id,
+    clienteId: cliente.clienteProfile!.id,
+    fleteroId: fletero.fleteroProfile!.id,
+    vehiculoId: fletero.vehiculoId,
+    precioAcordado: 1000,
+    etapa: "CERRADO",
   });
-  const reclamo = await prisma.reclamo.create({
-    data: { itemId: s.items[0]!.id, fleteId: flete.id, autorId: cliente.id, descripcion: "Llegó roto" },
+  const reclamo = await insertar<{ id: string }>("reclamos", {
+    itemId: s.items[0]!.id,
+    fleteId: flete.id,
+    autorId: cliente.id,
+    descripcion: "Llegó roto",
   });
   return { cliente, fletero, reclamoId: reclamo.id };
 }
@@ -52,7 +51,7 @@ describe("administración", () => {
     const cliente = await crearCliente();
     comoUsuario(admin);
     ok(await cambiarEstadoUsuario({ userId: cliente.id, activo: false }));
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: cliente.id } })).activo).toBe(false);
+    expect((await uno<{ activo: boolean }>("usuarios", { id: cliente.id })).activo).toBe(false);
     ok(await cambiarEstadoUsuario({ userId: cliente.id, activo: true }));
     expect(error(await cambiarEstadoUsuario({ userId: admin.id, activo: false }))).toMatch(
       /tu propia cuenta/,
@@ -67,8 +66,7 @@ describe("administración", () => {
     comoUsuario(await crearAdmin());
     ok(await verificarFletero({ fleteroId: fletero.fleteroProfile!.id, verificado: true }));
     expect(
-      (await prisma.fleteroProfile.findUniqueOrThrow({ where: { id: fletero.fleteroProfile!.id } }))
-        .verificado,
+      (await uno<{ verificado: boolean }>("perfiles_fletero", { id: fletero.fleteroProfile!.id })).verificado,
     ).toBe(true);
   });
 
@@ -84,21 +82,24 @@ describe("administración", () => {
       /ya fue resuelto/,
     );
 
-    const reclamo = await prisma.reclamo.findUniqueOrThrow({ where: { id: reclamoId } });
+    const reclamo = await uno<{ estado: string; resueltoPorId: string | null }>("reclamos", { id: reclamoId });
     expect(reclamo.estado).toBe("RESUELTO");
     expect(reclamo.resueltoPorId).toBe(admin.id);
-    const avisos = await prisma.notificacion.findMany({
-      where: { userId: { in: [cliente.id, fletero.id] }, titulo: { contains: "Se resolvió el reclamo" } },
-      select: { userId: true, href: true },
-    });
+    const avisos = (
+      await Promise.all([
+        filas<{ userId: string; titulo: string; href: string }>("notificaciones", { userId: cliente.id }),
+        filas<{ userId: string; titulo: string; href: string }>("notificaciones", { userId: fletero.id }),
+      ])
+    )
+      .flat()
+      .filter((a) => a.titulo.includes("Se resolvió el reclamo"))
+      .map((a) => ({ userId: a.userId, href: a.href }));
     expect(avisos).toHaveLength(2);
     expect(avisos.find((a) => a.userId === cliente.id)?.href).toMatch(/^\/cliente\/pedido\//);
   });
 
   it("la base no admite un reclamo resuelto sin resolución", async () => {
     const { reclamoId } = await reclamoAbierto();
-    await expect(
-      prisma.reclamo.update({ where: { id: reclamoId }, data: { estado: "RESUELTO" } }),
-    ).rejects.toThrow();
+    await expect(actualizar("reclamos", { id: reclamoId }, { estado: "RESUELTO" })).rejects.toThrow();
   });
 });

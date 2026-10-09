@@ -2,9 +2,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
-import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { consultaAccesoSolicitud, consultaConteosFeed, consultaFeed, type FilaFeed } from "./consultas-sql";
+import {
+  consultaAccesoSolicitud,
+  consultaConteosFeed,
+  consultaFeed,
+  type ConsultaSql,
+  type FilaFeed,
+} from "./consultas-sql";
 
 // Corre las consultas reales del feed contra Postgres + PostGIS (PGlite, en memoria) con la
 // migración del proyecto aplicada. Verifica radio, compatibilidad, fechas, estados y orden.
@@ -14,8 +19,8 @@ const MIGRACIONES = join(process.cwd(), "prisma/migrations");
 
 let db: PGlite;
 
-async function consultar<T>(sql: Prisma.Sql): Promise<T[]> {
-  const { rows } = await db.query<T>(sql.text, sql.values as unknown[]);
+async function consultar<T>(sql: ConsultaSql): Promise<T[]> {
+  const { rows } = await db.query<T>(sql.sql, sql.params);
   return rows;
 }
 
@@ -70,12 +75,12 @@ beforeAll(async () => {
   // Fletero "yo": base en Plaza Independencia, radio 10 km, camioneta de 1000 kg / 3,5 m³
   // (y un camión inactivo, que no tiene que contar). Fletero "otro" con un camión grande.
   await db.exec(`
-    insert into users (id, email, "passwordHash", nombre, apellido, rol, "updatedAt") values
+    insert into usuarios (id, email, "passwordHash", nombre, apellido, rol, "updatedAt") values
       ('u-cli', 'c@x', 'h', 'C', 'C', 'CLIENTE', now()),
       ('u-yo', 'yo@x', 'h', 'Y', 'O', 'FLETERO', now()),
       ('u-otro', 'otro@x', 'h', 'O', 'T', 'FLETERO', now());
-    insert into cliente_profiles (id, "userId") values ('c1', 'u-cli');
-    insert into fletero_profiles (id, "userId", "baseLat", "baseLng", "radioCoberturaKm") values
+    insert into perfiles_cliente (id, "userId") values ('c1', 'u-cli');
+    insert into perfiles_fletero (id, "userId", "baseLat", "baseLng", "radioCoberturaKm") values
       ('yo', 'u-yo', -26.8303, -65.2038, 10),
       ('otro', 'u-otro', -26.8303, -65.2038, 50);
     insert into vehiculos (id, "fleteroId", tipo, marca, modelo, patente, "capacidadKg", "volumenM3", activo) values

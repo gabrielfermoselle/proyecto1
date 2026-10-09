@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { FACTOR_RUTA_URBANA } from "@/domain/geo";
 import { precioSugerido } from "@/domain/precio";
-import { prisma } from "@/lib/prisma";
+import { numero } from "@/lib/db";
 import { crearCliente, crearFletero, crearSolicitud } from "../../../../test/db/fabrica";
+import { actualizar, uno } from "../../../../test/db/tabla";
 import { leerParametrosBuscador } from "./parametros";
 import { buscarFleteros, resolverReferencia } from "./queries";
 
@@ -61,9 +62,11 @@ describe("tarjetas del buscador", () => {
   it("con una solicitud, muestra distancia, si lo cubre y el precio estimado del dominio", async () => {
     const f = await crearFletero("Cercano");
     // La base de los tests es compartida: con las tarifas más bajas queda primero por precio.
-    await prisma.fleteroProfile.update({
-      where: { id: f.fleteroProfile!.id },
-      data: { precioMinimo: 100, precioPorKm: 1, precioPorM3: 0, precioPorAyudante: 0 },
+    await actualizar("perfiles_fletero", { id: f.fleteroProfile!.id }, {
+      precioMinimo: 100,
+      precioPorKm: 1,
+      precioPorM3: 0,
+      precioPorAyudante: 0,
     });
     const c = await crearCliente();
     const s = await crearSolicitud(c);
@@ -78,15 +81,20 @@ describe("tarjetas del buscador", () => {
     expect(tarjeta).toBeDefined();
     expect(tarjeta!.distanciaKm).toBeGreaterThan(2);
     expect(tarjeta!.cubreZona).toBe(true); // radio de 30 km
-    const perfil = await prisma.fleteroProfile.findUniqueOrThrow({ where: { id: f.fleteroProfile!.id } });
+    const perfil = await uno<{
+      precioMinimo: unknown;
+      precioPorKm: unknown;
+      precioPorM3: unknown;
+      precioPorAyudante: unknown;
+    }>("perfiles_fletero", { id: f.fleteroProfile!.id });
     expect(tarjeta!.precioEstimado).toBe(
       precioSugerido(
         { distanciaLinealKm: 3.2, volumenM3: 0, ayudantes: 0 },
         {
-          precioMinimo: perfil.precioMinimo.toNumber(),
-          precioPorKm: perfil.precioPorKm.toNumber(),
-          precioPorM3: perfil.precioPorM3.toNumber(),
-          precioPorAyudante: perfil.precioPorAyudante.toNumber(),
+          precioMinimo: numero(perfil.precioMinimo),
+          precioPorKm: numero(perfil.precioPorKm),
+          precioPorM3: numero(perfil.precioPorM3),
+          precioPorAyudante: numero(perfil.precioPorAyudante),
         },
       ),
     );

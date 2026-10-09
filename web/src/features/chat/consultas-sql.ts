@@ -1,14 +1,19 @@
-// Consultas SQL del chat que Prisma no expresa bien (no leídos contra la marca de lectura de cada
-// fila, último mensaje con LATERAL). Parametrizadas y sin conexión: el test las corre con PGlite.
+// Consultas SQL del chat (no leídos contra la marca de lectura de cada fila, último mensaje
+// con LATERAL). Los valores van en `params` ($1, $2…); el texto solo arma columnas fijas.
 
-import { Prisma, type EtapaFlete } from "@prisma/client";
+import type { EtapaFlete } from "@/domain/catalogos";
 
 export type LadoBandeja = "CLIENTE" | "FLETERO";
 
-// Columnas según el lado: fragmentos fijos, nunca input del usuario.
-const COLUMNAS: Record<LadoBandeja, { perfil: Prisma.Sql; leidoHasta: Prisma.Sql }> = {
-  CLIENTE: { perfil: Prisma.sql`c."clienteId"`, leidoHasta: Prisma.sql`c."leidoHastaCliente"` },
-  FLETERO: { perfil: Prisma.sql`c."fleteroId"`, leidoHasta: Prisma.sql`c."leidoHastaFletero"` },
+export interface ConsultaSql {
+  sql: string;
+  params: unknown[];
+}
+
+// Columnas según el lado: identificadores fijos, nunca input del usuario.
+const COLUMNAS: Record<LadoBandeja, { perfil: string; leidoHasta: string }> = {
+  CLIENTE: { perfil: `c."clienteId"`, leidoHasta: `c."leidoHastaCliente"` },
+  FLETERO: { perfil: `c."fleteroId"`, leidoHasta: `c."leidoHastaFletero"` },
 };
 
 export interface FilaBandeja {
@@ -35,7 +40,7 @@ export interface FilaBandeja {
 }
 
 /** No leídos: mensajes posteriores a mi marca de lectura que no escribí yo (los de sistema cuentan). */
-const noLeidos = (lado: LadoBandeja, userId: string) => Prisma.sql`
+const noLeidos = (lado: LadoBandeja, userId: string) => `
   SELECT count(*)::int FROM mensajes m
   WHERE m."conversacionId" = c.id
     AND m."createdAt" > COALESCE(${COLUMNAS[lado].leidoHasta}, '-infinity'::timestamp)
@@ -46,24 +51,26 @@ export function consultaBandeja(params: {
   perfilId: string;
   userId: string;
   limite: number;
-}): Prisma.Sql {
+}): ConsultaSql {
   const { lado, perfilId, userId, limite } = params;
-  return Prisma.sql`
+  return {
+    params: [userId, perfilId, limite],
+    sql: `
     SELECT
       c.id, c."solicitudId", c."fleteroId", c."ultimaActividadEn", s.titulo, s.estado::text AS "solicitudEstado",
       uc.nombre AS "clienteNombre", uc.apellido AS "clienteApellido",
       uf.nombre AS "fleteroNombre", uf.apellido AS "fleteroApellido",
       p.estado::text AS "presupuestoEstado", p."validoHasta" AS "presupuestoValidoHasta",
       CASE WHEN f."fleteroId" = c."fleteroId" THEN f.etapa::text END AS "fleteEtapa",
-      (${noLeidos(lado, userId)}) AS "noLeidos",
+      (${noLeidos(lado, "$1")}) AS "noLeidos",
       um.tipo::text AS "ultimoTipo", um.contenido AS "ultimoContenido", um.evento AS "ultimoEvento",
       um.datos AS "ultimoDatos", um."autorId" AS "ultimoAutorId"
     FROM conversaciones c
     JOIN solicitudes s ON s.id = c."solicitudId"
-    JOIN cliente_profiles cp ON cp.id = c."clienteId"
-    JOIN users uc ON uc.id = cp."userId"
-    JOIN fletero_profiles fp ON fp.id = c."fleteroId"
-    JOIN users uf ON uf.id = fp."userId"
+    JOIN perfiles_cliente cp ON cp.id = c."clienteId"
+    JOIN usuarios uc ON uc.id = cp."userId"
+    JOIN perfiles_fletero fp ON fp.id = c."fleteroId"
+    JOIN usuarios uf ON uf.id = fp."userId"
     LEFT JOIN presupuestos p ON p."solicitudId" = c."solicitudId" AND p."fleteroId" = c."fleteroId"
     LEFT JOIN fletes f ON f."solicitudId" = c."solicitudId"
     LEFT JOIN LATERAL (
@@ -71,19 +78,23 @@ export function consultaBandeja(params: {
       FROM mensajes m WHERE m."conversacionId" = c.id
       ORDER BY m."createdAt" DESC, m.id DESC LIMIT 1
     ) um ON true
-    WHERE ${COLUMNAS[lado].perfil} = ${perfilId}
+    WHERE ${COLUMNAS[lado].perfil} = $2
     ORDER BY c."ultimaActividadEn" DESC, c.id DESC
-    LIMIT ${limite}`;
+    LIMIT $3`,
+  };
 }
 
 export function consultaTotalNoLeidos(params: {
   lado: LadoBandeja;
   perfilId: string;
   userId: string;
-}): Prisma.Sql {
+}): ConsultaSql {
   const { lado, perfilId, userId } = params;
-  return Prisma.sql`
-    SELECT COALESCE(sum((${noLeidos(lado, userId)})), 0)::int AS total
+  return {
+    params: [userId, perfilId],
+    sql: `
+    SELECT COALESCE(sum((${noLeidos(lado, "$1")})), 0)::int AS total
     FROM conversaciones c
-    WHERE ${COLUMNAS[lado].perfil} = ${perfilId}`;
+    WHERE ${COLUMNAS[lado].perfil} = $2`,
+  };
 }

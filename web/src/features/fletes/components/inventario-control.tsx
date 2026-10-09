@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, CheckCheck, MessageSquareWarning, PenLine } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useOptimistic, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import type { FaseControl, ResultadoControl } from "@/domain/catalogos";
@@ -30,6 +31,7 @@ const controlDe = (item: ItemDto, fase: FaseControl) =>
  * deshace; el detalle (observación, problema, reclamo, foto) va en una hoja aparte.
  */
 export function InventarioControl({ fleteId, fase, items, fotosHabilitadas }: InventarioControlProps) {
+  const router = useRouter();
   const textos = TEXTOS_FASE[fase];
   // En descarga y recepción solo cuenta lo que viajó.
   const relevantes = fase === "CARGA" ? items : items.filter((i) => i.carga?.resultado === "CARGADO");
@@ -53,6 +55,7 @@ export function InventarioControl({ fleteId, fase, items, fotosHabilitadas }: In
       marcar(optimista);
       const r = await accion();
       if (!r.ok) setError(r.error ?? "No se pudo guardar.");
+      else router.refresh();
     });
   }
 

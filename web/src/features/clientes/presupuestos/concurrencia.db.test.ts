@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { retirarPresupuesto } from "@/features/fleteros/presupuestos/actions";
 import { cancelarSolicitud } from "@/features/clientes/solicitudes/actions";
-import { prisma } from "@/lib/prisma";
 import { crearCliente, crearFletero, crearSolicitud, presupuestar } from "../../../../test/db/fabrica";
+import { contar, filas, uno } from "../../../../test/db/tabla";
 import { comoUsuario, conPostgresReal } from "../../../../test/db/sesion";
 import { aceptarPresupuesto } from "./actions";
 
@@ -27,12 +27,8 @@ describe.runIf(conPostgresReal)("concurrencia sobre una misma solicitud", () => 
       ]);
 
       expect(resultados.filter((r) => r.ok)).toHaveLength(1);
-      expect(await prisma.flete.count({ where: { solicitudId: solicitud.id } })).toBe(1);
-      const estados = await prisma.presupuesto.findMany({
-        where: { solicitudId: solicitud.id },
-        select: { estado: true },
-        orderBy: { estado: "asc" },
-      });
+      expect(await contar("fletes", { solicitudId: solicitud.id })).toBe(1);
+      const estados = await filas<{ estado: string }>("presupuestos", { solicitudId: solicitud.id }, { columna: "estado" });
       expect(estados.map((e) => e.estado)).toEqual(["ACEPTADO", "RECHAZADO"]);
     }
   });
@@ -52,8 +48,8 @@ describe.runIf(conPostgresReal)("concurrencia sobre una misma solicitud", () => 
       const [ra, rr] = await Promise.all([aceptar, retirar]);
 
       expect([ra.ok, rr.ok].filter(Boolean)).toHaveLength(1);
-      const p = await prisma.presupuesto.findUniqueOrThrow({ where: { id: presupuestoId } });
-      const fletes = await prisma.flete.count({ where: { solicitudId: solicitud.id } });
+      const p = await uno<{ estado: string }>("presupuestos", { id: presupuestoId });
+      const fletes = await contar("fletes", { solicitudId: solicitud.id });
       // Nunca un flete con un presupuesto retirado, ni un presupuesto aceptado sin flete.
       expect({ estado: p.estado, fletes }).toEqual(
         ra.ok ? { estado: "ACEPTADO", fletes: 1 } : { estado: "RETIRADO", fletes: 0 },
@@ -74,8 +70,8 @@ describe.runIf(conPostgresReal)("concurrencia sobre una misma solicitud", () => 
       ]);
 
       expect([ra.ok, rc.ok].filter(Boolean)).toHaveLength(1);
-      const s = await prisma.solicitud.findUniqueOrThrow({ where: { id: solicitud.id } });
-      const fletes = await prisma.flete.count({ where: { solicitudId: solicitud.id } });
+      const s = await uno<{ estado: string }>("solicitudes", { id: solicitud.id });
+      const fletes = await contar("fletes", { solicitudId: solicitud.id });
       expect({ estado: s.estado, fletes }).toEqual(
         ra.ok ? { estado: "ADJUDICADA", fletes: 1 } : { estado: "CANCELADA", fletes: 0 },
       );

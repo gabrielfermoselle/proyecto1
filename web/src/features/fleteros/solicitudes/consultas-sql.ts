@@ -1,8 +1,6 @@
-// Consultas SQL del feed del fletero. Se arman con `Prisma.sql` (parametrizadas, sin
-// concatenar input) y no dependen de la conexión: el test de integración las corre contra
-// PGlite + PostGIS y la app con `prisma.$queryRaw`.
-
-import { Prisma } from "@prisma/client";
+// Consultas SQL del feed del fletero. Devuelven `{ sql, params }` con placeholders $1, $2
+// y no interpolan input. El ORDER BY es un fragmento fijo elegido por switch.
+// La app las corre con `consulta` de `@/lib/db`.
 
 export type TabFeed = "nuevas" | "presupuestadas";
 export type OrdenFeed = "distancia" | "fecha";
@@ -27,13 +25,42 @@ export interface ParametrosFeed {
   filtros?: FiltrosFeed;
 }
 
+export interface ConsultaSql {
+  sql: string;
+  params: unknown[];
+}
+
+interface Fragmento {
+  sql: string;
+  params: unknown[];
+}
+
+function frag(sql: string, ...params: unknown[]): Fragmento {
+  return { sql, params };
+}
+
+/** Renumera los `$1` de cada fragmento para poder concatenarlos. */
+function juntar(partes: Fragmento[], separador = "\n"): ConsultaSql {
+  const params: unknown[] = [];
+  const sql = partes
+    .filter((p) => p.sql.trim().length > 0)
+    .map((p) => {
+      const base = params.length;
+      params.push(...p.params);
+      return p.sql.replace(/\$(\d+)/g, (_, n: string) => `$${base + Number(n)}`);
+    })
+    .join(separador);
+  return { sql, params };
+}
+
 /** Condiciones de los filtros: cada una es un fragmento parametrizado o nada. */
-function condicionFiltros(f: FiltrosFeed = {}): Prisma.Sql {
-  return Prisma.sql`
-    ${f.maxKm ? Prisma.sql`AND ST_DWithin(s."origenGeo", f."baseGeo", ${f.maxKm * 1000})` : Prisma.empty}
-    ${f.desde ? Prisma.sql`AND s.fecha >= ${f.desde}::date` : Prisma.empty}
-    ${f.hasta ? Prisma.sql`AND s.fecha <= ${f.hasta}::date` : Prisma.empty}
-    ${f.tipo ? Prisma.sql`AND s."tipoFlete"::text = ${f.tipo}` : Prisma.empty}`;
+function condicionFiltros(f: FiltrosFeed = {}): Fragmento {
+  const partes: Fragmento[] = [];
+  if (f.maxKm) partes.push(frag(`AND ST_DWithin(s."origenGeo", f."baseGeo", $1)`, f.maxKm * 1000));
+  if (f.desde) partes.push(frag(`AND s.fecha >= $1::date`, f.desde));
+  if (f.hasta) partes.push(frag(`AND s.fecha <= $1::date`, f.hasta));
+  if (f.tipo) partes.push(frag(`AND s."tipoFlete"::text = $1`, f.tipo));
+  return juntar(partes, "\n");
 }
 
 export interface FilaFeed {
@@ -60,10 +87,14 @@ export interface FilaFeed {
 }
 
 // El ORDER BY no admite parámetros: se elige entre fragmentos fijos, nunca input del usuario.
-const ORDEN: Record<OrdenFeed, Prisma.Sql> = {
-  distancia: Prisma.sql`"distanciaBaseKm" ASC, s.fecha ASC, s.id ASC`,
-  fecha: Prisma.sql`s.fecha ASC, "distanciaBaseKm" ASC, s.id ASC`,
-};
+function ordenar(orden: OrdenFeed): string {
+  switch (orden) {
+    case "distancia":
+      return `"distanciaBaseKm" ASC, s.fecha ASC, s.id ASC`;
+    case "fecha":
+      return `s.fecha ASC, "distanciaBaseKm" ASC, s.id ASC`;
+  }
+}
 
 /**
  * Condición del feed para las solicitudes nuevas:
@@ -73,9 +104,9 @@ const ORDEN: Record<OrdenFeed, Prisma.Sql> = {
  *  - el fletero todavía no la presupuestó.
  * En "presupuestadas" se muestran las que ya presupuestó, aunque después haya cambiado su zona o sus vehículos.
  */
-function condicionTab(tab: TabFeed): Prisma.Sql {
-  if (tab === "presupuestadas") return Prisma.sql`mp.id IS NOT NULL`;
-  return Prisma.sql`
+function condicionTab(tab: TabFeed): string {
+  if (tab === "presupuestadas") return `mp.id IS NOT NULL`;
+  return `
     mp.id IS NULL
     AND ST_DWithin(s."origenGeo", f."baseGeo", f."radioCoberturaKm" * 1000)
     AND EXISTS (
@@ -85,8 +116,10 @@ function condicionTab(tab: TabFeed): Prisma.Sql {
     )`;
 }
 
-export function consultaFeed({ fleteroId, hoy, tab, orden, limite, filtros }: ParametrosFeed): Prisma.Sql {
-  return Prisma.sql`
+export function consultaFeed({ fleteroId, hoy, tab, orden, limite, filtros }: ParametrosFeed): ConsultaSql {
+  return juntar([
+    frag(
+      `
     SELECT
       s.id, s.titulo, s."tipoFlete"::text AS "tipoFlete",
       to_char(s.fecha, 'YYYY-MM-DD') AS fecha, s.franja::text AS franja,
@@ -101,28 +134,36 @@ export function consultaFeed({ fleteroId, hoy, tab, orden, limite, filtros }: Pa
       (SELECT count(*)::int FROM presupuestos p WHERE p."solicitudId" = s.id AND p.estado = 'PENDIENTE') AS "presupuestosRecibidos",
       mp.monto::float8 AS "miMonto"
     FROM solicitudes s
-    JOIN fletero_profiles f ON f.id = ${fleteroId}
+    JOIN perfiles_fletero f ON f.id = $1
     LEFT JOIN presupuestos mp ON mp."solicitudId" = s.id AND mp."fleteroId" = f.id
     WHERE s.estado = 'ABIERTA'
-      AND s.fecha >= ${hoy}::date
-      AND ${condicionTab(tab)}
-      ${condicionFiltros(filtros)}
-    ORDER BY ${ORDEN[orden]}
-    LIMIT ${limite}`;
+      AND s.fecha >= $2::date
+      AND ${condicionTab(tab)}`,
+      fleteroId,
+      hoy,
+    ),
+    condicionFiltros(filtros),
+    frag(`ORDER BY ${ordenar(orden)}`),
+    frag(`LIMIT $1`, limite),
+  ]);
 }
 
 export function consultaConteosFeed({
   fleteroId,
   hoy,
-}: Pick<ParametrosFeed, "fleteroId" | "hoy">): Prisma.Sql {
-  return Prisma.sql`
+}: Pick<ParametrosFeed, "fleteroId" | "hoy">): ConsultaSql {
+  return frag(
+    `
     SELECT
       count(*) FILTER (WHERE ${condicionTab("nuevas")})::int AS nuevas,
       count(*) FILTER (WHERE ${condicionTab("presupuestadas")})::int AS presupuestadas
     FROM solicitudes s
-    JOIN fletero_profiles f ON f.id = ${fleteroId}
+    JOIN perfiles_fletero f ON f.id = $1
     LEFT JOIN presupuestos mp ON mp."solicitudId" = s.id AND mp."fleteroId" = f.id
-    WHERE s.estado = 'ABIERTA' AND s.fecha >= ${hoy}::date`;
+    WHERE s.estado = 'ABIERTA' AND s.fecha >= $2::date`,
+    fleteroId,
+    hoy,
+  );
 }
 
 /**
@@ -130,17 +171,22 @@ export function consultaConteosFeed({
  * y dentro de su radio) o si ya tiene relación con ella (la presupuestó o es su flete).
  * La compatibilidad de carga no se exige acá: el detalle explica por qué no entra.
  */
-export function consultaAccesoSolicitud(fleteroId: string, solicitudId: string, hoy: string): Prisma.Sql {
-  return Prisma.sql`
+export function consultaAccesoSolicitud(fleteroId: string, solicitudId: string, hoy: string): ConsultaSql {
+  return frag(
+    `
     SELECT
       (ST_Distance(s."origenGeo", f."baseGeo") / 1000)::float8 AS "distanciaBaseKm",
       (
-        (s.estado = 'ABIERTA' AND s.fecha >= ${hoy}::date
+        (s.estado = 'ABIERTA' AND s.fecha >= $1::date
           AND ST_DWithin(s."origenGeo", f."baseGeo", f."radioCoberturaKm" * 1000))
         OR EXISTS (SELECT 1 FROM presupuestos p WHERE p."solicitudId" = s.id AND p."fleteroId" = f.id)
         OR EXISTS (SELECT 1 FROM fletes fl WHERE fl."solicitudId" = s.id AND fl."fleteroId" = f.id)
       ) AS permitido
     FROM solicitudes s
-    JOIN fletero_profiles f ON f.id = ${fleteroId}
-    WHERE s.id = ${solicitudId}`;
+    JOIN perfiles_fletero f ON f.id = $2
+    WHERE s.id = $3`,
+    hoy,
+    fleteroId,
+    solicitudId,
+  );
 }

@@ -1,8 +1,9 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { resumirCarga } from "@/domain/carga";
-import { fechaIsoAr, diaDesdeIso } from "@/domain/fechas";
+import { fechaIsoAr } from "@/domain/fechas";
 import { haversineKm, redondear } from "@/domain/geo";
 import {
   esSolicitudEditable,
@@ -19,8 +20,8 @@ import {
   rutaSubidaValida,
 } from "@/features/uploads/storage";
 import { ActionError, createClienteAction } from "@/lib/action";
+import { ahoraIso, db, fallar, nuevoId, relacion } from "@/lib/db";
 import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
-import { prisma } from "@/lib/prisma";
 import { configPublicaSupabase } from "@/lib/supabase";
 import {
   agregarFotoSolicitudSchema,
@@ -35,6 +36,11 @@ const NO_ENCONTRADA = "No encontramos esa solicitud.";
 function refrescar(solicitudId?: string) {
   revalidatePath("/cliente");
   if (solicitudId) revalidatePath(hrefPedido("CLIENTE", solicitudId));
+}
+
+function lista<T>(valor: T | T[] | null | undefined): T[] {
+  if (valor == null) return [];
+  return Array.isArray(valor) ? valor : [valor];
 }
 
 /**
@@ -60,21 +66,31 @@ export const crearSolicitud = createClienteAction({
 
     const carga = resumirCarga(d.items);
     const { items, fecha, ...resto } = d;
-    const solicitud = await prisma.solicitud.create({
-      data: {
+    const solicitudId = nuevoId();
+    const { error } = await db()
+      .from("solicitudes")
+      .insert({
         ...resto,
+        id: solicitudId,
         clienteId,
-        fecha: diaDesdeIso(fecha),
+        fecha,
         distanciaKm: redondear(haversineKm(origen, destino), 2),
         pesoTotalKg: carga.pesoTotalKg,
         volumenTotalM3: carga.volumenTotalM3,
         itemsSinMedidas: carga.itemsSinMedidas,
-        items: { create: items.map((item, orden) => ({ ...item, orden })) },
-      },
-      select: { id: true },
-    });
+        updatedAt: ahoraIso(),
+      });
+    fallar(error);
+
+    const { error: errorItems } = await db()
+      .from("items_inventario")
+      .insert(items.map((item, orden) => ({ ...item, id: nuevoId(), solicitudId, orden })));
+    if (errorItems) {
+      await db().from("solicitudes").delete().eq("id", solicitudId);
+      fallar(errorItems);
+    }
     refrescar();
-    return { id: solicitud.id };
+    return { id: solicitudId };
   },
 });
 
@@ -85,27 +101,42 @@ export const crearSolicitud = createClienteAction({
 export const cancelarSolicitud = createClienteAction({
   schema: cancelarSolicitudSchema,
   handler: async ({ solicitudId, motivo }, { clienteId }) => {
-    await conEventos(async (tx, { emitir }) => {
-      // Bloquea la solicitud: no puede aceptarse un presupuesto mientras se cancela.
-      const [solicitud] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM solicitudes
-        WHERE id = ${solicitudId} AND "clienteId" = ${clienteId} AND estado = 'ABIERTA'
-        FOR UPDATE`;
-      if (!solicitud) throw new ActionError("Esta solicitud ya no se puede cancelar.");
+    await conEventos(async (tx: SupabaseClient, { emitir }) => {
+      const marca = ahoraIso();
+      // El update condicionado reclama la fila: si otra operación ya la cerró, no toca nada.
+      const { data: reclamada, error: errorReclamo } = await tx
+        .from("solicitudes")
+        .update({ estado: "CANCELADA", motivoCancelacion: motivo, updatedAt: marca })
+        .eq("id", solicitudId)
+        .eq("clienteId", clienteId)
+        .eq("estado", "ABIERTA")
+        .select("id")
+        .maybeSingle();
+      fallar(errorReclamo);
+      if (!reclamada) throw new ActionError("Esta solicitud ya no se puede cancelar.");
 
-      const pendientes = await tx.presupuesto.findMany({
-        where: { solicitudId, estado: "PENDIENTE" },
-        select: { fleteroId: true },
-      });
-      await tx.presupuesto.updateMany({
-        where: { solicitudId, estado: "PENDIENTE" },
-        data: { estado: "RECHAZADO" },
-      });
-      await tx.solicitud.update({
-        where: { id: solicitudId },
-        data: { estado: "CANCELADA", motivoCancelacion: motivo },
-      });
-      for (const { fleteroId } of pendientes) {
+      const { data: pendientes, error: errorPendientes } = await tx
+        .from("presupuestos")
+        .select("fleteroId")
+        .eq("solicitudId", solicitudId)
+        .eq("estado", "PENDIENTE");
+      fallar(errorPendientes);
+      const { error: errorRechazo } = await tx
+        .from("presupuestos")
+        .update({ estado: "RECHAZADO", updatedAt: marca })
+        .eq("solicitudId", solicitudId)
+        .eq("estado", "PENDIENTE");
+      if (errorRechazo) {
+        const { error: errorReverso } = await tx
+          .from("solicitudes")
+          .update({ estado: "ABIERTA", motivoCancelacion: null, updatedAt: ahoraIso() })
+          .eq("id", solicitudId)
+          .eq("clienteId", clienteId)
+          .eq("estado", "CANCELADA");
+        fallar(errorReverso);
+        fallar(errorRechazo);
+      }
+      for (const { fleteroId } of pendientes ?? []) {
         await emitir({
           solicitudId,
           fleteroId,
@@ -125,20 +156,28 @@ export const cancelarSolicitud = createClienteAction({
 const carpetaFotos = (solicitudId: string) => `solicitudes/${solicitudId}`;
 
 async function solicitudEditable(solicitudId: string, clienteId: string) {
-  const solicitud = await prisma.solicitud.findFirst({
-    where: { id: solicitudId, clienteId },
-    select: {
-      estado: true,
-      items: { select: { id: true } },
-      _count: { select: { fotos: true } },
-    },
-  });
-  if (!solicitud) throw new ActionError(NO_ENCONTRADA);
-  if (!esSolicitudEditable(solicitud.estado)) {
+  const { data, error } = await db()
+    .from("solicitudes")
+    .select("estado, items_inventario(id), fotos(id)")
+    .eq("id", solicitudId)
+    .eq("clienteId", clienteId)
+    .maybeSingle();
+  fallar(error);
+  if (!data) throw new ActionError(NO_ENCONTRADA);
+  if (!esSolicitudEditable(data.estado as string)) {
     throw new ActionError("Las fotos se pueden cambiar mientras la solicitud está abierta.");
   }
-  const fotosDeItems = await prisma.foto.count({ where: { item: { solicitudId } } });
-  return { itemIds: solicitud.items.map((i) => i.id), fotos: solicitud._count.fotos + fotosDeItems };
+  const itemIds = lista(data.items_inventario as { id: string }[] | null).map((i) => i.id);
+  let fotosDeItems = 0;
+  if (itemIds.length > 0) {
+    const conteo = await db()
+      .from("fotos")
+      .select("id", { count: "exact", head: true })
+      .in("itemId", itemIds);
+    fallar(conteo.error);
+    fotosDeItems = conteo.count ?? 0;
+  }
+  return { itemIds, fotos: lista(data.fotos as { id: string }[] | null).length + fotosDeItems };
 }
 
 export const prepararFotoSolicitud = createClienteAction({
@@ -165,32 +204,65 @@ export const agregarFotoSolicitud = createClienteAction({
     if (!(await rutaSubidaValida(BUCKET_PRIVADO, ruta, carpetaFotos(solicitudId)))) {
       throw new ActionError("No pudimos verificar la foto. Probá de nuevo.");
     }
-    await prisma.foto.create({
-      // Una foto tiene un solo dueño (CHECK en la base): el ítem o la solicitud.
-      data: { ruta, ancho, alto, ...(itemId ? { itemId } : { solicitudId }) },
-    });
+    const { error } = await db()
+      .from("fotos")
+      .insert({
+        id: nuevoId(),
+        ruta,
+        ancho,
+        alto,
+        // Una foto tiene un solo dueño (CHECK en la base): el ítem o la solicitud.
+        ...(itemId ? { itemId } : { solicitudId }),
+      });
+    fallar(error);
     refrescar(solicitudId);
     return null;
   },
 });
 
+interface Dueña {
+  clienteId: string;
+  estado: string;
+}
+
+interface FotoQuitable {
+  id: string;
+  ruta: string;
+  solicitudId: string | null;
+  solicitudes: Dueña | Dueña[] | null;
+  items_inventario:
+    | { solicitudId: string; solicitudes: Dueña | Dueña[] | null }
+    | { solicitudId: string; solicitudes: Dueña | Dueña[] | null }[]
+    | null;
+}
+
+function abiertaDelCliente(valor: Dueña | Dueña[] | null, clienteId: string) {
+  const fila = relacion(valor);
+  return fila?.clienteId === clienteId && fila.estado === "ABIERTA";
+}
+
 export const quitarFotoSolicitud = createClienteAction({
   schema: quitarFotoSolicitudSchema,
   handler: async ({ fotoId }, { clienteId }) => {
-    const foto = await prisma.foto.findFirst({
-      where: {
-        id: fotoId,
-        OR: [
-          { solicitud: { clienteId, estado: "ABIERTA" } },
-          { item: { solicitud: { clienteId, estado: "ABIERTA" } } },
-        ],
-      },
-      select: { id: true, ruta: true, solicitudId: true, item: { select: { solicitudId: true } } },
-    });
-    if (!foto) throw new ActionError("Esa foto ya no se puede quitar.");
-    await prisma.foto.delete({ where: { id: foto.id } });
+    const { data, error } = await db()
+      .from("fotos")
+      .select(
+        "id, ruta, solicitudId, solicitudes(clienteId, estado), items_inventario(solicitudId, solicitudes(clienteId, estado))",
+      )
+      .eq("id", fotoId)
+      .maybeSingle();
+    fallar(error);
+    const foto = data as FotoQuitable | null;
+    const item = foto ? relacion(foto.items_inventario) : null;
+    const esSuya =
+      foto != null &&
+      (abiertaDelCliente(foto.solicitudes, clienteId) ||
+        (item != null && abiertaDelCliente(item.solicitudes, clienteId)));
+    if (!foto || !esSuya) throw new ActionError("Esa foto ya no se puede quitar.");
+    const { error: errorBorrado } = await db().from("fotos").delete().eq("id", foto.id);
+    fallar(errorBorrado);
     await eliminarArchivos(BUCKET_PRIVADO, [foto.ruta]);
-    refrescar(foto.solicitudId ?? foto.item?.solicitudId);
+    refrescar(foto.solicitudId ?? item?.solicitudId);
     return null;
   },
 });

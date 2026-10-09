@@ -1,9 +1,9 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { supabaseAdmin, supabaseHabilitado } from "@/lib/supabase";
+import { db, fallar } from "@/lib/db";
 import { env } from "@/lib/env";
 import { log } from "@/lib/log";
-import { prisma } from "@/lib/prisma";
+import { supabaseAdmin, supabaseHabilitado } from "@/lib/supabase";
 
 // Fotos en Supabase Storage. El navegador sube directo con una URL firmada por el servidor;
 // el binario nunca pasa por nuestra app.
@@ -35,7 +35,8 @@ export async function prepararSubida(bucket: Bucket, carpeta: string): Promise<S
   const ruta = `${carpeta}/${randomUUID()}.jpg`;
   const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(ruta);
   if (error) throw error;
-  await prisma.subidaPendiente.create({ data: { ruta: data.path, bucket } });
+  const { error: errorPendiente } = await db().from("subidas_pendientes").insert({ ruta: data.path, bucket });
+  fallar(errorPendiente);
   return { bucket, ruta: data.path, token: data.token };
 }
 

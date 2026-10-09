@@ -1,5 +1,5 @@
 import "server-only";
-import type { EtapaFlete, FranjaHoraria, Prisma } from "@prisma/client";
+import type { EtapaFlete, FranjaHoraria } from "@/domain/catalogos";
 import { conflictosCon } from "@/domain/agenda";
 import {
   admitePropuestas,
@@ -13,17 +13,24 @@ import { fechaIsoDeDia } from "@/domain/fechas";
 import { getTurnosActivos } from "@/features/fleteros/fletes/queries";
 import { hrefPedido, topicFlete } from "@/features/fletes/rutas";
 import { urlsFirmadas } from "@/features/uploads/storage";
+import { consulta, db, fallar, numero } from "@/lib/db";
 import { nombrePublico } from "@/lib/formato";
-import { prisma } from "@/lib/prisma";
 import type { UsuarioActual } from "@/lib/session";
 import { getContextoChat, hrefConversacion, perfilChat, type ContextoChat } from "./acceso";
 import { consultaBandeja, consultaTotalNoLeidos, type FilaBandeja } from "./consultas-sql";
 import type { Cursor } from "./cursor";
-import { aMensajeDto, rutasDeFotos, SELECT_MENSAJE, type MensajeDto, type RolChat } from "./dto";
+import { aMensajeDto, rutasDeFotos, type MensajeDto, type RolChat } from "./dto";
 import { textoEvento } from "./eventos-catalogo";
+import { listarMensajes } from "./mensaje-fila";
 
 export const MENSAJES_POR_PAGINA = 30;
 const MAXIMO_NUEVOS = 100;
+
+function comoFecha(valor: unknown): Date {
+  if (valor instanceof Date) return valor;
+  const texto = String(valor);
+  return new Date(/^\d{4}-\d{2}-\d{2}$/.test(texto) ? `${texto}T00:00:00.000Z` : texto);
+}
 
 // ---------------------------------------------------------------------------
 // Bandeja
@@ -59,12 +66,31 @@ function vistaPrevia(f: FilaBandeja, userId: string): string {
   }
 }
 
+interface FilaBandejaJson extends Omit<FilaBandeja, "ultimaActividadEn" | "presupuestoValidoHasta" | "noLeidos"> {
+  ultimaActividadEn: string;
+  presupuestoValidoHasta: string | null;
+  noLeidos: number | string;
+}
+
+function normalizarFila(f: FilaBandejaJson): FilaBandeja {
+  return {
+    ...f,
+    noLeidos: numero(f.noLeidos),
+    ultimaActividadEn: comoFecha(f.ultimaActividadEn),
+    presupuestoValidoHasta: f.presupuestoValidoHasta ? comoFecha(f.presupuestoValidoHasta) : null,
+  };
+}
+
 export async function getBandeja(usuario: UsuarioActual, limite = 50) {
   const perfil = perfilChat(usuario);
   if (!perfil) return { conversaciones: [], noLeidosTotal: 0 };
-  const filas = await prisma.$queryRaw<FilaBandeja[]>(
-    consultaBandeja({ lado: perfil.rol, perfilId: perfil.perfilId, userId: usuario.id, limite }),
-  );
+  const consultaSql = consultaBandeja({
+    lado: perfil.rol,
+    perfilId: perfil.perfilId,
+    userId: usuario.id,
+    limite,
+  });
+  const filas = (await consulta<FilaBandejaJson>(consultaSql.sql, consultaSql.params)).map(normalizarFila);
   const conversaciones: ConversacionBandeja[] = filas.map((f) => {
     const estado = estadoConversacion({
       solicitudEstado: f.solicitudEstado,
@@ -97,22 +123,24 @@ export async function getBandeja(usuario: UsuarioActual, limite = 50) {
 export async function contarNoLeidos(usuario: UsuarioActual): Promise<number> {
   const perfil = perfilChat(usuario);
   if (!perfil) return 0;
-  const [fila] = await prisma.$queryRaw<{ total: number }[]>(
-    consultaTotalNoLeidos({ lado: perfil.rol, perfilId: perfil.perfilId, userId: usuario.id }),
-  );
-  return fila?.total ?? 0;
+  const consultaSql = consultaTotalNoLeidos({
+    lado: perfil.rol,
+    perfilId: perfil.perfilId,
+    userId: usuario.id,
+  });
+  const [fila] = await consulta<{ total: number | string }>(consultaSql.sql, consultaSql.params);
+  return fila ? numero(fila.total) : 0;
 }
 
 // ---------------------------------------------------------------------------
 // Mensajes de una conversación (paginación por cursor)
 // ---------------------------------------------------------------------------
 
-const despuesDe = (c: Cursor): Prisma.MensajeWhereInput => ({
-  OR: [{ createdAt: { gt: c.createdAt } }, { createdAt: c.createdAt, id: { gt: c.id } }],
-});
-const antesDe = (c: Cursor): Prisma.MensajeWhereInput => ({
-  OR: [{ createdAt: { lt: c.createdAt } }, { createdAt: c.createdAt, id: { lt: c.id } }],
-});
+const filtroCursor = (sentido: "despues" | "antes", c: Cursor) => {
+  const cmp = sentido === "despues" ? "gt" : "lt";
+  const iso = c.createdAt.toISOString();
+  return `createdAt.${cmp}."${iso}",and(createdAt.eq."${iso}",id.${cmp}."${c.id}")`;
+};
 
 /**
  * Sin cursores: la última página. Con `antes`: la página anterior (scroll hacia arriba).
@@ -123,22 +151,19 @@ export async function getMensajes(
   ctx: ContextoChat,
   cursores: { antes?: Cursor | null; despues?: Cursor | null } = {},
 ): Promise<{ mensajes: MensajeDto[]; hayMasAnteriores: boolean }> {
-  const base: Prisma.MensajeWhereInput = { conversacionId: ctx.conversacionId };
   let crudos;
   let hayMasAnteriores = false;
   if (cursores.despues) {
-    crudos = await prisma.mensaje.findMany({
-      where: { ...base, ...despuesDe(cursores.despues) },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: MAXIMO_NUEVOS,
-      select: SELECT_MENSAJE,
+    crudos = await listarMensajes(db(), ctx.conversacionId, {
+      filtro: filtroCursor("despues", cursores.despues),
+      ascendente: true,
+      limite: MAXIMO_NUEVOS,
     });
   } else {
-    const pagina = await prisma.mensaje.findMany({
-      where: { ...base, ...(cursores.antes ? antesDe(cursores.antes) : {}) },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: MENSAJES_POR_PAGINA + 1,
-      select: SELECT_MENSAJE,
+    const pagina = await listarMensajes(db(), ctx.conversacionId, {
+      ...(cursores.antes ? { filtro: filtroCursor("antes", cursores.antes) } : {}),
+      ascendente: false,
+      limite: MENSAJES_POR_PAGINA + 1,
     });
     hayMasAnteriores = pagina.length > MENSAJES_POR_PAGINA;
     crudos = pagina.slice(0, MENSAJES_POR_PAGINA).reverse();
@@ -172,22 +197,42 @@ export interface MetaConversacion {
   conflictos: Record<string, string[]>;
 }
 
+async function idsDeMensajes(conversacionId: string): Promise<string[]> {
+  const { data, error } = await db().from("mensajes").select("id").eq("conversacionId", conversacionId);
+  fallar(error);
+  return (data ?? []).map((m) => m.id as string);
+}
+
 export async function getMetaConversacion(ctx: ContextoChat): Promise<MetaConversacion> {
-  const acordada =
-    ctx.estado === "NEGOCIACION"
-      ? await prisma.propuestaHorario.findFirst({
-          where: { estado: "ACEPTADA", aplicadaEn: null, mensaje: { conversacionId: ctx.conversacionId } },
-          orderBy: { respondidaEn: "desc" },
-          select: { fecha: true, franja: true },
-        })
-      : null;
+  const ids = ctx.estado === "NEGOCIACION" || ctx.miRol === "FLETERO" ? await idsDeMensajes(ctx.conversacionId) : [];
+  let acordada: { fecha: string; franja: FranjaHoraria } | null = null;
+  if (ctx.estado === "NEGOCIACION" && ids.length > 0) {
+    const { data, error } = await db()
+      .from("propuestas_horario")
+      .select("fecha, franja")
+      .in("mensajeId", ids)
+      .eq("estado", "ACEPTADA")
+      .is("aplicadaEn", null)
+      .order("respondidaEn", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    fallar(error);
+    acordada = data ? { fecha: fechaIsoDeDia(comoFecha(data.fecha)), franja: data.franja as FranjaHoraria } : null;
+  }
   let conflictos: Record<string, string[]> = {};
   if (ctx.miRol === "FLETERO") {
     const [pendientes, turnos] = await Promise.all([
-      prisma.propuestaHorario.findMany({
-        where: { estado: "PENDIENTE", mensaje: { conversacionId: ctx.conversacionId } },
-        select: { id: true, fecha: true, franja: true },
-      }),
+      ids.length === 0
+        ? Promise.resolve([] as { id: string; fecha: string; franja: FranjaHoraria }[])
+        : db()
+            .from("propuestas_horario")
+            .select("id, fecha, franja")
+            .in("mensajeId", ids)
+            .eq("estado", "PENDIENTE")
+            .then(({ data, error }) => {
+              fallar(error);
+              return (data ?? []) as { id: string; fecha: string; franja: FranjaHoraria }[];
+            }),
       getTurnosActivos(ctx.fleteroId),
     ]);
     const otros = turnos.filter((t) => t.solicitudId !== ctx.solicitudId);
@@ -197,7 +242,7 @@ export async function getMetaConversacion(ctx: ContextoChat): Promise<MetaConver
           (p) =>
             [
               p.id,
-              conflictosCon({ fecha: fechaIsoDeDia(p.fecha), franja: p.franja }, otros).map((t) => t.titulo),
+              conflictosCon({ fecha: fechaIsoDeDia(comoFecha(p.fecha)), franja: p.franja }, otros).map((t) => t.titulo),
             ] as const,
         )
         .filter(([, titulos]) => titulos.length > 0),
@@ -217,7 +262,7 @@ export async function getMetaConversacion(ctx: ContextoChat): Promise<MetaConver
       ? { id: ctx.presupuesto.id, monto: ctx.presupuesto.monto, estado: ctx.presupuesto.estado }
       : null,
     flete: ctx.fleteId && ctx.fleteEtapa ? { id: ctx.fleteId, etapa: ctx.fleteEtapa } : null,
-    fechaAcordada: acordada ? { fecha: fechaIsoDeDia(acordada.fecha), franja: acordada.franja } : null,
+    fechaAcordada: acordada,
     hrefDetalle: hrefPedido(ctx.miRol, ctx.solicitudId),
     conflictos,
   };
@@ -241,25 +286,26 @@ const MAXIMO_FLETES = 20;
 export async function topicsRealtime(usuario: UsuarioActual): Promise<string[]> {
   const perfil = perfilChat(usuario);
   if (!perfil) return [];
-  const delUsuario =
-    perfil.rol === "CLIENTE" ? { clienteId: perfil.perfilId } : { fleteroId: perfil.perfilId };
+  const columna = perfil.rol === "CLIENTE" ? "clienteId" : "fleteroId";
   const [conversaciones, fletes] = await Promise.all([
-    prisma.conversacion.findMany({
-      where: delUsuario,
-      orderBy: { ultimaActividadEn: "desc" },
-      take: MAXIMO_CANALES,
-      select: { id: true },
-    }),
-    // Seguimiento en vivo: solo los fletes en curso.
-    prisma.flete.findMany({
-      where: { ...delUsuario, etapa: { in: [...ETAPAS_ACTIVAS] } },
-      take: MAXIMO_FLETES,
-      select: { id: true },
-    }),
+    db()
+      .from("conversaciones")
+      .select("id")
+      .eq(columna, perfil.perfilId)
+      .order("ultimaActividadEn", { ascending: false })
+      .limit(MAXIMO_CANALES),
+    db()
+      .from("fletes")
+      .select("id")
+      .eq(columna, perfil.perfilId)
+      .in("etapa", [...ETAPAS_ACTIVAS])
+      .limit(MAXIMO_FLETES),
   ]);
+  fallar(conversaciones.error);
+  fallar(fletes.error);
   return [
     `usuario:${usuario.id}`,
-    ...conversaciones.map((c) => `conversacion:${c.id}`),
-    ...fletes.map((f) => topicFlete(f.id)),
+    ...(conversaciones.data ?? []).map((c) => `conversacion:${c.id as string}`),
+    ...(fletes.data ?? []).map((f) => topicFlete(f.id as string)),
   ];
 }

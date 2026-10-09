@@ -6,7 +6,6 @@ import { fechaIsoAr, sumarDias } from "@/domain/fechas";
 import type { Rol } from "@/domain/roles";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
 import { proponerHorario } from "@/features/chat/actions";
-import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "@/lib/action-result";
 import type { UsuarioActual } from "@/lib/session";
 import {
@@ -19,6 +18,7 @@ import {
   presupuestar,
 } from "../../test/db/fabrica";
 import { comoUsuario } from "../../test/db/sesion";
+import { filas, insertar, uno, unoONull } from "../../test/db/tabla";
 
 // Matriz de autorización (OWASP A01): para CADA Server Action de la app se verifica que
 //  1. sin sesión, falla;
@@ -62,9 +62,15 @@ async function crearMundo() {
       franja: "TARDE",
     }),
   );
-  const propuesta = await prisma.propuestaHorario.findFirstOrThrow({
-    where: { mensaje: { conversacionId: negociacion.conversacionId } },
+  const mensajesNegociacion = await filas<{ id: string }>("mensajes", {
+    conversacionId: negociacion.conversacionId,
   });
+  let propuesta: { id: string } | null = null;
+  for (const mensaje of mensajesNegociacion) {
+    propuesta = await unoONull<{ id: string }>("propuestas_horario", { mensajeId: mensaje.id });
+    if (propuesta) break;
+  }
+  if (!propuesta) throw new Error("No hay fila en propuestas_horario");
 
   // ...y otra con el flete ya confirmado.
   const adjudicada = await crearSolicitud(cliente);
@@ -72,17 +78,19 @@ async function crearMundo() {
   comoUsuario(cliente);
   const { fleteId } = ok(await aceptarPresupuesto({ presupuestoId }));
 
-  const fotoSolicitud = await prisma.foto.create({
-    data: { ruta: `solicitudes/${abierta.id}/${randomUUID()}.jpg`, solicitudId: abierta.id },
+  const fotoSolicitud = await insertar<{ id: string }>("fotos", {
+    ruta: `solicitudes/${abierta.id}/${randomUUID()}.jpg`,
+    solicitudId: abierta.id,
   });
-  const fotoVehiculo = await prisma.foto.create({
-    data: {
-      ruta: `vehiculos/${fletero.fleteroProfile!.id}/${randomUUID()}.jpg`,
-      vehiculoId: fletero.vehiculoId,
-    },
+  const fotoVehiculo = await insertar<{ id: string }>("fotos", {
+    ruta: `vehiculos/${fletero.fleteroProfile!.id}/${randomUUID()}.jpg`,
+    vehiculoId: fletero.vehiculoId,
   });
-  const notificacion = await prisma.notificacion.create({
-    data: { userId: cliente.id, tipo: "MENSAJE", titulo: "Hola", href: "/cliente" },
+  const notificacion = await insertar<{ id: string }>("notificaciones", {
+    userId: cliente.id,
+    tipo: "MENSAJE",
+    titulo: "Hola",
+    href: "/cliente",
   });
 
   return {
@@ -368,22 +376,20 @@ describe("matriz de autorización", () => {
 
 describe("el recurso ajeno no se modificó", () => {
   it("después de todos los intentos, todo sigue como estaba", async () => {
-    const [presupuesto, flete, foto, fotoVehiculo, propuesta, vehiculoDuenio, solicitud, textosIntrusos] =
+    const [presupuesto, flete, foto, fotoVehiculo, propuesta, vehiculoDuenio, solicitud, mensajes] =
       await Promise.all([
-        prisma.presupuesto.findUniqueOrThrow({ where: { id: mundo.presupuestoId } }),
-        prisma.flete.findUniqueOrThrow({ where: { id: mundo.fleteId } }),
-        prisma.foto.findUnique({ where: { id: mundo.fotoSolicitudId } }),
-        prisma.foto.findUnique({ where: { id: mundo.fotoVehiculoId } }),
-        prisma.propuestaHorario.findUniqueOrThrow({ where: { id: mundo.propuestaId } }),
-        prisma.vehiculo.findUniqueOrThrow({ where: { id: mundo.fletero.vehiculoId } }),
-        prisma.solicitud.findUniqueOrThrow({ where: { id: mundo.abierta.id } }),
-        prisma.mensaje.count({
-          where: {
-            conversacionId: mundo.conversacionId,
-            autorId: { in: [mundo.otroCliente.id, mundo.otroFletero.id] },
-          },
-        }),
+        uno<{ estado: string }>("presupuestos", { id: mundo.presupuestoId }),
+        uno<{ etapa: string }>("fletes", { id: mundo.fleteId }),
+        unoONull("fotos", { id: mundo.fotoSolicitudId }),
+        unoONull("fotos", { id: mundo.fotoVehiculoId }),
+        uno<{ estado: string }>("propuestas_horario", { id: mundo.propuestaId }),
+        uno<{ activo: boolean; marca: string }>("vehiculos", { id: mundo.fletero.vehiculoId }),
+        uno<{ estado: string }>("solicitudes", { id: mundo.abierta.id }),
+        filas<{ autorId: string | null }>("mensajes", { conversacionId: mundo.conversacionId }),
       ]);
+    const textosIntrusos = mensajes.filter(
+      (m) => m.autorId === mundo.otroCliente.id || m.autorId === mundo.otroFletero.id,
+    ).length;
     expect(presupuesto.estado).toBe("PENDIENTE");
     expect(flete.etapa).toBe("CONFIRMADO");
     expect(foto).not.toBeNull();
@@ -401,7 +407,7 @@ describe("el recurso ajeno no se modificó", () => {
     ).toEqual({
       marcadas: 0,
     });
-    const n = await prisma.notificacion.findUniqueOrThrow({ where: { id: mundo.notificacionId } });
+    const n = await uno<{ leidaEn: string | null }>("notificaciones", { id: mundo.notificacionId });
     expect(n.leidaEn).toBeNull();
   });
 });

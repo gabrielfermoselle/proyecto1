@@ -1,8 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
-import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FACTOR_RUTA_URBANA, haversineKm } from "@/domain/geo";
 import { precioSugerido } from "@/domain/precio";
@@ -11,13 +10,12 @@ import { consultaBuscador, type FilaBuscador, type ParametrosBuscador } from "./
 // Corre la consulta real del buscador contra Postgres + PostGIS (PGlite, en memoria) con la
 // migración del proyecto: cercanía, zona de cobertura, filtros, compatibilidad y orden.
 
-const MIGRACION = join(process.cwd(), "prisma/migrations/20261001000000_init/migration.sql");
 const PLAZA = { lat: -26.8303, lng: -65.2038 }; // Plaza Independencia
 
 let db: PGlite;
 
 async function buscar(p: Partial<ParametrosBuscador> = {}): Promise<FilaBuscador[]> {
-  const sql: Prisma.Sql = consultaBuscador({
+  const sql = consultaBuscador({
     punto: PLAZA,
     radio: null,
     tipoVehiculo: null,
@@ -30,7 +28,7 @@ async function buscar(p: Partial<ParametrosBuscador> = {}): Promise<FilaBuscador
     limite: 50,
     ...p,
   });
-  const { rows } = await db.query<FilaBuscador>(sql.text, sql.values as unknown[]);
+  const { rows } = await db.query<FilaBuscador>(sql.sql, sql.params);
   return rows;
 }
 const ids = (filas: FilaBuscador[]) => filas.map((f) => f.id);
@@ -53,12 +51,12 @@ interface FleteroFixture {
 
 async function fletero(f: FleteroFixture) {
   await db.query(
-    `insert into users (id, email, "passwordHash", nombre, apellido, rol, activo, "updatedAt")
+    `insert into usuarios (id, email, "passwordHash", nombre, apellido, rol, activo, "updatedAt")
      values ($1, $2, 'h', 'N', 'A', 'FLETERO', $3, now())`,
     [`u-${f.id}`, `${f.id}@x`, f.activo ?? true],
   );
   await db.query(
-    `insert into fletero_profiles (id, "userId", "baseLat", "baseLng", "radioCoberturaKm", "precioMinimo",
+    `insert into perfiles_fletero (id, "userId", "baseLat", "baseLng", "radioCoberturaKm", "precioMinimo",
        "precioPorKm", "precioPorM3", "ratingPromedio", "cantidadCalificaciones", disponible, "onboardingCompletadoEn")
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
@@ -85,7 +83,12 @@ async function fletero(f: FleteroFixture) {
 
 beforeAll(async () => {
   db = await PGlite.create({ extensions: { postgis } });
-  await db.exec(readFileSync(MIGRACION, "utf8"));
+  const carpeta = join(process.cwd(), "prisma/migrations");
+  for (const m of readdirSync(carpeta)
+    .filter((d) => /^\d+_/.test(d))
+    .sort()) {
+    await db.exec(readFileSync(join(carpeta, m, "migration.sql"), "utf8"));
+  }
 
   const camioneta = { tipo: "CAMIONETA", kg: 1000, m3: 4 };
   // Barrio Norte (~1,5 km), radio 10: llega a la plaza. Barato por km, caro de mínimo.
@@ -148,9 +151,9 @@ describe("buscador de fleteros (SQL real con PostGIS)", () => {
   });
 
   it("sin calificaciones no pasa un filtro de calificación", async () => {
-    await db.query(`update fletero_profiles set "ratingPromedio" = 0, "cantidadCalificaciones" = 0 where id = 'yb'`);
+    await db.query(`update perfiles_fletero set "ratingPromedio" = 0, "cantidadCalificaciones" = 0 where id = 'yb'`);
     expect(ids(await buscar({ ratingMinimo: 3 }))).toEqual(["norte", "tafi"]);
-    await db.query(`update fletero_profiles set "ratingPromedio" = 4.2, "cantidadCalificaciones" = 5 where id = 'yb'`);
+    await db.query(`update perfiles_fletero set "ratingPromedio" = 4.2, "cantidadCalificaciones" = 5 where id = 'yb'`);
   });
 
   it("ordena por precio mínimo sin solicitud de referencia", async () => {
