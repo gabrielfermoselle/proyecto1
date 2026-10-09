@@ -96,13 +96,13 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
   // El pedido sigue en la misma página, ahora con el flete y el contacto directo.
   await expect(florencia).toHaveURL(/\/cliente\/pedido\//);
   await florencia.reload();
-  await expect(florencia.getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
+  await expect(florencia.locator("#contenido").getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
   await expect(florencia.getByRole("link", { name: "WhatsApp" })).toBeVisible();
 
   await carlos.goto("/fletero/trabajos");
   await carlos.getByRole("link", { name: SOLICITUD }).click();
   await expect(carlos).toHaveURL(/\/fletero\/pedido\//);
-  await expect(carlos.getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
+  await expect(carlos.locator("#contenido").getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
   // Con el flete confirmado, el fletero ya ve la dirección exacta.
   await expect(carlos.getByRole("link", { name: "Cómo llegar" }).first()).toBeVisible();
 });
@@ -119,14 +119,14 @@ async function avanzar(page: Page, boton: string, etapa: string, { firma = false
   } else {
     await dialogo.getByRole("button", { name: "Sí, confirmar" }).click();
   }
-  await expect(page.getByText(etapa)).toBeVisible();
+  await expect(page.locator("#contenido").getByText(etapa)).toBeVisible();
 }
 
 test("el fletero sale a buscar la carga y la cliente ve el avance", async () => {
   await avanzar(carlos, "Salgo a buscar la carga", "Etapa 2 de 7: En camino al origen");
 
   await florencia.reload();
-  await expect(florencia.getByText("Etapa 2 de 7: En camino al origen")).toBeVisible();
+  await expect(florencia.locator("#contenido").getByText("Etapa 2 de 7: En camino al origen")).toBeVisible();
 });
 
 test("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", async () => {
@@ -152,7 +152,7 @@ test("el fletero descarga todo y firma la entrega", async () => {
 
 test("la cliente revisa lo que recibió, cierra el flete y califica", async () => {
   await florencia.reload();
-  await expect(florencia.getByText("Etapa 6 de 7: Entregado")).toBeVisible();
+  await expect(florencia.locator("#contenido").getByText("Etapa 6 de 7: Entregado")).toBeVisible();
   const cerrar = florencia.getByRole("button", { name: "Cerrar el flete" });
   await expect(cerrar).toBeDisabled();
 
