@@ -1,32 +1,19 @@
 "use client";
 
-import { ClipboardList, MessagesSquare, Search, Truck, UserRound } from "lucide-react";
+import { ClipboardList, MessagesSquare, Plus, Search, UserRound } from "lucide-react";
+import Link from "next/link";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
+import { Button } from "@/components/ui/button";
 import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
 
 const secciones = (): SeccionNav[] => [
   {
     href: "/cliente",
-    label: "Mis fletes",
-    Icono: Truck,
-    // "/cliente" exacto y el seguimiento de cada flete.
-    prefijos: ["/cliente/fletes"],
-    enInferior: true,
-  },
-  {
-    href: "/cliente/solicitudes",
-    label: "Solicitudes",
+    label: "Mis pedidos",
+    labelCorto: "Pedidos",
     Icono: ClipboardList,
-    prefijos: ["/cliente/solicitudes"],
+    prefijos: ["/cliente/pedido"],
     enInferior: true,
-  },
-  {
-    href: "/cliente/mensajes",
-    label: "Mensajes",
-    Icono: MessagesSquare,
-    prefijos: ["/cliente/mensajes"],
-    enInferior: true,
-    extra: <NoLeidosBadge />,
   },
   {
     href: "/cliente/fleteros",
@@ -36,11 +23,30 @@ const secciones = (): SeccionNav[] => [
     enInferior: true,
   },
   {
-    href: "/cliente/perfil",
+    href: "/cliente/nuevo",
+    label: "Nuevo pedido",
+    labelCorto: "Nuevo",
+    Icono: Plus,
+    prefijos: [],
+    enInferior: true,
+    enSuperior: false,
+    destacada: true,
+  },
+  {
+    href: "/chat",
+    label: "Chat",
+    Icono: MessagesSquare,
+    prefijos: ["/chat"],
+    enInferior: true,
+    extra: <NoLeidosBadge />,
+  },
+  {
+    href: "/perfil",
     label: "Perfil",
     Icono: UserRound,
-    prefijos: ["/cliente/perfil"],
+    prefijos: [],
     enInferior: true,
+    enSuperior: false,
   },
 ];
 
@@ -49,5 +55,16 @@ export function ClienteNavTabs() {
 }
 
 export function ClienteNavInferior() {
-  return <NavInferior secciones={secciones()} ocultarEn={/^\/cliente\/mensajes\/[^/]+/} />;
+  return <NavInferior secciones={secciones()} ocultarEn={/^\/chat\/[^/]+/} />;
+}
+
+export function BotonNuevoPedido() {
+  return (
+    <Button asChild variant="accent" size="sm">
+      <Link href="/cliente/nuevo">
+        <Plus aria-hidden="true" />
+        Nuevo pedido
+      </Link>
+    </Button>
+  );
 }

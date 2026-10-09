@@ -198,6 +198,10 @@ const MATRIZ: Record<string, Caso> = {
     roles: ["FLETERO"],
     ajeno: (m) => ({ como: m.otroFletero, input: { fotoId: m.fotoVehiculoId } }),
   },
+  // Los documentos son siempre los del fletero de la sesión: no reciben IDs.
+  firmarSubidaDocumento: { roles: ["FLETERO"] },
+  guardarDocumento: { roles: ["FLETERO"] },
+  eliminarDocumento: { roles: ["FLETERO"] },
 
   // --- chat ---
   enviarMensaje: {

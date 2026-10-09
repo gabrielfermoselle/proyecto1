@@ -18,8 +18,7 @@ export function perfilChat(usuario: UsuarioActual): { rol: RolChat; perfilId: st
   return null;
 }
 
-export const hrefConversacion = (rol: RolChat, conversacionId: string) =>
-  `${rol === "CLIENTE" ? "/cliente" : "/fletero"}/mensajes/${conversacionId}`;
+export { hrefConversacion } from "./acceso-rutas";
 
 export interface ContextoChat {
   conversacionId: string;

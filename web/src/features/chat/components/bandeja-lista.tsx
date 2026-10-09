@@ -94,7 +94,7 @@ export function BandejaLista({ textoVacio }: { textoVacio: string }) {
                 <span className="flex items-center justify-between gap-2">
                   <span
                     className={cn(
-                      "truncate text-sm",
+                      "min-w-0 truncate text-sm",
                       c.noLeidos > 0 ? "text-foreground" : "text-muted-foreground",
                     )}
                   >

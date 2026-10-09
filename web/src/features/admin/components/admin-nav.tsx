@@ -1,29 +1,21 @@
 "use client";
 
-import { ClipboardList, LayoutDashboard, MessageSquareWarning, Users } from "lucide-react";
+import { BadgeCheck, Flag } from "lucide-react";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
 
 const secciones = (): SeccionNav[] => [
-  { href: "/admin", label: "Resumen", Icono: LayoutDashboard, prefijos: [], enInferior: true },
   {
-    href: "/admin/usuarios",
-    label: "Usuarios",
-    Icono: Users,
-    prefijos: ["/admin/usuarios"],
+    href: "/admin/fleteros",
+    label: "Fleteros",
+    Icono: BadgeCheck,
+    prefijos: ["/admin/fleteros"],
     enInferior: true,
   },
   {
-    href: "/admin/reclamos",
-    label: "Reclamos",
-    Icono: MessageSquareWarning,
-    prefijos: ["/admin/reclamos"],
-    enInferior: true,
-  },
-  {
-    href: "/admin/solicitudes",
-    label: "Solicitudes",
-    Icono: ClipboardList,
-    prefijos: ["/admin/solicitudes"],
+    href: "/admin/reportes",
+    label: "Reportes",
+    Icono: Flag,
+    prefijos: ["/admin/reportes"],
     enInferior: true,
   },
 ];

@@ -12,6 +12,9 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline: "border border-input bg-card shadow-sm hover:bg-muted",
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/90",
+        /** Dorado: la acción principal sobre el toldo verde. */
+        accent:
+          "bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 focus-visible:ring-offset-secondary",
         ghost: "hover:bg-muted",
         link: "text-primary underline-offset-4 hover:underline",
       },

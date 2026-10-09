@@ -10,7 +10,6 @@ import { FRANJA } from "@/domain/catalogos";
 import { puedeCancelar } from "@/domain/ciclo-flete";
 import type { MetaConversacion } from "@/features/chat/queries";
 import { cancelarFlete } from "@/features/fletes/actions";
-import { hrefFlete } from "@/features/fletes/rutas";
 import { formatearDia, formatearPesos } from "@/lib/formato";
 import { aceptarPresupuesto } from "../presupuestos/actions";
 
@@ -98,7 +97,7 @@ export function AccionesChatCliente({
 
       {puedeConfirmar && flete ? (
         <Button asChild size="sm" className="max-sm:flex-1">
-          <Link href={hrefFlete("CLIENTE", flete.id)}>Revisar y confirmar la recepción</Link>
+          <Link href={meta.hrefDetalle}>Revisar y confirmar la recepción</Link>
         </Button>
       ) : null}
 

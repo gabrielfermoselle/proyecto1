@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TIPOS_VEHICULO } from "@/domain/catalogos";
+import { TIPOS_DOCUMENTO, TIPOS_VEHICULO } from "@/domain/catalogos";
 import { estaEnRegion } from "@/domain/geo";
 import { esPatenteValida, normalizarPatente } from "@/domain/patente";
 import { nombreSchema, telefonoSchema } from "@/features/auth/schemas";
@@ -90,3 +90,12 @@ export type DatosInput = z.input<typeof datosSchema>;
 export type VehiculoInput = z.input<typeof vehiculoSchema>;
 export type ZonaInput = z.input<typeof zonaSchema>;
 export type TarifasInput = z.input<typeof tarifasSchema>;
+
+const tipoDocumento = z.enum(TIPOS_DOCUMENTO, { errorMap: () => ({ message: "Elegí qué documento es" }) });
+
+export const tipoDocumentoSchema = z.object({ tipo: tipoDocumento });
+
+export const documentoSchema = z.object({
+  tipo: tipoDocumento,
+  ruta: z.string().min(1).max(300),
+});

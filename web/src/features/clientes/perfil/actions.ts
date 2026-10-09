@@ -12,6 +12,7 @@ export const guardarDatosCliente = createClienteAction({
   handler: async ({ nombre, apellido, telefono }, { usuario }) => {
     await prisma.user.update({ where: { id: usuario.id }, data: { nombre, apellido, telefono } });
     revalidatePath("/cliente", "layout");
+    revalidatePath("/perfil");
     return null;
   },
 });
@@ -22,6 +23,7 @@ export const guardarDireccionHabitual = createClienteAction({
   handler: async ({ direccionHabitual, lat, lng }, { clienteId }) => {
     await prisma.clienteProfile.update({ where: { id: clienteId }, data: { direccionHabitual, lat, lng } });
     revalidatePath("/cliente", "layout");
+    revalidatePath("/perfil");
     return null;
   },
 });

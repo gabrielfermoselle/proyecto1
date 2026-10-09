@@ -1,169 +1,201 @@
-import { ArrowRight, CalendarDays, ExternalLink, Inbox, PartyPopper, PauseCircle } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Inbox, PartyPopper, PauseCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Estrellas } from "@/components/shared/estrellas";
 import { PageHeader } from "@/components/shared/page-header";
-import { StatTile } from "@/components/shared/stat-tile";
+import { SegmentedNav } from "@/components/shared/segmented-nav";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { TurnoCard } from "@/features/fleteros/fletes/components/turno-card";
-import { GananciasChart } from "@/features/fleteros/metricas/components/ganancias-chart";
-import { getPanelFletero } from "@/features/fleteros/metricas/queries";
-import { formatearDia, formatearPesos, formatearPorcentaje, formatearRating } from "@/lib/formato";
+import { FRANJA } from "@/domain/catalogos";
+import { fechaIsoAr } from "@/domain/fechas";
+import { getTurnosActivos } from "@/features/fleteros/fletes/queries";
+import { FiltrosFeed } from "@/features/fleteros/solicitudes/components/filtros-feed";
+import { SolicitudCard } from "@/features/fleteros/solicitudes/components/solicitud-card";
+import {
+  filtrosDeParametros,
+  hayFiltros,
+  leerParametrosFeed,
+  urlFeed,
+} from "@/features/fleteros/solicitudes/parametros";
+import { getFeed } from "@/features/fleteros/solicitudes/queries";
+import { hrefPedido } from "@/features/fletes/rutas";
+import { MapaPuntos } from "@/features/mapas/components/mapas-dinamicos";
+import { formatearDia, formatearKm } from "@/lib/formato";
 import { requireFletero } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Panel" };
+export const metadata: Metadata = { title: "Pedidos disponibles" };
 
-export default async function PanelFleteroPage({
+/** En el mapa se muestran más pedidos de una vez (no hay "ver más"). */
+const PAGINAS_MAPA = 10;
+
+export default async function PedidosDisponiblesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bienvenida?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { usuario, fleteroId } = await requireFletero();
-  const { bienvenida } = await searchParams;
-  const panel = await getPanelFletero(fleteroId);
-  const { metricas: m } = panel;
+  const crudos = await searchParams;
+  const params = leerParametrosFeed(crudos);
+  const hoy = fechaIsoAr();
+  const enMapa = params.vista === "mapa";
+  const conFiltros = hayFiltros(params);
+  const [feed, turnos] = await Promise.all([
+    getFeed(fleteroId, {
+      tab: "nuevas",
+      orden: params.orden,
+      pagina: enMapa ? PAGINAS_MAPA : params.pagina,
+      filtros: filtrosDeParametros(params, hoy),
+    }),
+    getTurnosActivos(fleteroId),
+  ]);
+  const proximo = [...turnos].sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
 
   return (
     <div className="grid gap-6">
       <PageHeader
-        title={`Hola, ${usuario.nombre}`}
-        actions={
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/fleteros/${fleteroId}`}>
-              Mi perfil público
-              <ExternalLink aria-hidden="true" />
-            </Link>
-          </Button>
-        }
+        title="Pedidos disponibles"
+        description={`Hola, ${usuario.nombre}. Pedidos a menos de ${feed.perfil.radioKm} km de tu base que entran en tus vehículos.`}
       />
 
-      {bienvenida ? (
+      {crudos.bienvenida ? (
         <Alert variant="success">
           <PartyPopper aria-hidden="true" />
           <p>
-            <strong>¡Tu perfil está listo!</strong> Ya aparecés en el buscador y podés presupuestar
-            solicitudes cerca tuyo.
+            <strong>¡Tu perfil está listo!</strong> Ya aparecés en el buscador y podés presupuestar pedidos
+            cerca tuyo. Subí tus documentos para que te verifiquemos.
           </p>
         </Alert>
       ) : null}
-      {!panel.disponible ? (
+      {!feed.perfil.disponible ? (
         <Alert>
           <PauseCircle aria-hidden="true" />
           <p>
-            Estás en pausa: no aparecés en el buscador.{" "}
+            <strong>Estás en pausa.</strong> Podés ver los pedidos, pero para presupuestar{" "}
             <Link href="/fletero/perfil" className="font-semibold text-primary underline underline-offset-4">
-              Activar disponibilidad
+              activá tu disponibilidad
             </Link>
+            .
           </p>
         </Alert>
       ) : null}
 
-      <Link
-        href="/fletero/solicitudes"
-        className="group flex items-center gap-4 rounded-lg bg-secondary p-5 text-secondary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        <Inbox className="size-8 shrink-0" aria-hidden="true" />
-        <span className="flex-1">
-          <span className="block font-heading text-xl font-extrabold">
-            {panel.solicitudesNuevas === 0
-              ? "No hay solicitudes nuevas"
-              : `${panel.solicitudesNuevas} solicitud${panel.solicitudesNuevas > 1 ? "es" : ""} nueva${panel.solicitudesNuevas > 1 ? "s" : ""} cerca tuyo`}
+      {proximo ? (
+        <Link
+          href={hrefPedido("FLETERO", proximo.solicitudId)}
+          className="group flex items-center gap-4 rounded-xl bg-secondary px-5 py-4 text-secondary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <BriefcaseBusiness className="size-6 shrink-0 text-accent" aria-hidden="true" />
+          <span className="grid min-w-0 flex-1">
+            <span className="text-sm text-secondary-foreground/80">
+              Tu próximo trabajo{turnos.length > 1 ? ` (de ${turnos.length} en curso)` : ""}
+            </span>
+            <span className="truncate font-semibold">
+              {formatearDia(proximo.fecha, { hoy })} · {FRANJA[proximo.franja].etiqueta} · {proximo.titulo}
+            </span>
           </span>
-          <span className="text-sm opacity-90">Que entran en tus vehículos y todavía no presupuestaste.</span>
-        </span>
-        <ArrowRight
-          className="size-6 shrink-0 transition-transform group-hover:translate-x-1"
-          aria-hidden="true"
-        />
-      </Link>
+          <ArrowRight
+            className="size-5 shrink-0 transition-transform group-hover:translate-x-1"
+            aria-hidden="true"
+          />
+        </Link>
+      ) : null}
 
-      <section aria-labelledby="titulo-numeros">
-        <h2 id="titulo-numeros" className="sr-only">
-          Tus números
-        </h2>
-        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatTile
-            label="Ganancias del mes"
-            value={formatearPesos(m.gananciasMes)}
-            detail="Fletes confirmados por el cliente"
-          />
-          <StatTile
-            label="Fletes completados"
-            value={m.fletesCompletados}
-            detail={m.fletesEnCurso > 0 ? `${m.fletesEnCurso} en curso` : "Ninguno en curso"}
-          />
-          <StatTile
-            label="Calificación"
-            value={panel.cantidadCalificaciones > 0 ? formatearRating(panel.rating) : "—"}
-            detail={
-              panel.cantidadCalificaciones > 0 ? (
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <Estrellas puntaje={panel.rating} />
-                  {panel.cantidadCalificaciones} reseña{panel.cantidadCalificaciones > 1 ? "s" : ""}
-                </span>
-              ) : (
-                "Todavía sin reseñas"
-              )
-            }
-          />
-          <StatTile
-            label="Tasa de aceptación"
-            value={m.tasaAceptacion === null ? "—" : formatearPorcentaje(m.tasaAceptacion)}
-            detail={
-              m.tasaAceptacion === null
-                ? "Cuando los clientes elijan, la vas a ver acá"
-                : `De ${m.presupuestosDecididos} presupuestos que los clientes decidieron`
-            }
-          />
-        </dl>
-      </section>
+      <FiltrosFeed params={params} radioKm={feed.perfil.radioKm} conFiltros={conFiltros} />
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <h2 className="text-lg font-bold">Ganancias de los últimos 6 meses</h2>
-            <p className="text-sm text-muted-foreground">
-              Total histórico: {formatearPesos(m.gananciasTotales)}
-            </p>
-          </CardHeader>
-          <CardContent>
-            <GananciasChart datos={m.gananciasPorMes} />
-          </CardContent>
-        </Card>
-
-        <section aria-labelledby="titulo-proximos" className="grid gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 id="titulo-proximos" className="text-lg font-bold">
-              Próximos fletes
-            </h2>
-            <Button asChild variant="link" size="sm">
-              <Link href="/fletero/agenda">Ver agenda</Link>
-            </Button>
-          </div>
-          {panel.proximos.length === 0 ? (
-            <EmptyState
-              icon={<CalendarDays />}
-              title="Sin fletes agendados"
-              description="Cuando un cliente acepte tu presupuesto, lo vas a ver acá."
-              className="py-8"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-semibold" aria-live="polite">
+          {feed.solicitudes.length === 0
+            ? "Ningún pedido"
+            : `${feed.solicitudes.length}${feed.hayMas ? "+" : ""} ${feed.solicitudes.length === 1 ? "pedido" : "pedidos"}`}
+          {conFiltros ? <span className="font-normal text-muted-foreground"> con estos filtros</span> : null}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {!enMapa ? (
+            <SegmentedNav
+              label="Ordenar por"
+              segmentos={[
+                {
+                  href: urlFeed(params, { orden: "distancia" }),
+                  label: "Más cerca",
+                  activo: params.orden === "distancia",
+                },
+                {
+                  href: urlFeed(params, { orden: "fecha" }),
+                  label: "Más pronto",
+                  activo: params.orden === "fecha",
+                },
+              ]}
             />
-          ) : (
-            <ul className="grid gap-2">
-              {panel.proximos.map((t) => (
-                <li key={t.id} className="grid gap-1">
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    {formatearDia(t.fecha, { largo: true })}
-                  </p>
-                  <TurnoCard turno={t} enConflicto={panel.enConflicto.has(t.id)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          ) : null}
+          <SegmentedNav
+            label="Vista"
+            segmentos={[
+              { href: urlFeed(params, { vista: "lista" }), label: "Lista", activo: !enMapa },
+              { href: urlFeed(params, { vista: "mapa" }), label: "Mapa", activo: enMapa },
+            ]}
+          />
+        </div>
       </div>
+
+      {feed.solicitudes.length === 0 ? (
+        <EmptyState
+          icon={<Inbox />}
+          title={conFiltros ? "No hay pedidos con esos filtros" : "No hay pedidos nuevos en tu zona"}
+          description={
+            conFiltros
+              ? "Probá con otra fecha, otro tipo o todo tu radio."
+              : `Te mostramos los pedidos a menos de ${feed.perfil.radioKm} km que entran en tus vehículos. Si ampliás tu radio o sumás un vehículo más grande, vas a ver más.`
+          }
+          action={
+            conFiltros ? (
+              <Button asChild variant="outline">
+                <Link href="/fletero">Ver todos</Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href="/fletero/perfil#zona">Ajustar mi zona</Link>
+              </Button>
+            )
+          }
+        />
+      ) : enMapa ? (
+        <div className="grid gap-2">
+          <MapaPuntos
+            etiqueta="Mapa de pedidos cerca de tu base. Cada pin es una ubicación aproximada."
+            base={feed.perfil.base}
+            radioKm={feed.perfil.radioKm}
+            puntos={feed.solicitudes.map((s) => ({
+              id: s.id,
+              ...s.ubicacion,
+              titulo: s.titulo,
+              detalle: `${formatearDia(s.fecha)} · ${FRANJA[s.franja].etiqueta} · a ${formatearKm(s.distanciaBaseKm)}`,
+              href: hrefPedido("FLETERO", s.id),
+              variante: "aprox",
+            }))}
+          />
+          <p className="text-sm text-muted-foreground">
+            Los pines muestran una ubicación aproximada. La dirección exacta aparece cuando el cliente acepta
+            tu presupuesto.
+          </p>
+        </div>
+      ) : (
+        <>
+          <ul className="grid gap-3">
+            {feed.solicitudes.map((s) => (
+              <li key={s.id}>
+                <SolicitudCard solicitud={s} />
+              </li>
+            ))}
+          </ul>
+          {feed.hayMas ? (
+            <Button asChild variant="outline" className="justify-self-center">
+              <Link href={urlFeed(params, { pagina: params.pagina + 1 })} scroll={false}>
+                Ver más pedidos
+              </Link>
+            </Button>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

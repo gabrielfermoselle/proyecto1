@@ -33,7 +33,7 @@ test("cambiar la contraseña cierra las sesiones abiertas y se entra con la nuev
   await ingresar(page, email, CLAVE);
   await expect(page).toHaveURL("/cliente");
 
-  await page.goto("/cliente/perfil");
+  await page.goto("/perfil");
   await page.getByLabel("Contraseña actual").fill(CLAVE);
   await page.getByLabel("Contraseña nueva").fill(NUEVA);
   await page.getByLabel("Repetí la nueva").fill(NUEVA);
@@ -43,7 +43,7 @@ test("cambiar la contraseña cierra las sesiones abiertas y se entra con la nuev
   await expect(page.getByText("Cambiaste tu contraseña y cerramos tus sesiones")).toBeVisible();
 
   // La sesión del otro dispositivo (iniciada antes del cambio) ya no vale.
-  await otroDispositivo.goto("/cliente/perfil");
+  await otroDispositivo.goto("/perfil");
   await expect(otroDispositivo).toHaveURL(/\/login/);
 
   await ingresar(page, email, CLAVE);

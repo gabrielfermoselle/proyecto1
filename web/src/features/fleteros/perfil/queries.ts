@@ -1,6 +1,6 @@
 import "server-only";
 import type { PerfilParaOnboarding } from "@/domain/onboarding";
-import { urlPublica } from "@/features/uploads/storage";
+import { urlPublica, urlsFirmadas } from "@/features/uploads/storage";
 import { configPublicaSupabase } from "@/lib/supabase";
 import { prisma } from "@/lib/prisma";
 
@@ -88,3 +88,25 @@ export async function getPerfilFletero(fleteroId: string) {
 
 export type PerfilFletero = Awaited<ReturnType<typeof getPerfilFletero>>;
 export type VehiculoPerfil = PerfilFletero["vehiculos"][number];
+
+/** Documentos subidos para la verificación, con URLs firmadas (el bucket es privado). */
+export async function getDocumentosFletero(fleteroId: string) {
+  const [documentos, perfil] = await Promise.all([
+    prisma.documentoFletero.findMany({
+      where: { fleteroId },
+      select: { tipo: true, ruta: true, createdAt: true },
+    }),
+    prisma.fleteroProfile.findUniqueOrThrow({ where: { id: fleteroId }, select: { verificado: true } }),
+  ]);
+  const urls = await urlsFirmadas(documentos.map((d) => d.ruta));
+  return {
+    verificado: perfil.verificado,
+    documentos: documentos.map((d) => ({
+      tipo: d.tipo,
+      subidoEn: d.createdAt,
+      url: urls.get(d.ruta) ?? null,
+    })),
+  };
+}
+
+export type DocumentoSubido = Awaited<ReturnType<typeof getDocumentosFletero>>["documentos"][number];

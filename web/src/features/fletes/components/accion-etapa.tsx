@@ -92,7 +92,7 @@ export function AccionEtapa({ fleteId, etapa, rol, resumen }: AccionEtapaProps) 
   }
 
   return (
-    <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 grid gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur md:bottom-0 md:mx-0 md:rounded-lg md:border">
+    <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 grid gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur lg:bottom-0 lg:mx-0 lg:rounded-xl lg:border">
       {!previa.ok ? <p className="text-sm font-medium text-muted-foreground">{previa.motivo}</p> : null}
       <ConfirmDialog
         title={`${ACCION_HACIA[siguiente] ?? "Confirmar"}`}

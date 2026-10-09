@@ -30,7 +30,7 @@ npm run dev         # http://localhost:3000
 | `carlos@demo.test` | Fletero (camioneta, Barrio Norte) | Feed de solicitudes cercanas y chat con Ana |
 | `soledad@demo.test` | Fletera (auto) | Flete confirmado con Ana, que avanza en vivo |
 | `diego@demo.test` | Fletero nuevo | Onboarding sin terminar |
-| `admin@demo.test` | Administración | Usuarios, verificación de fleteros y reclamos |
+| `admin@demo.test` | Administración | Verificación de fleteros (documentos), cuentas, denuncias y pedidos |
 
 ## Recorrido
 
@@ -42,7 +42,7 @@ npm run dev         # http://localhost:3000
 3. Intentar abrir `/admin` como cliente → vuelve a su área (**autorización por rol**).
 
 ### 2. Perfil del cliente y búsqueda de fleteros (3 min)
-1. Como **ana** → *Perfil*: datos y **dirección habitual** con mapa.
+1. Como **ana** → *Perfil* (Mi cuenta): datos y **dirección habitual** con mapa.
 2. *Fleteros*: por defecto mide la **distancia desde la dirección habitual** y muestra solo los
    que **llegan a ese punto** con su radio. Cada tarjeta muestra distancia, calificación, fletes
    hechos y precio mínimo.
@@ -54,11 +54,14 @@ npm run dev         # http://localhost:3000
    fleteros sin distancia.
 
 ### 3. Solicitud y presupuestos (3 min)
-1. Como **ana** → *Publicar un flete*: origen y destino con autocompletado y mapa, fecha y
-   franja, **inventario** con cantidades, medidas, ítems frágiles y fotos.
-2. En el otro navegador, como **carlos** → *Solicitudes*: el feed muestra solo lo que está
+1. Como **ana** → *Nuevo pedido*, en 5 pasos: tipo, origen y destino con autocompletado y mapa
+   (la **distancia** se calcula sola), **inventario** con cantidades y medidas, fecha y franja, y
+   extras (ayudantes, **embalaje**). Al publicar, sumar fotos.
+2. En el otro navegador, como **carlos** → *Pedidos disponibles* (con filtros de zona, fecha y
+   tipo): el feed muestra solo lo que está
    **dentro de su radio** y entra en sus vehículos, con la dirección aproximada (sin altura).
-3. Carlos abre la solicitud, ve el **precio sugerido**, lo ajusta y envía el presupuesto.
+3. Carlos abre el pedido, ve el **precio sugerido**, lo ajusta, pone la **hora de llegada** y
+   envía el presupuesto.
 4. Ana ve el presupuesto **al instante** (notificación) y en *Mudanza de monoambiente*
    **compara** los tres presupuestos lado a lado.
 
@@ -86,8 +89,9 @@ npm run dev         # http://localhost:3000
 3. Descargar el **comprobante en PDF**.
 
 ### 7. Administración (1 min)
-1. Como **admin** → *Reclamos*: resolver un reclamo (lo ven las dos partes).
-2. *Usuarios*: **verificar** a un fletero (aparece la insignia) o desactivar una cuenta.
+1. Como **admin** → *Reportes*: resolver una denuncia (lo ven las dos partes).
+2. *Fleteros*: revisar los **documentos** y **verificar** a un fletero (aparece la insignia);
+   en *Todas las cuentas*, desactivar una.
 
 ### 8. Seguridad y cuenta (1 min)
 1. Como **rocio** → *Perfil* → *Contraseña*: al cambiarla se **cierran todas sus sesiones**

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
+    "dev:local": "tsx test/e2e/servidor.ts --puerto 3000",
+    "preview": "next build && next start",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

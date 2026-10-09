@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, CalendarClock, FileText, MessageCircle, Truck } from "lucide-react";
+import { Bell } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,7 @@ import { useChat } from "@/features/chat/components/chat-provider";
 import { formatearFechaHora } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { marcarNotificacionesLeidas } from "../actions";
-
-const ICONO = {
-  MENSAJE: MessageCircle,
-  PRESUPUESTO: FileText,
-  FLETE: Truck,
-  PROPUESTA: CalendarClock,
-} as const;
+import { ICONO_NOTIFICACION as ICONO } from "./lista-notificaciones";
 
 /** Campana con las notificaciones dentro de la app. Se actualiza en vivo (o por consultas). */
 export function CampanaNotificaciones() {
@@ -68,13 +63,13 @@ export function CampanaNotificaciones() {
         aria-expanded={abierta}
         aria-controls={panelId}
         onClick={() => setAbierta((a) => !a)}
-        className="relative"
+        className="relative hover:bg-white/10 focus-visible:ring-accent focus-visible:ring-offset-0"
       >
         <Bell aria-hidden="true" />
         <span className="sr-only">Notificaciones{noLeidas > 0 ? `, ${noLeidas} sin leer` : ""}</span>
         {noLeidas > 0 ? (
           <span
-            className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground"
+            className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground"
             aria-hidden="true"
           >
             {noLeidas > 9 ? "9+" : noLeidas}
@@ -86,7 +81,7 @@ export function CampanaNotificaciones() {
           id={panelId}
           role="region"
           aria-label="Notificaciones"
-          className="fixed inset-x-2 top-16 z-40 max-h-[70vh] overflow-y-auto rounded-lg border bg-popover shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-96"
+          className="fixed inset-x-2 top-16 z-40 max-h-[70vh] overflow-y-auto rounded-xl border bg-popover text-popover-foreground shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-96"
         >
           <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
             <h2 className="font-bold">Notificaciones</h2>
@@ -135,6 +130,13 @@ export function CampanaNotificaciones() {
               })}
             </ul>
           )}
+          <Link
+            href="/notificaciones"
+            onClick={() => setAbierta(false)}
+            className="block border-t px-4 py-3 text-center text-sm font-semibold text-primary hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            Ver todas las notificaciones
+          </Link>
         </div>
       ) : null}
     </div>

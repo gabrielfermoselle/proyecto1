@@ -4,7 +4,10 @@
 // valor lo pone la base, así `migrate dev` no intenta tocarlas. Los CHECK y los índices GIST también viven en SQL.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  /// Las relaciones de cada consulta se resuelven con JOIN en una sola ida a la base (sin esto,
+  /// Prisma hace una consulta por relación: con la base lejos, cada una suma ~165 ms).
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -125,32 +128,32 @@ enum EstadoReclamo {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  passwordHash      String
-  nombre            String             @db.VarChar(60)
-  apellido          String             @db.VarChar(60)
+  id                      String              @id @default(cuid())
+  email                   String              @unique
+  passwordHash            String
+  nombre                  String              @db.VarChar(60)
+  apellido                String              @db.VarChar(60)
   /// Nunca se expone a la otra parte: la coordinación es por el chat.
-  telefono          String?            @db.VarChar(20)
-  avatarUrl         String?
-  rol               Rol
-  activo            Boolean            @default(true)
+  telefono                String?             @db.VarChar(20)
+  avatarUrl               String?
+  rol                     Rol
+  activo                  Boolean             @default(true)
   /// Último cambio de contraseña: las sesiones iniciadas antes dejan de valer (ver domain/sesion.ts).
   credencialesCambiadasEn DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  clienteProfile    ClienteProfile?
-  fleteroProfile    FleteroProfile?
-  mensajes          Mensaje[]
-  cambiosEstado     EstadoFlete[]
-  notificaciones    Notificacion[]
-  propuestas        PropuestaHorario[] @relation("PropuestaPor")
-  respuestas        PropuestaHorario[] @relation("RespondidaPor")
-  controles         ControlItem[]
-  reclamos          Reclamo[]          @relation("ReclamoAutor")
-  reclamosResueltos Reclamo[]          @relation("ReclamoResueltoPor")
-  conformidades     Conformidad[]
-  tokensRecuperacion TokenRecuperacion[]
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  clienteProfile          ClienteProfile?
+  fleteroProfile          FleteroProfile?
+  mensajes                Mensaje[]
+  cambiosEstado           EstadoFlete[]
+  notificaciones          Notificacion[]
+  propuestas              PropuestaHorario[]  @relation("PropuestaPor")
+  respuestas              PropuestaHorario[]  @relation("RespondidaPor")
+  controles               ControlItem[]
+  reclamos                Reclamo[]           @relation("ReclamoAutor")
+  reclamosResueltos       Reclamo[]           @relation("ReclamoResueltoPor")
+  conformidades           Conformidad[]
+  tokensRecuperacion      TokenRecuperacion[]
 
   @@map("users")
 }
@@ -215,10 +218,33 @@ model FleteroProfile {
   fletes                 Flete[]
   conversaciones         Conversacion[]
   calificaciones         Calificacion[]
+  documentos             DocumentoFletero[]
 
   @@index([disponible, ratingPromedio])
   @@index([baseGeo], map: "fletero_profiles_baseGeo_gix", type: Gist)
   @@map("fletero_profiles")
+}
+
+/// Documentación que el fletero sube para que la administración lo verifique.
+enum TipoDocumento {
+  DNI_FRENTE
+  DNI_DORSO
+  LICENCIA
+  SEGURO
+}
+
+/// Una foto por tipo: subir otra reemplaza la anterior. Bucket privado; solo la ven el
+/// fletero y la administración.
+model DocumentoFletero {
+  id        String         @id @default(cuid())
+  fleteroId String
+  fletero   FleteroProfile @relation(fields: [fleteroId], references: [id], onDelete: Cascade)
+  tipo      TipoDocumento
+  ruta      String         @unique
+  createdAt DateTime       @default(now())
+
+  @@unique([fleteroId, tipo])
+  @@map("documentos_fletero")
 }
 
 model Vehiculo {
@@ -271,7 +297,11 @@ model Solicitud {
   franja               FranjaHoraria
   tipoVehiculoSugerido TipoVehiculo?
   ayudantesRequeridos  Int                                   @default(0)
+  /// Extra pedido por el cliente: que el fletero lleve material de embalaje.
+  requiereEmbalaje     Boolean                               @default(false)
   estado               EstadoSolicitud                       @default(ABIERTA)
+  /// Solo si el cliente la canceló: lo ven los fleteros que la habían presupuestado.
+  motivoCancelacion    String?                               @db.VarChar(300)
   createdAt            DateTime                              @default(now())
   updatedAt            DateTime                              @updatedAt
   items                ItemInventario[]
@@ -354,6 +384,8 @@ model Presupuesto {
   montoSugerido    Decimal           @db.Decimal(12, 2)
   incluyeAyudantes Int               @default(0)
   mensaje          String?           @db.VarChar(500)
+  /// Hora estimada de llegada al origen ("HH:MM", hora de Tucumán), dentro de la franja pedida.
+  horaLlegada      String?           @db.VarChar(5)
   validoHasta      DateTime
   estado           EstadoPresupuesto @default(PENDIENTE)
   createdAt        DateTime          @default(now())

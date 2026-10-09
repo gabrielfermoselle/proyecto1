@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { VALIDECES } from "@/domain/presupuesto";
+import { FORMATO_HORA, VALIDECES } from "@/domain/presupuesto";
 
 const id = z.string().min(1).max(40);
 
@@ -15,6 +15,11 @@ export const presupuestoSchema = z.object({
     .min(1_000, "El monto mínimo es $1.000")
     .max(50_000_000, "Revisá el monto"),
   ayudantes: z.coerce.number().int().min(0).max(10, "Hasta 10 ayudantes"),
+  /** Opcional: a qué hora llega al origen. Se valida contra la franja en el servidor. */
+  horaLlegada: z
+    .union([z.literal(""), z.string().regex(FORMATO_HORA, "Usá el formato HH:MM, ej. 09:30")])
+    .optional()
+    .transform((v) => (v ? v : null)),
   validez: z.enum(VALIDECES, { errorMap: () => ({ message: "Elegí hasta cuándo vale el presupuesto" }) }),
   mensaje: z
     .string()

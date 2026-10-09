@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ETIQUETA_ETAPA, FRANJA } from "@/domain/catalogos";
 import { VehiculoIcono } from "@/features/fleteros/components/vehiculo-icono";
+import { hrefPedido } from "@/features/fletes/rutas";
 import { formatearPesos } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import type { TurnoAgenda } from "../queries";
@@ -19,7 +20,7 @@ export function TurnoCard({
   return (
     <article
       className={cn(
-        "relative grid gap-1 rounded-lg border-2 bg-card p-3 shadow-sm focus-within:ring-2 focus-within:ring-ring",
+        "relative grid gap-1 rounded-lg border-2 bg-card p-3 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring hover:shadow-md",
         enConflicto ? "border-destructive" : "border-transparent",
       )}
     >
@@ -36,7 +37,7 @@ export function TurnoCard({
       </div>
       <h3 className={cn("font-bold leading-snug", compacto && "text-sm")}>
         <Link
-          href={`/fletero/fletes/${turno.id}`}
+          href={hrefPedido("FLETERO", turno.solicitudId)}
           className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none"
         >
           {turno.titulo}

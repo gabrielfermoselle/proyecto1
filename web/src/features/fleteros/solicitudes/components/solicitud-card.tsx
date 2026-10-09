@@ -1,102 +1,106 @@
-import { AlertTriangle, ArrowRight, CalendarDays, MapPin, Package, Route, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, Package, Users } from "lucide-react";
 import Link from "next/link";
+import { TipoFleteIcono } from "@/components/shared/tipo-flete-icono";
 import { Badge } from "@/components/ui/badge";
 import { ETIQUETA_TIPO_FLETE, FRANJA } from "@/domain/catalogos";
 import { fechaIsoAr, sumarDias } from "@/domain/fechas";
+import { hrefPedido } from "@/features/fletes/rutas";
 import { formatearDia, formatearKg, formatearKm, formatearM3, formatearPesos } from "@/lib/formato";
+import { cn } from "@/lib/utils";
 import type { TarjetaSolicitud } from "../queries";
 
+/**
+ * Un pedido disponible, en una fila: qué es, de dónde a dónde, cuándo, a cuánto de tu base y
+ * [Ver]. En el celular se apila.
+ */
 export function SolicitudCard({ solicitud: s }: { solicitud: TarjetaSolicitud }) {
   const hoy = fechaIsoAr();
   const urgente = s.fecha === hoy || s.fecha === sumarDias(hoy, 1);
+  const href = hrefPedido("FLETERO", s.id);
 
   return (
-    <article className="relative grid gap-3 rounded-lg border bg-card p-4 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring hover:shadow-md">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="muted">{ETIQUETA_TIPO_FLETE[s.tipoFlete]}</Badge>
-        {s.itemsSinMedidas > 0 ? (
-          <Badge variant="warning">
-            <AlertTriangle aria-hidden="true" />
-            Medidas incompletas
-          </Badge>
-        ) : null}
-        {s.miMonto !== null ? (
-          <Badge variant="success">Tu presupuesto: {formatearPesos(s.miMonto)}</Badge>
-        ) : null}
+    <article className="group relative grid gap-3 rounded-xl border bg-card p-4 shadow-sm transition-[border-color,box-shadow] focus-within:ring-2 focus-within:ring-ring hover:border-primary/40 hover:shadow-md lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.3fr)_9rem_6rem_auto] lg:items-center lg:gap-5 lg:py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <TipoFleteIcono tipo={s.tipoFlete} />
+        <div className="grid min-w-0 gap-0.5">
+          <h2 className="truncate font-bold leading-snug">
+            <Link
+              href={href}
+              className="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
+            >
+              {s.titulo}
+            </Link>
+          </h2>
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            {ETIQUETA_TIPO_FLETE[s.tipoFlete]}
+            <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1">
+              <Package className="size-3.5" aria-hidden="true" />
+              {s.cantidadItems} {s.cantidadItems === 1 ? "ítem" : "ítems"} · {formatearKg(s.pesoTotalKg)} ·{" "}
+              {formatearM3(s.volumenTotalM3)}
+            </span>
+          </p>
+        </div>
       </div>
 
-      <h2 className="text-lg font-bold leading-snug">
-        <Link
-          href={`/fletero/solicitudes/${s.id}`}
-          className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none"
+      <p className="grid min-w-0 gap-0.5 text-sm">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+          <span className="truncate">{s.zonaOrigen}</span>
+        </span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="size-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+          <span className="sr-only">hasta </span>
+          <span className="truncate">{s.zonaDestino}</span>
+        </span>
+      </p>
+
+      <div className="flex gap-8 lg:contents">
+        <p className={cn("text-sm", urgente && "font-semibold text-primary")}>
+          <span className="block">{formatearDia(s.fecha, { hoy })}</span>
+          <span className="text-muted-foreground">{FRANJA[s.franja].etiqueta}</span>
+        </p>
+
+        <p className="text-sm">
+          <span className="font-heading text-lg font-extrabold tabular-nums">
+            {formatearKm(s.distanciaBaseKm)}
+          </span>
+          <span className="block text-muted-foreground">de tu base</span>
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
+        <div className="flex flex-wrap gap-1.5 lg:hidden xl:flex">
+          {s.itemsSinMedidas > 0 ? (
+            <Badge variant="warning">
+              <AlertTriangle aria-hidden="true" />
+              Sin medidas
+            </Badge>
+          ) : null}
+          {s.ayudantesRequeridos > 0 ? (
+            <Badge variant="muted">
+              <Users aria-hidden="true" />
+              {s.ayudantesRequeridos}
+            </Badge>
+          ) : null}
+          {s.requiereEmbalaje ? <Badge variant="muted">Embalaje</Badge> : null}
+          {s.miMonto !== null ? (
+            <Badge variant="success">Tu presupuesto: {formatearPesos(s.miMonto)}</Badge>
+          ) : null}
+          {s.presupuestosRecibidos > 0 ? (
+            <Badge variant="outline">
+              {s.presupuestosRecibidos} {s.presupuestosRecibidos === 1 ? "presupuesto" : "presupuestos"}
+            </Badge>
+          ) : null}
+        </div>
+        <span
+          aria-hidden="true"
+          className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors group-hover:bg-primary/90"
         >
-          {s.titulo}
-        </Link>
-      </h2>
-
-      <p className="flex items-start gap-2 text-sm">
-        <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span>
-          {s.zonaOrigen}
-          <ArrowRight className="mx-1 inline size-3.5 text-muted-foreground" aria-label="hasta" />
-          {s.zonaDestino}
+          Ver
+          <ArrowRight className="size-4" />
         </span>
-      </p>
-
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
-        <div className="flex items-center gap-2">
-          <dt>
-            <CalendarDays className="size-4 text-muted-foreground" aria-hidden="true" />
-            <span className="sr-only">Fecha</span>
-          </dt>
-          <dd className={urgente ? "font-semibold text-primary" : undefined}>
-            {formatearDia(s.fecha, { hoy })} · {FRANJA[s.franja].etiqueta}
-          </dd>
-        </div>
-        <div className="flex items-center gap-2">
-          <dt>
-            <Route className="size-4 text-muted-foreground" aria-hidden="true" />
-            <span className="sr-only">Distancia</span>
-          </dt>
-          <dd>
-            <strong>a {formatearKm(s.distanciaBaseKm)}</strong> de tu base · recorrido ~
-            {formatearKm(s.recorridoKm)}
-          </dd>
-        </div>
-        <div className="flex items-center gap-2">
-          <dt>
-            <Package className="size-4 text-muted-foreground" aria-hidden="true" />
-            <span className="sr-only">Carga</span>
-          </dt>
-          <dd>
-            {s.cantidadItems} {s.cantidadItems === 1 ? "ítem" : "ítems"} · {formatearKg(s.pesoTotalKg)} ·{" "}
-            {formatearM3(s.volumenTotalM3)}
-            {s.itemsFragiles > 0 ? ` · ${s.itemsFragiles} frágil${s.itemsFragiles > 1 ? "es" : ""}` : ""}
-          </dd>
-        </div>
-        {s.ayudantesRequeridos > 0 ? (
-          <div className="flex items-center gap-2">
-            <dt>
-              <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="sr-only">Ayudantes</span>
-            </dt>
-            <dd>
-              Pide {s.ayudantesRequeridos} ayudante{s.ayudantesRequeridos > 1 ? "s" : ""}
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-
-      <p className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-sm text-muted-foreground">
-        <span>
-          {s.vehiculoSugerido ? `Entra en tu ${s.vehiculoSugerido}` : "Revisá si entra en tus vehículos"}
-        </span>
-        <span>
-          {s.presupuestosRecibidos === 0
-            ? "Sin presupuestos todavía"
-            : `${s.presupuestosRecibidos} presupuesto${s.presupuestosRecibidos > 1 ? "s" : ""} recibido${s.presupuestosRecibidos > 1 ? "s" : ""}`}
-        </span>
-      </p>
+      </div>
     </article>
   );
 }

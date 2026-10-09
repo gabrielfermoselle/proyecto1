@@ -1,8 +1,18 @@
 import type { Rol } from "@prisma/client";
 
-/** Página del flete de cada parte: la gestión del fletero o el seguimiento del cliente. */
-export const hrefFlete = (rol: Extract<Rol, "CLIENTE" | "FLETERO">, fleteId: string) =>
-  `${rol === "CLIENTE" ? "/cliente" : "/fletero"}/fletes/${fleteId}`;
+type RolPedido = Extract<Rol, "CLIENTE" | "FLETERO">;
+
+/**
+ * Página del pedido de cada parte, por el id de la solicitud: antes de aceptar muestra los
+ * presupuestos (cliente) o el formulario para presupuestar (fletero); después, el flete.
+ */
+export const hrefPedido = (rol: RolPedido, solicitudId: string) =>
+  `${rol === "CLIENTE" ? "/cliente" : "/fletero"}/pedido/${solicitudId}`;
+
+/** Patrón de la página del pedido, para `revalidatePath(…, "page")`. */
+export const patronPedido = (rol: RolPedido) => `${rol === "CLIENTE" ? "/cliente" : "/fletero"}/pedido/[id]`;
+
+export const hrefCalificar = (solicitudId: string) => `/cliente/pedido/${solicitudId}/calificar`;
 
 export const hrefComprobante = (fleteId: string) => `/api/fletes/${fleteId}/comprobante`;
 

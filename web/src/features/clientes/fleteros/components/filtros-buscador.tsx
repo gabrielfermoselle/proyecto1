@@ -29,7 +29,12 @@ const ETIQUETA_RADIO: Record<ParametrosBuscadorUrl["radio"], string> = {
 };
 
 /** Formulario GET: los filtros quedan en la URL (se pueden compartir y volver atrás). */
-export function FiltrosBuscador({ valores, referenciaAplicada, direccionHabitual, solicitudes }: FiltrosBuscadorProps) {
+export function FiltrosBuscador({
+  valores,
+  referenciaAplicada,
+  direccionHabitual,
+  solicitudes,
+}: FiltrosBuscadorProps) {
   const [ref, setRef] = useState<Referencia>(referenciaAplicada);
   const [escrita, setEscrita] = useState(
     valores.ref === "direccion" && valores.lat !== undefined && valores.lng !== undefined
@@ -86,7 +91,10 @@ export function FiltrosBuscador({ valores, referenciaAplicada, direccionHabitual
             ) : (
               <>
                 Todavía no cargaste tu dirección.{" "}
-                <Link href="/cliente/perfil#direccion" className="font-semibold text-primary underline-offset-4 hover:underline">
+                <Link
+                  href="/perfil#direccion"
+                  className="font-semibold text-primary underline-offset-4 hover:underline"
+                >
                   Cargala en tu perfil
                 </Link>{" "}
                 para ver primero a los más cercanos.

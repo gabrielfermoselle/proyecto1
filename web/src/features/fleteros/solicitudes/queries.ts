@@ -19,6 +19,7 @@ import {
   consultaAccesoSolicitud,
   consultaConteosFeed,
   consultaFeed,
+  type FiltrosFeed,
   type FilaFeed,
   type OrdenFeed,
   type TabFeed,
@@ -60,6 +61,7 @@ function aTarjeta(fila: FilaFeed, vehiculos: VehiculoActivo[]) {
     cantidadItems: fila.cantidadItems,
     itemsFragiles: fila.itemsFragiles,
     ayudantesRequeridos: fila.ayudantesRequeridos,
+    requiereEmbalaje: fila.requiereEmbalaje,
     presupuestosRecibidos: fila.presupuestosRecibidos,
     miMonto: fila.miMonto,
     vehiculoSugerido: sugerido ? `${sugerido.marca} ${sugerido.modelo}` : null,
@@ -70,13 +72,20 @@ export type TarjetaSolicitud = ReturnType<typeof aTarjeta>;
 
 export async function getFeed(
   fleteroId: string,
-  opciones: { tab: TabFeed; orden: OrdenFeed; pagina: number },
+  opciones: { tab: TabFeed; orden: OrdenFeed; pagina: number; filtros?: FiltrosFeed },
 ) {
   const hoy = fechaIsoAr();
   const limite = POR_PAGINA * opciones.pagina;
   const [filas, conteos, perfil, vehiculos] = await Promise.all([
     prisma.$queryRaw<FilaFeed[]>(
-      consultaFeed({ fleteroId, hoy, tab: opciones.tab, orden: opciones.orden, limite: limite + 1 }),
+      consultaFeed({
+        fleteroId,
+        hoy,
+        tab: opciones.tab,
+        orden: opciones.orden,
+        limite: limite + 1,
+        ...(opciones.filtros ? { filtros: opciones.filtros } : {}),
+      }),
     ),
     prisma.$queryRaw<{ nuevas: number; presupuestadas: number }[]>(consultaConteosFeed({ fleteroId, hoy })),
     prisma.fleteroProfile.findUniqueOrThrow({
@@ -138,6 +147,8 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
         volumenTotalM3: true,
         itemsSinMedidas: true,
         ayudantesRequeridos: true,
+        requiereEmbalaje: true,
+        motivoCancelacion: true,
         tipoVehiculoSugerido: true,
         createdAt: true,
         cliente: { select: { user: { select: { nombre: true, apellido: true } } } },
@@ -167,6 +178,7 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
             validoHasta: true,
             mensaje: true,
             incluyeAyudantes: true,
+            horaLlegada: true,
           },
         },
         _count: { select: { presupuestos: { where: { estado: "PENDIENTE" } } } },
@@ -239,6 +251,8 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
     distanciaBaseKm: acceso.distanciaBaseKm,
     carga,
     ayudantesRequeridos: s.ayudantesRequeridos,
+    requiereEmbalaje: s.requiereEmbalaje,
+    motivoCancelacion: s.motivoCancelacion,
     tipoVehiculoSugerido: s.tipoVehiculoSugerido,
     fotos: fotos.flatMap(({ ruta, ...f }) => {
       const url = urlsFotos.get(ruta);

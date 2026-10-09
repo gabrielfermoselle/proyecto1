@@ -1,6 +1,6 @@
 import "server-only";
 import { fechaIsoAr } from "@/domain/fechas";
-import { hrefFlete } from "@/features/fletes/rutas";
+import { hrefPedido } from "@/features/fletes/rutas";
 import { eliminarArchivos, type Bucket } from "@/features/uploads/storage";
 import { prisma } from "@/lib/prisma";
 import { consultaLimpiar } from "@/lib/limite-tasa-sql";
@@ -31,7 +31,7 @@ export async function vencerSolicitudes(hoy: string = fechaIsoAr()) {
         tipo: "PRESUPUESTO" as const,
         titulo: "Tu solicitud venció sin elegir presupuesto",
         cuerpo: s.titulo,
-        href: `/cliente/solicitudes/${s.id}`,
+        href: hrefPedido("CLIENTE", s.id),
         clave: `solicitud-vencida:${s.id}`,
       })),
       skipDuplicates: true,
@@ -53,6 +53,7 @@ export async function avisarFletesDemorados(hoy: string = fechaIsoAr()) {
     },
     select: {
       id: true,
+      solicitudId: true,
       solicitud: { select: { titulo: true } },
       cliente: { select: { userId: true } },
       fletero: { select: { userId: true } },
@@ -66,7 +67,7 @@ export async function avisarFletesDemorados(hoy: string = fechaIsoAr()) {
         tipo: "FLETE" as const,
         titulo: "Tu flete quedó sin hacer: hablalo con el fletero o cancelalo",
         cuerpo: f.solicitud.titulo,
-        href: hrefFlete("CLIENTE", f.id),
+        href: hrefPedido("CLIENTE", f.solicitudId),
         clave: `flete-demorado:${f.id}`,
       },
       {
@@ -74,7 +75,7 @@ export async function avisarFletesDemorados(hoy: string = fechaIsoAr()) {
         tipo: "FLETE" as const,
         titulo: "Un flete tuyo quedó sin hacer: avanzalo o cancelalo",
         cuerpo: f.solicitud.titulo,
-        href: hrefFlete("FLETERO", f.id),
+        href: hrefPedido("FLETERO", f.solicitudId),
         clave: `flete-demorado:${f.id}`,
       },
     ]),

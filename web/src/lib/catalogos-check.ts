@@ -10,6 +10,7 @@ import type {
   FranjaHoraria,
   ResultadoControl,
   Rol,
+  TipoDocumento,
   TipoFlete,
   TipoVehiculo,
 } from "@prisma/client";
@@ -30,4 +31,5 @@ export type _Verificaciones = [
   Afirmar<Iguales<FaseControl, Catalogos.FaseControl>>,
   Afirmar<Iguales<ResultadoControl, Catalogos.ResultadoControl>>,
   Afirmar<Iguales<EstadoReclamo, Catalogos.EstadoReclamo>>,
+  Afirmar<Iguales<TipoDocumento, Catalogos.TipoDocumento>>,
 ];

@@ -8,6 +8,18 @@ import { prisma } from "@/lib/prisma";
 
 // Solicitudes del cliente: siempre filtradas por su clienteId (si no es suya, no existe).
 
+/** Presupuestos vigentes de un pedido abierto: cuántos hay y desde cuánto. */
+function resumenPresupuestos(pendientes: { monto: { toNumber(): number }; validoHasta: Date }[]) {
+  const ahora = new Date();
+  const vigentes = pendientes
+    .filter((p) => !estaVencido(p.validoHasta, ahora))
+    .map((p) => p.monto.toNumber());
+  return {
+    presupuestosPendientes: vigentes.length,
+    presupuestoMinimo: vigentes.length > 0 ? Math.min(...vigentes) : null,
+  };
+}
+
 export async function getSolicitudesDelCliente(clienteId: string) {
   const filas = await prisma.solicitud.findMany({
     where: { clienteId },
@@ -23,8 +35,12 @@ export async function getSolicitudesDelCliente(clienteId: string) {
       origenDireccion: true,
       destinoDireccion: true,
       createdAt: true,
-      flete: { select: { id: true, etapa: true } },
-      _count: { select: { items: true, presupuestos: { where: { estado: "PENDIENTE" } } } },
+      distanciaKm: true,
+      flete: {
+        select: { id: true, etapa: true, precioAcordado: true, calificacion: { select: { id: true } } },
+      },
+      presupuestos: { where: { estado: "PENDIENTE" }, select: { monto: true, validoHasta: true } },
+      _count: { select: { items: true } },
     },
   });
   return filas.map((s) => ({
@@ -36,9 +52,17 @@ export async function getSolicitudesDelCliente(clienteId: string) {
     franja: s.franja,
     origen: s.origenDireccion,
     destino: s.destinoDireccion,
+    distanciaKm: s.distanciaKm.toNumber(),
     items: s._count.items,
-    presupuestosPendientes: s._count.presupuestos,
-    flete: s.flete,
+    ...resumenPresupuestos(s.presupuestos),
+    flete: s.flete
+      ? {
+          id: s.flete.id,
+          etapa: s.flete.etapa,
+          precioAcordado: s.flete.precioAcordado.toNumber(),
+          calificado: s.flete.calificacion !== null,
+        }
+      : null,
   }));
 }
 
@@ -77,6 +101,8 @@ export async function getSolicitudDelCliente(clienteId: string, solicitudId: str
       volumenTotalM3: true,
       itemsSinMedidas: true,
       ayudantesRequeridos: true,
+      requiereEmbalaje: true,
+      motivoCancelacion: true,
       tipoVehiculoSugerido: true,
       createdAt: true,
       fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
@@ -106,6 +132,7 @@ export async function getSolicitudDelCliente(clienteId: string, solicitudId: str
           validoHasta: true,
           mensaje: true,
           incluyeAyudantes: true,
+          horaLlegada: true,
           createdAt: true,
           vehiculo: { select: { tipo: true, marca: true, modelo: true } },
           fletero: {
@@ -177,6 +204,8 @@ export async function getSolicitudDelCliente(clienteId: string, solicitudId: str
       itemsSinMedidas: s.itemsSinMedidas,
     },
     ayudantesRequeridos: s.ayudantesRequeridos,
+    requiereEmbalaje: s.requiereEmbalaje,
+    motivoCancelacion: s.motivoCancelacion,
     tipoVehiculoSugerido: s.tipoVehiculoSugerido,
     fotos: fotos(s.fotos),
     items: s.items.map((i) => ({
@@ -199,6 +228,7 @@ export async function getSolicitudDelCliente(clienteId: string, solicitudId: str
       validoHasta: p.validoHasta,
       mensaje: p.mensaje,
       ayudantes: p.incluyeAyudantes,
+      horaLlegada: p.horaLlegada,
       vehiculo: p.vehiculo,
       fletero: {
         id: p.fletero.id,

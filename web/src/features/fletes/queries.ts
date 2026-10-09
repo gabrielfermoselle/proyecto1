@@ -1,4 +1,5 @@
 import "server-only";
+import { contactoVisible } from "@/domain/chat";
 import type { EstadoInicialItem, EtapaFlete, ResultadoControl, Rol } from "@prisma/client";
 import {
   esEtapaEnMovimiento,
@@ -78,8 +79,12 @@ const SELECT_LUGAR = {
 
 const comoRol = (rol: Rol): RolChat => (rol === "CLIENTE" ? "CLIENTE" : "FLETERO");
 
+/**
+ * Detalle del flete para una de sus partes, por su id o por el de su solicitud (así la página del
+ * pedido lo pide en paralelo con la solicitud). `null` si no existe o no participa.
+ */
 export async function getFleteDetalle(
-  fleteId: string,
+  ref: string | { solicitudId: string },
   usuario: UsuarioActual,
   { firmarFotos = true }: { firmarFotos?: boolean } = {},
 ) {
@@ -87,7 +92,7 @@ export async function getFleteDetalle(
   if (!perfil) return null;
   const f = await prisma.flete.findFirst({
     where: {
-      id: fleteId,
+      ...(typeof ref === "string" ? { id: ref } : { solicitudId: ref.solicitudId }),
       ...(perfil.rol === "CLIENTE" ? { clienteId: perfil.perfilId } : { fleteroId: perfil.perfilId }),
     },
     select: {
@@ -99,7 +104,7 @@ export async function getFleteDetalle(
       vehiculo: { select: { marca: true, modelo: true, tipo: true, patente: true } },
       presupuesto: { select: { incluyeAyudantes: true } },
       calificacion: { select: { puntaje: true, comentario: true, createdAt: true } },
-      fletero: { select: { user: { select: { nombre: true, apellido: true } } } },
+      fletero: { select: { user: { select: { nombre: true, apellido: true, telefono: true } } } },
       historial: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -153,7 +158,7 @@ export async function getFleteDetalle(
           franja: true,
           createdAt: true,
           ...SELECT_LUGAR,
-          cliente: { select: { user: { select: { nombre: true, apellido: true } } } },
+          cliente: { select: { user: { select: { nombre: true, apellido: true, telefono: true } } } },
           items: {
             orderBy: { orden: "asc" },
             select: {
@@ -261,9 +266,14 @@ export async function getFleteDetalle(
     id: f.id,
     etapa: f.etapa as EtapaFlete,
     miRol: perfil.rol,
+    fleteroId: f.fleteroId,
     cliente,
     fletero,
     contraparte: perfil.rol === "CLIENTE" ? fletero : cliente,
+    /** Con el flete confirmado (y no cancelado) las partes pueden hablar por WhatsApp o teléfono. */
+    telefonoContraparte: contactoVisible(f.etapa)
+      ? ((perfil.rol === "CLIENTE" ? f.fletero.user.telefono : s.cliente.user.telefono) ?? null)
+      : null,
     solicitudId: s.id,
     titulo: s.titulo,
     descripcion: s.descripcion,

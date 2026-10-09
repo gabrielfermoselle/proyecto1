@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, CalendarX, Minus, Plus } from "lucide-react";
+import { AlertTriangle, CalendarX, Minus, Package, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -41,8 +41,13 @@ interface PresupuestoFormProps {
   distanciaLinealKm: number;
   volumenM3: number;
   ayudantesRequeridos: number;
+  /** Franja que pidió el cliente: la hora de llegada tiene que caer adentro. */
+  franja: FranjaHoraria;
+  pideEmbalaje: boolean;
   conflictos: { id: string; titulo: string; franja: FranjaHoraria }[];
 }
+
+const dosDigitos = (n: number) => String(n).padStart(2, "0");
 
 export function PresupuestoForm(props: PresupuestoFormProps) {
   const { solicitudId, fechaFlete, vehiculos, tarifas, distanciaLinealKm, volumenM3, conflictos } = props;
@@ -66,6 +71,7 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
       monto: sugeridoPara(props.ayudantesRequeridos),
       ayudantes: props.ayudantesRequeridos,
       validez: "48h",
+      horaLlegada: "",
       mensaje: "",
     },
   });
@@ -208,6 +214,27 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
           </p>
         ) : null}
       </div>
+
+      <div className="grid gap-2">
+        <FormField
+          label="Hora de llegada (opcional)"
+          type="time"
+          min={`${dosDigitos(FRANJA[props.franja].desde)}:00`}
+          max={`${dosDigitos(FRANJA[props.franja].hasta)}:00`}
+          step={900}
+          className="max-w-[10rem]"
+          hint={`El cliente lo pidió para ${FRANJA[props.franja].etiqueta.toLowerCase()}.`}
+          error={errors.horaLlegada?.message}
+          {...register("horaLlegada")}
+        />
+      </div>
+
+      {props.pideEmbalaje ? (
+        <p className="flex items-start gap-2 rounded-lg bg-accent/15 px-3 py-2 text-sm">
+          <Package className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          El cliente pidió embalaje: si lo incluís, contalo en el mensaje.
+        </p>
+      ) : null}
 
       <fieldset className="grid gap-2">
         <legend className="mb-1 text-sm font-semibold">El presupuesto vale por</legend>

@@ -11,6 +11,7 @@ import {
   trayectoValido,
 } from "@/domain/solicitud";
 import { conEventos } from "@/features/chat/eventos";
+import { hrefPedido } from "@/features/fletes/rutas";
 import {
   BUCKET_PRIVADO,
   eliminarArchivos,
@@ -32,8 +33,8 @@ import {
 const NO_ENCONTRADA = "No encontramos esa solicitud.";
 
 function refrescar(solicitudId?: string) {
-  revalidatePath("/cliente/solicitudes");
-  if (solicitudId) revalidatePath(`/cliente/solicitudes/${solicitudId}`);
+  revalidatePath("/cliente");
+  if (solicitudId) revalidatePath(hrefPedido("CLIENTE", solicitudId));
 }
 
 /**
@@ -83,7 +84,7 @@ export const crearSolicitud = createClienteAction({
  */
 export const cancelarSolicitud = createClienteAction({
   schema: cancelarSolicitudSchema,
-  handler: async ({ solicitudId }, { clienteId }) => {
+  handler: async ({ solicitudId, motivo }, { clienteId }) => {
     await conEventos(async (tx, { emitir }) => {
       // Bloquea la solicitud: no puede aceptarse un presupuesto mientras se cancela.
       const [solicitud] = await tx.$queryRaw<{ id: string }[]>`
@@ -100,9 +101,17 @@ export const cancelarSolicitud = createClienteAction({
         where: { solicitudId, estado: "PENDIENTE" },
         data: { estado: "RECHAZADO" },
       });
-      await tx.solicitud.update({ where: { id: solicitudId }, data: { estado: "CANCELADA" } });
+      await tx.solicitud.update({
+        where: { id: solicitudId },
+        data: { estado: "CANCELADA", motivoCancelacion: motivo },
+      });
       for (const { fleteroId } of pendientes) {
-        await emitir({ solicitudId, fleteroId, evento: "SOLICITUD_CANCELADA", datos: {} });
+        await emitir({
+          solicitudId,
+          fleteroId,
+          evento: "SOLICITUD_CANCELADA",
+          datos: motivo ? { motivo } : {},
+        });
       }
     });
     refrescar(solicitudId);

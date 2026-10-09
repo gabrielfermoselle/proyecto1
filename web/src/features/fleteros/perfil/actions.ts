@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { primerPasoPendiente, PASOS_ONBOARDING, pasosCompletos } from "@/domain/onboarding";
 import {
+  BUCKET_PRIVADO,
   BUCKET_PUBLICO,
   eliminarArchivos,
   prepararSubida,
@@ -16,9 +17,11 @@ import { getPerfilFletero } from "./queries";
 import {
   datosSchema,
   disponibilidadSchema,
+  documentoSchema,
   estadoVehiculoSchema,
   fotoVehiculoSchema,
   tarifasSchema,
+  tipoDocumentoSchema,
   vehiculoEdicionSchema,
   vehiculoSchema,
   zonaSchema,
@@ -36,6 +39,7 @@ const VEHICULO_NO_ENCONTRADO = "No encontramos ese vehículo.";
 
 function refrescar() {
   revalidatePath("/fletero", "layout");
+  revalidatePath("/perfil");
 }
 
 export const guardarDatos = createFleteroAction({
@@ -206,6 +210,60 @@ export const eliminarFotoVehiculo = createFleteroAction({
     await prisma.foto.delete({ where: { id: foto.id } });
     await eliminarArchivos(BUCKET_PUBLICO, [foto.ruta]);
     refrescar();
+    return null;
+  },
+});
+
+// --- Documentos para la verificación (bucket privado: los ven el fletero y la administración) ---
+
+const carpetaDocumentos = (fleteroId: string) => `documentos/${fleteroId}`;
+
+export const firmarSubidaDocumento = createFleteroAction({
+  schema: tipoDocumentoSchema,
+  requiereOnboarding: false,
+  handler: async (_datos, { fleteroId }) => {
+    const subida = await prepararSubida(BUCKET_PRIVADO, carpetaDocumentos(fleteroId));
+    if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
+    return subida;
+  },
+});
+
+/** Guarda la foto de un documento; si ya había una de ese tipo, la reemplaza. */
+export const guardarDocumento = createFleteroAction({
+  schema: documentoSchema,
+  requiereOnboarding: false,
+  handler: async ({ tipo, ruta }, { fleteroId }) => {
+    if (!(await rutaSubidaValida(BUCKET_PRIVADO, ruta, carpetaDocumentos(fleteroId))))
+      throw new ActionError("La foto no es válida.");
+    const anterior = await prisma.documentoFletero.findUnique({
+      where: { fleteroId_tipo: { fleteroId, tipo } },
+      select: { ruta: true },
+    });
+    await prisma.documentoFletero.upsert({
+      where: { fleteroId_tipo: { fleteroId, tipo } },
+      create: { fleteroId, tipo, ruta },
+      update: { ruta, createdAt: new Date() },
+    });
+    if (anterior) await eliminarArchivos(BUCKET_PRIVADO, [anterior.ruta]);
+    refrescar();
+    revalidatePath("/admin/fleteros");
+    return null;
+  },
+});
+
+export const eliminarDocumento = createFleteroAction({
+  schema: tipoDocumentoSchema,
+  requiereOnboarding: false,
+  handler: async ({ tipo }, { fleteroId }) => {
+    const documento = await prisma.documentoFletero.findUnique({
+      where: { fleteroId_tipo: { fleteroId, tipo } },
+      select: { id: true, ruta: true },
+    });
+    if (!documento) throw new ActionError("No encontramos ese documento.");
+    await prisma.documentoFletero.delete({ where: { id: documento.id } });
+    await eliminarArchivos(BUCKET_PRIVADO, [documento.ruta]);
+    refrescar();
+    revalidatePath("/admin/fleteros");
     return null;
   },
 });
