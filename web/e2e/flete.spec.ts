@@ -119,7 +119,8 @@ async function avanzar(page: Page, boton: string, etapa: string, { firma = false
   } else {
     await dialogo.getByRole("button", { name: "Sí, confirmar" }).click();
   }
-  await expect(page.locator("#contenido").getByText(etapa)).toBeVisible();
+  // Pedir la ubicación puede tardar unos segundos antes de que la etapa quede guardada.
+  await expect(page.locator("#contenido").getByText(etapa)).toBeVisible({ timeout: 25_000 });
 }
 
 test("el fletero sale a buscar la carga y la cliente ve el avance", async () => {

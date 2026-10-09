@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ interface AccionEtapaProps {
  * pide la firma de conformidad cuando corresponde y, para el fletero, comparte su ubicación.
  */
 export function AccionEtapa({ fleteId, etapa, rol, resumen }: AccionEtapaProps) {
+  const router = useRouter();
   const [firmado, setFirmado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [estado, setEstado] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export function AccionEtapa({ fleteId, etapa, rol, resumen }: AccionEtapaProps) 
       return false;
     }
     setFirmado(false);
+    router.refresh();
     return true;
   }
 
