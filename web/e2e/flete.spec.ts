@@ -169,9 +169,10 @@ test("la cliente revisa lo que recibió, cierra el flete y califica", async () =
 
   await florencia.locator("#contenido").getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
   await expect(florencia).toHaveURL(/\/calificar$/);
-  // El radio es solo para lectores de pantalla: se toca la estrella (su label).
-  const cinco = florencia.locator("#contenido").getByRole("radio", { name: "5 estrellas: Excelente" });
-  await florencia.locator("#contenido").locator("label", { has: cinco }).click();
+  // El radio es solo para lectores de pantalla: se toca la estrella (el label que lo envuelve).
+  const contenido = florencia.locator("#contenido");
+  const cinco = contenido.getByRole("radio", { name: "5 estrellas: Excelente" });
+  await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click();
   await expect(cinco).toBeChecked();
   await florencia.locator("#contenido").getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
   const calificar = florencia.locator("#contenido").getByRole("button", { name: "Enviar calificación" });
