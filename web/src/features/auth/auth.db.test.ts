@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { cargarUsuario, error, ok } from "../../../test/db/fabrica";
+import { contar, insertar, uno, unoONull } from "../../../test/db/tabla";
 import { comoUsuario } from "../../../test/db/sesion";
 import { cambiarContrasena, registrarUsuario } from "./actions";
 import { ERROR_DEMASIADOS_INTENTOS } from "./schemas";
@@ -36,12 +36,9 @@ describe("registrarUsuario", () => {
     const datos = registro();
     expect(ok(await registrarUsuario(datos))).toEqual({ rol: "CLIENTE" });
 
-    const u = await prisma.user.findUniqueOrThrow({
-      where: { email: datos.email },
-      include: { clienteProfile: true, fleteroProfile: true },
-    });
-    expect(u.clienteProfile).not.toBeNull();
-    expect(u.fleteroProfile).toBeNull();
+    const u = await uno<{ id: string; passwordHash: string }>("usuarios", { email: datos.email });
+    expect(await unoONull("perfiles_cliente", { userId: u.id })).not.toBeNull();
+    expect(await unoONull("perfiles_fletero", { userId: u.id })).toBeNull();
     expect(u.passwordHash).not.toContain("clave1234");
     expect(await bcrypt.compare("clave1234", u.passwordHash)).toBe(true);
   });
@@ -50,24 +47,22 @@ describe("registrarUsuario", () => {
     const datos = registro({ rol: "FLETERO" });
     ok(await registrarUsuario(datos));
 
-    const u = await prisma.user.findUniqueOrThrow({
-      where: { email: datos.email },
-      include: { fleteroProfile: true },
-    });
+    const u = await uno<{ id: string; rol: string }>("usuarios", { email: datos.email });
+    const perfil = await uno<{ onboardingCompletadoEn: string | null }>("perfiles_fletero", { userId: u.id });
     expect(u.rol).toBe("FLETERO");
-    expect(u.fleteroProfile?.onboardingCompletadoEn).toBeNull();
+    expect(perfil.onboardingCompletadoEn).toBeNull();
   });
 
   it("nadie puede registrarse como administrador", async () => {
     const r = await registrarUsuario(registro({ rol: "ADMIN" }) as never);
     expect(campo(r, "rol")).toBeDefined();
-    expect(await prisma.user.count({ where: { rol: "ADMIN", nombre: "Lucía" } })).toBe(0);
+    expect(await contar("usuarios", { rol: "ADMIN", nombre: "Lucía" })).toBe(0);
   });
 
   it("normaliza el email y no permite duplicarlo cambiando mayúsculas o espacios", async () => {
     const email = emailUnico();
     ok(await registrarUsuario(registro({ email: `  ${email.toUpperCase()} ` })));
-    expect(await prisma.user.count({ where: { email } })).toBe(1);
+    expect(await contar("usuarios", { email })).toBe(1);
 
     const r = await registrarUsuario(registro({ email: email.replace("persona", "PERSONA") }));
     expect(campo(r, "email")).toEqual([expect.stringMatching(/Ya hay una cuenta con ese email/)]);
@@ -77,7 +72,7 @@ describe("registrarUsuario", () => {
     const datos = registro({ telefono: "(381) 411-2222" });
     ok(await registrarUsuario(datos));
 
-    expect((await prisma.user.findUniqueOrThrow({ where: { email: datos.email } })).telefono).toBe(
+    expect((await uno<{ telefono: string }>("usuarios", { email: datos.email })).telefono).toBe(
       "3814112222",
     );
   });
@@ -102,7 +97,7 @@ describe("registrarUsuario", () => {
 
     const datos = registro();
     expect(error(await registrarUsuario(datos))).toMatch(/muchas cuentas desde esta conexión/);
-    expect(await prisma.user.count({ where: { email: datos.email } })).toBe(0);
+    expect(await contar("usuarios", { email: datos.email })).toBe(0);
   });
 });
 
@@ -117,17 +112,15 @@ describe("login (authorize de NextAuth)", () => {
 
   async function cuenta(activo = true) {
     const email = emailUnico();
-    await prisma.user.create({
-      data: {
-        email,
-        passwordHash: await bcrypt.hash("clave1234", 4),
-        nombre: "Mario",
-        apellido: "Paz",
-        rol: "FLETERO",
-        activo,
-        fleteroProfile: { create: {} },
-      },
+    const usuario = await insertar<{ id: string }>("usuarios", {
+      email,
+      passwordHash: await bcrypt.hash("clave1234", 4),
+      nombre: "Mario",
+      apellido: "Paz",
+      rol: "FLETERO",
+      activo,
     });
+    await insertar("perfiles_fletero", { userId: usuario.id });
     return email;
   }
 
@@ -164,17 +157,14 @@ describe("login (authorize de NextAuth)", () => {
 
 describe("cambiarContrasena", () => {
   async function conClave(clave = "clave1234") {
-    const u = await prisma.user.create({
-      data: {
-        email: emailUnico(),
-        passwordHash: await bcrypt.hash(clave, 4),
-        nombre: "Rosa",
-        apellido: "Paz",
-        rol: "CLIENTE",
-        clienteProfile: { create: {} },
-      },
-      select: { id: true },
+    const u = await insertar<{ id: string }>("usuarios", {
+      email: emailUnico(),
+      passwordHash: await bcrypt.hash(clave, 4),
+      nombre: "Rosa",
+      apellido: "Paz",
+      rol: "CLIENTE",
     });
+    await insertar("perfiles_cliente", { userId: u.id });
     return cargarUsuario(u.id);
   }
   const cambio = (actual: string, nueva = "nueva12345") => ({ actual, nueva, confirmar: nueva });
@@ -186,10 +176,10 @@ describe("cambiarContrasena", () => {
 
     ok(await cambiarContrasena(cambio("clave1234")));
 
-    const guardado = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    const guardado = await uno<{ passwordHash: string; credencialesCambiadasEn: string }>("usuarios", { id: u.id });
     expect(await bcrypt.compare("nueva12345", guardado.passwordHash)).toBe(true);
     expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(false);
-    expect(guardado.credencialesCambiadasEn!.getTime()).toBeGreaterThanOrEqual(antes - 1000);
+    expect(new Date(guardado.credencialesCambiadasEn).getTime()).toBeGreaterThanOrEqual(antes - 1000);
   });
 
   it("con la actual incorrecta no cambia nada y marca el campo", async () => {
@@ -198,7 +188,7 @@ describe("cambiarContrasena", () => {
 
     const r = await cambiarContrasena(cambio("otra98765"));
     expect(campo(r, "actual")).toEqual(["La contraseña actual no es correcta."]);
-    const guardado = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    const guardado = await uno<{ passwordHash: string; credencialesCambiadasEn: string | null }>("usuarios", { id: u.id });
     expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(true);
     expect(guardado.credencialesCambiadasEn).toBeNull();
   });

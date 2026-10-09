@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
-import { prisma } from "@/lib/prisma";
+import { numero } from "@/lib/db";
 import {
   crearCliente,
   crearFletero,
@@ -11,6 +11,7 @@ import {
   presupuestar,
 } from "../../../test/db/fabrica";
 import { comoUsuario } from "../../../test/db/sesion";
+import { filas, uno } from "../../../test/db/tabla";
 import {
   avanzarEtapa,
   calificarFlete,
@@ -73,16 +74,21 @@ describe("flete de punta a punta por las acciones", () => {
     ok(await calificarFlete({ fleteId, puntaje: 4, comentario: "Bien, pero hubo un rayón" }));
     expect(error(await calificarFlete({ fleteId, puntaje: 5 }))).toMatch(/Ya calificaste/);
 
-    const flete = await prisma.flete.findUniqueOrThrow({
-      where: { id: fleteId },
-      select: {
-        etapa: true,
-        recepcionConfirmadaEn: true,
-        conformidades: { select: { rol: true } },
-        reclamos: { select: { descripcion: true } },
-        historial: { orderBy: { createdAt: "asc" }, select: { etapa: true, lat: true } },
-      },
-    });
+    const fila = await uno<{ etapa: string; recepcionConfirmadaEn: string | null }>("fletes", { id: fleteId });
+    const conformidades = await filas<{ rol: string }>("conformidades", { fleteId });
+    const reclamos = await filas<{ descripcion: string }>("reclamos", { fleteId });
+    const historial = await filas<{ etapa: string; lat: number | null }>(
+      "estados_flete",
+      { fleteId },
+      { columna: "createdAt" },
+    );
+    const flete = {
+      etapa: fila.etapa,
+      recepcionConfirmadaEn: fila.recepcionConfirmadaEn,
+      conformidades: conformidades.map((c) => ({ rol: c.rol })),
+      reclamos: reclamos.map((r) => ({ descripcion: r.descripcion })),
+      historial: historial.map((h) => ({ etapa: h.etapa, lat: h.lat })),
+    };
     expect(flete.etapa).toBe("CERRADO");
     expect(flete.recepcionConfirmadaEn).not.toBeNull();
     expect(flete.conformidades.map((c) => c.rol).sort()).toEqual(["CLIENTE", "FLETERO"]);
@@ -109,12 +115,11 @@ describe("flete de punta a punta por las acciones", () => {
       "FLETE_CERRADO",
     ]);
     // La calificación actualiza el promedio desnormalizado del perfil.
-    const perfil = await prisma.fleteroProfile.findUniqueOrThrow({
-      where: { id: fletero.fleteroProfile!.id },
-      select: { ratingPromedio: true, cantidadCalificaciones: true },
+    const perfil = await uno<{ ratingPromedio: unknown; cantidadCalificaciones: number }>("perfiles_fletero", {
+      id: fletero.fleteroProfile!.id,
     });
     expect(perfil.cantidadCalificaciones).toBe(1);
-    expect(perfil.ratingPromedio.toNumber()).toBe(4);
+    expect(numero(perfil.ratingPromedio)).toBe(4);
   });
 });
 
@@ -153,14 +158,14 @@ describe("autorización y reglas", () => {
     ok(await quitarControl({ fleteId, itemId: item, fase: "CARGA" }));
     comoUsuario(cliente);
     ok(await cancelarFlete({ fleteId, motivo: "Ya no lo necesito" }));
-    const final = await prisma.flete.findUniqueOrThrow({
-      where: { id: fleteId },
-      select: {
-        etapa: true,
-        solicitud: { select: { estado: true } },
-        historial: { where: { etapa: "CANCELADO" }, select: { nota: true } },
-      },
-    });
+    const flete = await uno<{ etapa: string }>("fletes", { id: fleteId });
+    const solicitudFinal = await uno<{ estado: string }>("solicitudes", { id: solicitud.id });
+    const historial = await filas<{ nota: string | null }>("estados_flete", { fleteId, etapa: "CANCELADO" });
+    const final = {
+      etapa: flete.etapa,
+      solicitud: { estado: solicitudFinal.estado },
+      historial: historial.map((h) => ({ nota: h.nota })),
+    };
     expect(final).toEqual({
       etapa: "CANCELADO",
       solicitud: { estado: "CANCELADA" },

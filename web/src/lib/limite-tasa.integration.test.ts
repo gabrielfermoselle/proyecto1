@@ -2,13 +2,12 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
-import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { consultaConsumir, consultaLimpiar, inicioVentana } from "./limite-tasa-sql";
+import { consultaConsumir, consultaLimpiar, inicioVentana, type ConsultaSql } from "./limite-tasa-sql";
 
 let db: PGlite;
-const consumir = async (sql: Prisma.Sql) =>
-  (await db.query<{ cantidad: number }>(sql.text, sql.values as unknown[])).rows[0]?.cantidad;
+const consumir = async (sql: ConsultaSql) =>
+  (await db.query<{ cantidad: number }>(sql.sql, sql.params)).rows[0]?.cantidad;
 
 beforeAll(async () => {
   db = await PGlite.create({ extensions: { postgis } });
@@ -54,7 +53,7 @@ describe("limitador de envíos (SQL real)", () => {
 
   it("limpia las ventanas viejas", async () => {
     const sql = consultaLimpiar(new Date("2026-10-01T15:30:00Z"));
-    await db.query(sql.text, sql.values as unknown[]);
+    await db.query(sql.sql, sql.params);
     const { rows } = await db.query<{ clave: string }>(
       "select distinct clave from limites_tasa order by clave",
     );

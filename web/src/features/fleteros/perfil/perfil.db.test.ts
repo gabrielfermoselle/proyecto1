@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { prisma } from "@/lib/prisma";
+import { consulta } from "@/lib/db";
 import {
   cargarUsuario,
   crearCliente,
@@ -11,6 +11,7 @@ import {
   presupuestar,
 } from "../../../../test/db/fabrica";
 import { comoUsuario, conPostgresReal } from "../../../../test/db/sesion";
+import { insertar, uno } from "../../../../test/db/tabla";
 import {
   actualizarVehiculo,
   cambiarEstadoVehiculo,
@@ -26,17 +27,14 @@ import {
 
 /** Fletero recién registrado: perfil vacío, sin vehículos ni zona. */
 async function fleteroNuevo() {
-  const u = await prisma.user.create({
-    data: {
-      email: `nuevo-${randomUUID().slice(0, 8)}@test.local`,
-      passwordHash: "x",
-      nombre: "Nuevo",
-      apellido: "Prueba",
-      rol: "FLETERO",
-      fleteroProfile: { create: {} },
-    },
-    select: { id: true },
+  const u = await insertar<{ id: string }>("usuarios", {
+    email: `nuevo-${randomUUID().slice(0, 8)}@test.local`,
+    passwordHash: "x",
+    nombre: "Nuevo",
+    apellido: "Prueba",
+    rol: "FLETERO",
   });
+  await insertar("perfiles_fletero", { userId: u.id });
   return cargarUsuario(u.id);
 }
 
@@ -80,7 +78,9 @@ describe("onboarding", () => {
     const r = ok(await guardarTarifas(tarifas));
 
     expect(r).toEqual({ completo: false, pendientes: ["datos", "vehiculos", "zona"] });
-    const perfil = await prisma.fleteroProfile.findUniqueOrThrow({ where: { id: f.fleteroProfile!.id } });
+    const perfil = await uno<{ onboardingCompletadoEn: string | null }>("perfiles_fletero", {
+      id: f.fleteroProfile!.id,
+    });
     expect(perfil.onboardingCompletadoEn).toBeNull();
   });
 
@@ -93,7 +93,9 @@ describe("onboarding", () => {
     ok(await guardarZona(zona));
     expect(ok(await guardarTarifas(tarifas))).toEqual({ completo: true, pendientes: [] });
 
-    const perfil = await prisma.fleteroProfile.findUniqueOrThrow({ where: { id: f.fleteroProfile!.id } });
+    const perfil = await uno<{ onboardingCompletadoEn: string | null }>("perfiles_fletero", {
+      id: f.fleteroProfile!.id,
+    });
     expect(perfil.onboardingCompletadoEn).not.toBeNull();
   });
 
@@ -118,9 +120,7 @@ describe("datos personales", () => {
 
     ok(await guardarDatos(datos(`${dni.slice(0, 2)}.${dni.slice(2, 5)}.${dni.slice(5)}`)));
 
-    expect((await prisma.fleteroProfile.findUniqueOrThrow({ where: { id: a.fleteroProfile!.id } })).dni).toBe(
-      dni,
-    );
+    expect((await uno<{ dni: string }>("perfiles_fletero", { id: a.fleteroProfile!.id })).dni).toBe(dni);
   });
 
   // La violación de único fuera de transacción rompe el protocolo de PGlite: solo en Postgres real.
@@ -151,7 +151,7 @@ describe("vehículos", () => {
 
     const { id } = ok(await crearVehiculo(vehiculo(escrita)));
 
-    expect((await prisma.vehiculo.findUniqueOrThrow({ where: { id } })).patente).toBe(patente);
+    expect((await uno<{ patente: string }>("vehiculos", { id })).patente).toBe(patente);
   });
 
   it.runIf(conPostgresReal)("una patente no se puede registrar dos veces, ni por otro fletero", async () => {
@@ -197,7 +197,7 @@ describe("vehículos", () => {
     expect(error(await cambiarEstadoVehiculo({ id: duenio.vehiculoId, activo: false }))).toMatch(
       /No encontramos ese vehículo/,
     );
-    expect((await prisma.vehiculo.findUniqueOrThrow({ where: { id: duenio.vehiculoId } })).activo).toBe(true);
+    expect((await uno<{ activo: boolean }>("vehiculos", { id: duenio.vehiculoId })).activo).toBe(true);
   });
 
   it("con el onboarding completo no puede quedarse sin vehículos activos", async () => {
@@ -232,9 +232,11 @@ describe("zona de trabajo", () => {
 
     ok(await guardarZona(zona));
 
-    const [fila] = await prisma.$queryRaw<{ lat: number; lng: number }[]>`
-      SELECT ST_Y("baseGeo"::geometry) AS lat, ST_X("baseGeo"::geometry) AS lng
-      FROM perfiles_fletero WHERE id = ${f.fleteroProfile!.id}`;
+    const [fila] = await consulta<{ lat: number; lng: number }>(
+      `SELECT ST_Y("baseGeo"::geometry) AS lat, ST_X("baseGeo"::geometry) AS lng
+      FROM perfiles_fletero WHERE id = $1`,
+      [f.fleteroProfile!.id],
+    );
     expect(fila!.lat).toBeCloseTo(zona.baseLat, 5);
     expect(fila!.lng).toBeCloseTo(zona.baseLng, 5);
   });

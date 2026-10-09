@@ -2,9 +2,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
-import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { consultaAccesoSolicitud, consultaConteosFeed, consultaFeed, type FilaFeed } from "./consultas-sql";
+import {
+  consultaAccesoSolicitud,
+  consultaConteosFeed,
+  consultaFeed,
+  type ConsultaSql,
+  type FilaFeed,
+} from "./consultas-sql";
 
 // Corre las consultas reales del feed contra Postgres + PostGIS (PGlite, en memoria) con la
 // migración del proyecto aplicada. Verifica radio, compatibilidad, fechas, estados y orden.
@@ -14,8 +19,8 @@ const MIGRACIONES = join(process.cwd(), "prisma/migrations");
 
 let db: PGlite;
 
-async function consultar<T>(sql: Prisma.Sql): Promise<T[]> {
-  const { rows } = await db.query<T>(sql.text, sql.values as unknown[]);
+async function consultar<T>(sql: ConsultaSql): Promise<T[]> {
+  const { rows } = await db.query<T>(sql.sql, sql.params);
   return rows;
 }
 

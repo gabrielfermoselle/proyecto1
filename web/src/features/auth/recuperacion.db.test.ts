@@ -3,8 +3,8 @@ import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { limpiarTokensRecuperacion } from "@/features/mantenimiento/servicio";
 import type { Correo } from "@/lib/correo";
-import { prisma } from "@/lib/prisma";
 import { error, ok } from "../../../test/db/fabrica";
+import { filas, insertar, insertarVarios, uno } from "../../../test/db/tabla";
 import { restablecerContrasena, solicitarRecuperacion } from "./actions";
 import { correoRecuperacion, generarToken, hashToken } from "./recuperacion";
 
@@ -29,18 +29,15 @@ beforeEach(() => {
 
 async function cuenta(activo = true) {
   const email = `olvido-${randomUUID().slice(0, 8)}@test.local`;
-  const u = await prisma.user.create({
-    data: {
-      email,
-      passwordHash: await bcrypt.hash("vieja1234", 4),
-      nombre: "Olga",
-      apellido: "Paz",
-      rol: "CLIENTE",
-      activo,
-      clienteProfile: { create: {} },
-    },
-    select: { id: true },
+  const u = await insertar<{ id: string }>("usuarios", {
+    email,
+    passwordHash: await bcrypt.hash("vieja1234", 4),
+    nombre: "Olga",
+    apellido: "Paz",
+    rol: "CLIENTE",
+    activo,
   });
+  await insertar("perfiles_cliente", { userId: u.id });
   return { id: u.id, email };
 }
 
@@ -77,11 +74,11 @@ describe("solicitarRecuperacion", () => {
     expect(enviados.lista).toHaveLength(1);
     expect(enviados.lista[0]!.para).toBe(c.email);
     const token = tokenDelEmail();
-    const guardados = await prisma.tokenRecuperacion.findMany({ where: { userId: c.id } });
+    const guardados = await filas<{ tokenHash: string; expiraEn: string }>("tokens_recuperacion", { userId: c.id });
     expect(guardados).toHaveLength(1);
     expect(guardados[0]!.tokenHash).toBe(hashToken(token));
     expect(JSON.stringify(guardados)).not.toContain(token);
-    expect(guardados[0]!.expiraEn.getTime() - Date.now()).toBeGreaterThan(29 * 60 * 1000);
+    expect(new Date(guardados[0]!.expiraEn).getTime() - Date.now()).toBeGreaterThan(29 * 60 * 1000);
   });
 
   it("responde igual si el email no existe o la cuenta está desactivada, y no envía nada", async () => {
@@ -117,7 +114,7 @@ describe("restablecerContrasena", () => {
 
     ok(await restablecer(token));
 
-    const u = await prisma.user.findUniqueOrThrow({ where: { id: c.id } });
+    const u = await uno<{ passwordHash: string; credencialesCambiadasEn: string | null }>("usuarios", { id: c.id });
     expect(await bcrypt.compare("nueva12345", u.passwordHash)).toBe(true);
     expect(u.credencialesCambiadasEn).not.toBeNull();
     expect(error(await restablecer(token, "otra98765"))).toMatch(/venció o ya se usó/);
@@ -126,13 +123,11 @@ describe("restablecerContrasena", () => {
   it("rechaza un link vencido", async () => {
     const c = await cuenta();
     const { token, tokenHash } = generarToken();
-    await prisma.tokenRecuperacion.create({
-      data: {
-        userId: c.id,
-        tokenHash,
-        createdAt: new Date(Date.now() - 40 * 60 * 1000),
-        expiraEn: new Date(Date.now() - 10 * 60 * 1000),
-      },
+    await insertar("tokens_recuperacion", {
+      userId: c.id,
+      tokenHash,
+      createdAt: new Date(Date.now() - 40 * 60 * 1000),
+      expiraEn: new Date(Date.now() - 10 * 60 * 1000),
     });
     expect(error(await restablecer(token))).toMatch(/venció o ya se usó/);
   });
@@ -155,15 +150,13 @@ describe("mantenimiento", () => {
     const dia = 24 * 60 * 60 * 1000;
     const viejo = generarToken();
     const vigente = generarToken();
-    await prisma.tokenRecuperacion.createMany({
-      data: [
-        { userId: c.id, tokenHash: viejo.tokenHash, createdAt: new Date(Date.now() - 3 * dia), expiraEn: new Date(Date.now() - 2 * dia) },
-        { userId: c.id, tokenHash: vigente.tokenHash, expiraEn: new Date(Date.now() + 30 * 60 * 1000) },
-      ],
-    });
+    await insertarVarios("tokens_recuperacion", [
+      { userId: c.id, tokenHash: viejo.tokenHash, createdAt: new Date(Date.now() - 3 * dia), expiraEn: new Date(Date.now() - 2 * dia) },
+      { userId: c.id, tokenHash: vigente.tokenHash, expiraEn: new Date(Date.now() + 30 * 60 * 1000) },
+    ]);
 
     expect(await limpiarTokensRecuperacion()).toBeGreaterThanOrEqual(1);
-    const quedan = await prisma.tokenRecuperacion.findMany({ where: { userId: c.id }, select: { tokenHash: true } });
+    const quedan = await filas<{ tokenHash: string }>("tokens_recuperacion", { userId: c.id });
     expect(quedan.map((t) => t.tokenHash)).toEqual([vigente.tokenHash]);
   });
 });

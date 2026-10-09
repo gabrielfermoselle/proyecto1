@@ -7,15 +7,10 @@
  *
  * Las tarifas son valores de referencia para la demo, no precios de mercado relevados.
  */
-import {
-  PrismaClient,
-  type EtapaFlete,
-  type Prisma,
-  type FranjaHoraria,
-  type TipoFlete,
-  type TipoVehiculo,
-} from "@prisma/client";
+import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
+import type { EtapaFlete, FranjaHoraria, TipoFlete, TipoVehiculo } from "../src/domain/catalogos";
+import { actualizar, contar, filas, insertar, insertarVarios, vaciar } from "../src/lib/filas";
 import { resumirCarga, type ItemCarga } from "../src/domain/carga";
 import { haversineKm, redondear, type Coordenadas } from "../src/domain/geo";
 import { precioSugerido, type Tarifas } from "../src/domain/precio";
@@ -30,7 +25,15 @@ if (process.env.NODE_ENV === "production") {
   process.exit(1);
 }
 
-const prisma = new PrismaClient();
+const urlSupabase = process.env.SUPABASE_URL ?? "";
+if (!/localhost|127\.0\.0\.1/.test(urlSupabase)) {
+  console.error("El seed solo corre contra una base local de prueba.");
+  process.exit(1);
+}
+
+const sb = createClient(urlSupabase, process.env.SUPABASE_SERVICE_ROLE_KEY ?? "", {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 const PASSWORD_DEMO = "Demo1234";
 const HORA = 60 * 60 * 1000;
@@ -107,16 +110,18 @@ function datosUsuario({
 }
 
 async function crearCliente(nombre: string, apellido: string, email: string, telefono: string, lugar: Lugar) {
-  const user = await prisma.user.create({
-    data: {
-      ...datosUsuario({ nombre, apellido, email, telefono }),
-      rol: "CLIENTE",
-      createdAt: hace(90),
-      clienteProfile: { create: { direccionHabitual: lugar.direccion, lat: lugar.lat, lng: lugar.lng } },
-    },
-    select: { id: true, clienteProfile: { select: { id: true } } },
+  const user = await insertar<{ id: string }>(sb, "usuarios", {
+    ...datosUsuario({ nombre, apellido, email, telefono }),
+    rol: "CLIENTE",
+    createdAt: hace(90),
   });
-  return { userId: user.id, clienteId: user.clienteProfile!.id };
+  const perfil = await insertar<{ id: string }>(sb, "perfiles_cliente", {
+    userId: user.id,
+    direccionHabitual: lugar.direccion,
+    lat: lugar.lat,
+    lng: lugar.lng,
+  });
+  return { userId: user.id, clienteId: perfil.id };
 }
 
 interface VehiculoSeed {
@@ -145,36 +150,28 @@ interface FleteroSeed {
 }
 
 async function crearFletero(f: FleteroSeed) {
-  const user = await prisma.user.create({
-    data: {
-      ...datosUsuario(f),
-      rol: "FLETERO",
-      createdAt: hace(120),
-      fleteroProfile: {
-        create: {
-          dni: f.dni,
-          bio: f.bio,
-          baseDireccion: f.base.direccion,
-          baseLat: f.base.lat,
-          baseLng: f.base.lng,
-          radioCoberturaKm: f.radioCoberturaKm,
-          ...f.tarifas,
-          disponible: f.disponible ?? true,
-          verificado: f.verificado ?? true,
-          onboardingCompletadoEn: hace(118),
-          vehiculos: { create: f.vehiculos },
-        },
-      },
-    },
-    select: {
-      id: true,
-      fleteroProfile: {
-        select: { id: true, vehiculos: { select: { id: true }, orderBy: { capacidadKg: "desc" } } },
-      },
-    },
+  const user = await insertar<{ id: string }>(sb, "usuarios", {
+    ...datosUsuario(f),
+    rol: "FLETERO",
+    createdAt: hace(120),
   });
-  const perfil = user.fleteroProfile!;
-  return { userId: user.id, fleteroId: perfil.id, vehiculoId: perfil.vehiculos[0]!.id, tarifas: f.tarifas };
+  const perfil = await insertar<{ id: string }>(sb, "perfiles_fletero", {
+    userId: user.id,
+    dni: f.dni,
+    bio: f.bio,
+    baseDireccion: f.base.direccion,
+    baseLat: f.base.lat,
+    baseLng: f.base.lng,
+    radioCoberturaKm: f.radioCoberturaKm,
+    ...f.tarifas,
+    disponible: f.disponible ?? true,
+    verificado: f.verificado ?? true,
+    onboardingCompletadoEn: hace(118),
+  });
+  const vehiculos = [];
+  for (const v of f.vehiculos) vehiculos.push(await insertar<{ id: string; capacidadKg: number }>(sb, "vehiculos", { fleteroId: perfil.id, ...v }));
+  vehiculos.sort((a, b) => b.capacidadKg - a.capacidadKg);
+  return { userId: user.id, fleteroId: perfil.id, vehiculoId: vehiculos[0]!.id, tarifas: f.tarifas };
 }
 
 type Fletero = Awaited<ReturnType<typeof crearFletero>>;
@@ -228,52 +225,50 @@ async function crearSolicitud(
 ) {
   const carga = resumirCarga(s.items);
   const distanciaKm = redondear(haversineKm(s.origen, s.destino), 2);
-  const solicitud = await prisma.solicitud.create({
-    data: {
-      clienteId: s.cliente.clienteId,
-      tipoFlete: s.tipoFlete,
-      titulo: s.titulo,
-      descripcion: s.descripcion ?? null,
-      origenDireccion: s.origen.direccion,
-      origenLat: s.origen.lat,
-      origenLng: s.origen.lng,
-      origenPiso: s.origenPiso ?? null,
-      origenAscensor: s.origenAscensor ?? false,
-      destinoDireccion: s.destino.direccion,
-      destinoLat: s.destino.lat,
-      destinoLng: s.destino.lng,
-      destinoPiso: s.destinoPiso ?? null,
-      destinoAscensor: s.destinoAscensor ?? false,
-      distanciaKm,
-      pesoTotalKg: carga.pesoTotalKg,
-      volumenTotalM3: carga.volumenTotalM3,
-      itemsSinMedidas: carga.itemsSinMedidas,
-      fecha: s.fecha,
-      franja: s.franja,
-      tipoVehiculoSugerido: s.tipoVehiculoSugerido ?? null,
-      ayudantesRequeridos: s.ayudantesRequeridos ?? 0,
-      // Las mudanzas de la demo piden embalaje: así se ve el extra en el feed y en los presupuestos.
-      requiereEmbalaje: s.requiereEmbalaje ?? s.tipoFlete === "MUDANZA",
-      estado,
-      createdAt: hace(s.creadaHaceDias),
-      items: {
-        create: s.items.map(
-          ({ nombre, cantidad, largoCm, anchoCm, altoCm, pesoKgAprox, fragil, notas }, orden) => ({
-            nombre,
-            cantidad,
-            largoCm: largoCm ?? null,
-            anchoCm: anchoCm ?? null,
-            altoCm: altoCm ?? null,
-            pesoKgAprox: pesoKgAprox ?? null,
-            fragil: fragil ?? false,
-            notas: notas ?? null,
-            orden,
-          }),
-        ),
-      },
-    },
-    select: { id: true },
+  const solicitud = await insertar<{ id: string }>(sb, "solicitudes", {
+    clienteId: s.cliente.clienteId,
+    tipoFlete: s.tipoFlete,
+    titulo: s.titulo,
+    descripcion: s.descripcion ?? null,
+    origenDireccion: s.origen.direccion,
+    origenLat: s.origen.lat,
+    origenLng: s.origen.lng,
+    origenPiso: s.origenPiso ?? null,
+    origenAscensor: s.origenAscensor ?? false,
+    destinoDireccion: s.destino.direccion,
+    destinoLat: s.destino.lat,
+    destinoLng: s.destino.lng,
+    destinoPiso: s.destinoPiso ?? null,
+    destinoAscensor: s.destinoAscensor ?? false,
+    distanciaKm,
+    pesoTotalKg: carga.pesoTotalKg,
+    volumenTotalM3: carga.volumenTotalM3,
+    itemsSinMedidas: carga.itemsSinMedidas,
+    fecha: s.fecha,
+    franja: s.franja,
+    tipoVehiculoSugerido: s.tipoVehiculoSugerido ?? null,
+    ayudantesRequeridos: s.ayudantesRequeridos ?? 0,
+    // Las mudanzas de la demo piden embalaje: así se ve el extra en el feed y en los presupuestos.
+    requiereEmbalaje: s.requiereEmbalaje ?? s.tipoFlete === "MUDANZA",
+    estado,
+    createdAt: hace(s.creadaHaceDias),
   });
+  await insertarVarios(
+    sb,
+    "items_inventario",
+    s.items.map(({ nombre, cantidad, largoCm, anchoCm, altoCm, pesoKgAprox, fragil, notas }, orden) => ({
+      solicitudId: solicitud.id,
+      nombre,
+      cantidad,
+      largoCm: largoCm ?? null,
+      anchoCm: anchoCm ?? null,
+      altoCm: altoCm ?? null,
+      pesoKgAprox: pesoKgAprox ?? null,
+      fragil: fragil ?? false,
+      notas: notas ?? null,
+      orden,
+    })),
+  );
   return { ...solicitud, seed: s, distanciaKm, volumenTotalM3: carga.volumenTotalM3 };
 }
 
@@ -304,21 +299,18 @@ async function presupuestar(
   const desde = FRANJA[solicitud.seed.franja].desde;
   const horaLlegada =
     solicitud.seed.franja === "FLEXIBLE" ? null : `${String(desde + 1).padStart(2, "0")}:00`;
-  const presupuesto = await prisma.presupuesto.create({
-    data: {
-      horaLlegada,
-      solicitudId: solicitud.id,
-      fleteroId: fletero.fleteroId,
-      vehiculoId: opciones.vehiculoId ?? fletero.vehiculoId,
-      monto,
-      montoSugerido: sugerido,
-      incluyeAyudantes: ayudantes,
-      mensaje: opciones.mensaje ?? null,
-      validoHasta,
-      estado,
-      createdAt: creado,
-    },
-    select: { id: true, monto: true },
+  const presupuesto = await insertar<{ id: string }>(sb, "presupuestos", {
+    horaLlegada,
+    solicitudId: solicitud.id,
+    fleteroId: fletero.fleteroId,
+    vehiculoId: opciones.vehiculoId ?? fletero.vehiculoId,
+    monto,
+    montoSugerido: sugerido,
+    incluyeAyudantes: ayudantes,
+    mensaje: opciones.mensaje ?? null,
+    validoHasta,
+    estado,
+    createdAt: creado,
   });
 
   // Igual que en la app: presupuestar abre el chat con el aviso del sistema y el mensaje del fletero.
@@ -333,7 +325,7 @@ async function presupuestar(
     await mensajeTexto(conversacionId, fletero.userId, opciones.mensaje, minutosDespues(creado, 1));
   if (estado === "RETIRADO")
     await mensajeSistema(conversacionId, "PRESUPUESTO_RETIRADO", {}, minutosDespues(creado, 90));
-  return { ...presupuesto, conversacionId };
+  return { id: presupuesto.id, monto, conversacionId };
 }
 
 // ---------------------------------------------------------------------------
@@ -344,16 +336,15 @@ const minutosDespues = (instante: Date, minutos: number) =>
   new Date(instante.getTime() + minutos * 60 * 1000);
 
 async function conversacionDe(solicitud: Solicitud, fletero: Fletero, creada: Date): Promise<string> {
-  const conversacion = await prisma.conversacion.upsert({
-    where: { solicitudId_fleteroId: { solicitudId: solicitud.id, fleteroId: fletero.fleteroId } },
-    create: {
-      solicitudId: solicitud.id,
-      fleteroId: fletero.fleteroId,
-      clienteId: solicitud.seed.cliente.clienteId,
-      createdAt: creada,
-    },
-    update: {},
-    select: { id: true },
+  const existente = (
+    await filas<{ id: string }>(sb, "conversaciones", { solicitudId: solicitud.id, fleteroId: fletero.fleteroId })
+  )[0];
+  if (existente) return existente.id;
+  const conversacion = await insertar<{ id: string }>(sb, "conversaciones", {
+    solicitudId: solicitud.id,
+    fleteroId: fletero.fleteroId,
+    clienteId: solicitud.seed.cliente.clienteId,
+    createdAt: creada,
   });
   return conversacion.id;
 }
@@ -364,13 +355,11 @@ async function mensajeSistema<E extends EventoChat>(
   datos: DatosEvento<E>,
   en: Date,
 ) {
-  await prisma.mensaje.create({
-    data: { conversacionId, tipo: "SISTEMA", evento, datos: datos as Prisma.InputJsonValue, createdAt: en },
-  });
+  await insertar(sb, "mensajes", { conversacionId, tipo: "SISTEMA", evento, datos, createdAt: en });
 }
 
 async function mensajeTexto(conversacionId: string, autorId: string, contenido: string, en: Date) {
-  await prisma.mensaje.create({ data: { conversacionId, autorId, contenido, createdAt: en } });
+  await insertar(sb, "mensajes", { conversacionId, autorId, contenido, createdAt: en });
 }
 
 const ORDEN_ETAPAS: EtapaFlete[] = [
@@ -467,33 +456,44 @@ async function adjudicar(
   }
   const en = (e: EtapaFlete) => historial.find((h) => h.etapa === e)!.createdAt;
 
-  const flete = await prisma.flete.create({
-    data: {
-      solicitudId: solicitud.id,
-      presupuestoId: ganador.id,
-      clienteId: cliente.clienteId,
-      fleteroId: fletero.fleteroId,
-      vehiculoId: fletero.vehiculoId,
-      precioAcordado: ganador.monto,
-      etapa,
-      recepcionConfirmadaEn: etapa === "CERRADO" ? en("CERRADO") : null,
-      createdAt: hace(confirmadoHace),
-      historial: { create: historial },
-    },
-    select: { id: true },
+  const flete = await insertar<{ id: string }>(sb, "fletes", {
+    solicitudId: solicitud.id,
+    presupuestoId: ganador.id,
+    clienteId: cliente.clienteId,
+    fleteroId: fletero.fleteroId,
+    vehiculoId: fletero.vehiculoId,
+    precioAcordado: ganador.monto,
+    etapa,
+    recepcionConfirmadaEn: etapa === "CERRADO" ? en("CERRADO") : null,
+    createdAt: hace(confirmadoHace),
   });
+  await insertarVarios(
+    sb,
+    "estados_flete",
+    historial.map((h) => ({ ...h, fleteId: flete.id })),
+  );
 
   // Inventario controlado según la etapa.
-  const items = await prisma.itemInventario.findMany({
-    where: { solicitudId: solicitud.id },
-    orderBy: { orden: "asc" },
-    select: { id: true, nombre: true },
-  });
-  const controles: Prisma.ControlItemCreateManyInput[] = [];
+  const items = await filas<{ id: string; nombre: string }>(
+    sb,
+    "items_inventario",
+    { solicitudId: solicitud.id },
+    { columna: "orden" },
+  );
+  const controles: {
+    itemId: string;
+    fleteId: string;
+    fase: "CARGA" | "DESCARGA" | "RECEPCION";
+    resultado: "CARGADO" | "NO_CARGADO" | "ENTREGADO" | "CON_DANO" | "FALTANTE" | "CONFORME" | "RECLAMO";
+    autorId: string;
+    observacion: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }[] = [];
   const control = (
     itemId: string,
     fase: "CARGA" | "DESCARGA" | "RECEPCION",
-    resultado: Prisma.ControlItemCreateManyInput["resultado"],
+    resultado: (typeof controles)[number]["resultado"],
     autorId: string,
     momento: Date,
     observacion: string | null = null,
@@ -552,17 +552,15 @@ async function adjudicar(
       ),
     );
   }
-  await prisma.controlItem.createMany({ data: controles });
+  await insertarVarios(sb, "controles_item", controles);
   const reclamado = opciones.incidencias && llego("CERRADO") ? items[1] : undefined;
   if (reclamado) {
-    await prisma.reclamo.create({
-      data: {
-        itemId: reclamado.id,
-        fleteId: flete.id,
-        autorId: cliente.userId,
-        descripcion: "Llegó golpeada y con parte del contenido roto.",
-        createdAt: minutosDespues(en("CERRADO"), -9),
-      },
+    await insertar(sb, "reclamos", {
+      itemId: reclamado.id,
+      fleteId: flete.id,
+      autorId: cliente.userId,
+      descripcion: "Llegó golpeada y con parte del contenido roto.",
+      createdAt: minutosDespues(en("CERRADO"), -9),
     });
   }
 
@@ -577,25 +575,21 @@ async function adjudicar(
     ),
   );
   if (llego("ENTREGADO")) {
-    await prisma.conformidad.create({
-      data: {
-        fleteId: flete.id,
-        rol: "FLETERO",
-        userId: fletero.userId,
-        texto: textoConformidad("FLETERO", resumen),
-        aceptadaEn: en("ENTREGADO"),
-      },
+    await insertar(sb, "conformidades", {
+      fleteId: flete.id,
+      rol: "FLETERO",
+      userId: fletero.userId,
+      texto: textoConformidad("FLETERO", resumen),
+      aceptadaEn: en("ENTREGADO"),
     });
   }
   if (llego("CERRADO")) {
-    await prisma.conformidad.create({
-      data: {
-        fleteId: flete.id,
-        rol: "CLIENTE",
-        userId: cliente.userId,
-        texto: textoConformidad("CLIENTE", resumen),
-        aceptadaEn: en("CERRADO"),
-      },
+    await insertar(sb, "conformidades", {
+      fleteId: flete.id,
+      rol: "CLIENTE",
+      userId: cliente.userId,
+      texto: textoConformidad("CLIENTE", resumen),
+      aceptadaEn: en("CERRADO"),
     });
   }
 
@@ -608,7 +602,7 @@ async function adjudicar(
         await mensajeSistema(
           c,
           "FLETE_CONFIRMADO",
-          { monto: ganador.monto.toNumber(), fecha: fechaIsoDeDia(fecha), franja },
+          { monto: ganador.monto, fecha: fechaIsoDeDia(fecha), franja },
           h.createdAt,
         );
         break;
@@ -677,15 +671,13 @@ async function calificar(
   comentario: string,
   haceDias: number,
 ) {
-  await prisma.calificacion.create({
-    data: {
-      fleteId: adjudicado.fleteId,
-      clienteId: adjudicado.cliente.clienteId,
-      fleteroId: adjudicado.fletero.fleteroId,
-      puntaje,
-      comentario,
-      createdAt: hace(haceDias),
-    },
+  await insertar(sb, "calificaciones", {
+    fleteId: adjudicado.fleteId,
+    clienteId: adjudicado.cliente.clienteId,
+    fleteroId: adjudicado.fletero.fleteroId,
+    puntaje,
+    comentario,
+    createdAt: hace(haceDias),
   });
 }
 
@@ -706,12 +698,15 @@ async function conversar(
 
 /** Última actividad = último mensaje; todo leído salvo lo que se deja pendiente para la demo. */
 async function ajustarLecturas() {
-  await prisma.$executeRaw`
-    UPDATE conversaciones c SET "ultimaActividadEn" = m.ultimo
-    FROM (SELECT "conversacionId", max("createdAt") AS ultimo FROM mensajes GROUP BY 1) m
-    WHERE m."conversacionId" = c.id`;
-  await prisma.$executeRaw`
-    UPDATE conversaciones SET "leidoHastaCliente" = "ultimaActividadEn", "leidoHastaFletero" = "ultimaActividadEn"`;
+  const mensajes = await filas<{ conversacionId: string; createdAt: string }>(sb, "mensajes");
+  const ultimo = new Map<string, string>();
+  for (const m of mensajes) {
+    const previo = ultimo.get(m.conversacionId);
+    if (!previo || m.createdAt > previo) ultimo.set(m.conversacionId, m.createdAt);
+  }
+  for (const [id, en] of ultimo) {
+    await actualizar(sb, "conversaciones", { id }, { ultimaActividadEn: en, leidoHastaCliente: en, leidoHastaFletero: en });
+  }
 }
 
 async function notificacion(
@@ -722,9 +717,7 @@ async function notificacion(
   cuerpo: string,
   clave?: string,
 ) {
-  await prisma.notificacion.create({
-    data: { userId, tipo, titulo, href, cuerpo, ...(clave ? { clave } : {}) },
-  });
+  await insertar(sb, "notificaciones", { userId, tipo, titulo, href, cuerpo, ...(clave ? { clave } : {}) });
 }
 
 // ---------------------------------------------------------------------------
@@ -732,42 +725,46 @@ async function notificacion(
 // ---------------------------------------------------------------------------
 
 async function limpiar() {
-  await prisma.$transaction([
-    prisma.limiteTasa.deleteMany(),
-    prisma.tokenRecuperacion.deleteMany(),
-    prisma.subidaPendiente.deleteMany(),
-    prisma.notificacion.deleteMany(),
-    prisma.calificacion.deleteMany(),
-    prisma.conformidad.deleteMany(),
-    prisma.reclamo.deleteMany(),
-    prisma.controlItem.deleteMany(),
-    prisma.estadoFlete.deleteMany(),
-    prisma.propuestaHorario.deleteMany(),
-    prisma.mensaje.deleteMany(),
-    prisma.conversacion.deleteMany(),
-    prisma.flete.deleteMany(),
-    prisma.presupuesto.deleteMany(),
-    prisma.foto.deleteMany(),
-    prisma.itemInventario.deleteMany(),
-    prisma.solicitud.deleteMany(),
-    prisma.vehiculo.deleteMany(),
-    prisma.fleteroProfile.deleteMany(),
-    prisma.clienteProfile.deleteMany(),
-    prisma.user.deleteMany(),
-  ]);
+  const tablas: [string, string][] = [
+    ["limites_tasa", "clave"],
+    ["tokens_recuperacion", "id"],
+    ["subidas_pendientes", "ruta"],
+    ["notificaciones", "id"],
+    ["calificaciones", "id"],
+    ["conformidades", "id"],
+    ["reclamos", "id"],
+    ["controles_item", "id"],
+    ["estados_flete", "id"],
+    ["propuestas_horario", "id"],
+    ["mensajes", "id"],
+    ["conversaciones", "id"],
+    ["fletes", "id"],
+    ["presupuestos", "id"],
+    ["fotos", "id"],
+    ["items_inventario", "id"],
+    ["solicitudes", "id"],
+    ["vehiculos", "id"],
+    ["perfiles_fletero", "id"],
+    ["perfiles_cliente", "id"],
+    ["usuarios", "id"],
+  ];
+  for (const [tabla, columna] of tablas) await vaciar(sb, tabla, columna);
 }
 
 /** Recalcula el rating desnormalizado, igual que lo hará la Server Action de calificar. */
 async function recalcularRatings() {
-  const agregados = await prisma.calificacion.groupBy({
-    by: ["fleteroId"],
-    _avg: { puntaje: true },
-    _count: true,
-  });
-  for (const a of agregados) {
-    await prisma.fleteroProfile.update({
-      where: { id: a.fleteroId },
-      data: { ratingPromedio: redondear(a._avg.puntaje ?? 0, 2), cantidadCalificaciones: a._count },
+  const calificaciones = await filas<{ fleteroId: string; puntaje: number }>(sb, "calificaciones");
+  const porFletero = new Map<string, number[]>();
+  for (const c of calificaciones) {
+    const lista = porFletero.get(c.fleteroId) ?? [];
+    lista.push(c.puntaje);
+    porFletero.set(c.fleteroId, lista);
+  }
+  for (const [fleteroId, puntajes] of porFletero) {
+    const promedio = puntajes.reduce((suma, p) => suma + p, 0) / puntajes.length;
+    await actualizar(sb, "perfiles_fletero", { id: fleteroId }, {
+      ratingPromedio: redondear(promedio, 2),
+      cantidadCalificaciones: puntajes.length,
     });
   }
 }
@@ -777,16 +774,14 @@ async function main() {
   await limpiar();
 
   // --- Admin ---
-  await prisma.user.create({
-    data: {
-      ...datosUsuario({
-        nombre: "Equipo",
-        apellido: "Fletes Tucumán",
-        email: "admin@demo.test",
-        telefono: "3814000000",
-      }),
-      rol: "ADMIN",
-    },
+  await insertar(sb, "usuarios", {
+    ...datosUsuario({
+      nombre: "Equipo",
+      apellido: "Fletes Tucumán",
+      email: "admin@demo.test",
+      telefono: "3814000000",
+    }),
+    rol: "ADMIN",
   });
 
   // --- Clientes ---
@@ -831,13 +826,11 @@ async function main() {
 
   // Clienta recién registrada, sin dirección habitual: el buscador le pide que la cargue y
   // muestra a los fleteros sin distancia.
-  await prisma.user.create({
-    data: {
-      ...datosUsuario({ nombre: "Paula", apellido: "Ibarra", email: "paula@demo.test", telefono: "" }),
-      rol: "CLIENTE",
-      clienteProfile: { create: {} },
-    },
+  const paula = await insertar<{ id: string }>(sb, "usuarios", {
+    ...datosUsuario({ nombre: "Paula", apellido: "Ibarra", email: "paula@demo.test", telefono: "" }),
+    rol: "CLIENTE",
   });
+  await insertar(sb, "perfiles_cliente", { userId: paula.id });
   // Cuenta para mostrar "cambiar contraseña" y "¿Olvidaste tu contraseña?" en la defensa sin
   // cerrar las sesiones de las cuentas del recorrido principal.
   await crearCliente("Rocío", "Medina", "rocio@demo.test", "3816009988", LUGARES.parque);
@@ -1155,18 +1148,16 @@ async function main() {
   });
 
   // Fletero recién registrado: sirve para probar el onboarding.
-  await prisma.user.create({
-    data: {
-      ...datosUsuario({
-        nombre: "Diego",
-        apellido: "Villagra",
-        email: "diego@demo.test",
-        telefono: "3815000014",
-      }),
-      rol: "FLETERO",
-      fleteroProfile: { create: {} },
-    },
+  const diego = await insertar<{ id: string }>(sb, "usuarios", {
+    ...datosUsuario({
+      nombre: "Diego",
+      apellido: "Villagra",
+      email: "diego@demo.test",
+      telefono: "3815000014",
+    }),
+    rol: "FLETERO",
   });
+  await insertar(sb, "perfiles_fletero", { userId: diego.id });
 
   // --- Solicitudes abiertas (para comparar presupuestos y para el feed de fleteros) ---
   const mudanzaAna = await crearSolicitud({
@@ -1594,29 +1585,26 @@ async function main() {
 
   // --- Estado de demo del chat ---
   // Ana todavía no leyó los presupuestos de su mudanza; Carlos no leyó la última respuesta de Ana.
-  await prisma.conversacion.updateMany({
-    where: { solicitudId: mudanzaAna.id },
-    data: { leidoHastaCliente: null },
-  });
-  await prisma.conversacion.update({
-    where: { id: presupuestoCarlos.conversacionId },
-    data: { leidoHastaFletero: null },
-  });
+  await actualizar(sb, "conversaciones", { solicitudId: mudanzaAna.id }, { leidoHastaCliente: null });
+  await actualizar(sb, "conversaciones", { id: presupuestoCarlos.conversacionId }, { leidoHastaFletero: null });
 
   // Soledad propone cambiar el horario del flete confirmado: Ana lo acepta con un toque.
   const propuestaEn = hace(0, 1);
-  await prisma.mensaje.create({
-    data: {
-      conversacionId: compraConfirmada.conversacionId,
-      autorId: soledad.userId,
-      tipo: "PROPUESTA",
-      createdAt: propuestaEn,
-      propuesta: { create: { fecha: dia(2), franja: "MANANA", propuestaPorId: soledad.userId } },
-    },
+  const propuestaMsg = await insertar<{ id: string }>(sb, "mensajes", {
+    conversacionId: compraConfirmada.conversacionId,
+    autorId: soledad.userId,
+    tipo: "PROPUESTA",
+    createdAt: propuestaEn,
   });
-  await prisma.conversacion.update({
-    where: { id: compraConfirmada.conversacionId },
-    data: { ultimaActividadEn: propuestaEn, leidoHastaFletero: propuestaEn },
+  await insertar(sb, "propuestas_horario", {
+    mensajeId: propuestaMsg.id,
+    fecha: dia(2),
+    franja: "MANANA",
+    propuestaPorId: soledad.userId,
+  });
+  await actualizar(sb, "conversaciones", { id: compraConfirmada.conversacionId }, {
+    ultimaActividadEn: propuestaEn,
+    leidoHastaFletero: propuestaEn,
   });
 
   const chatAna = (conversacionId: string) => `/cliente/mensajes/${conversacionId}`;
@@ -1654,12 +1642,12 @@ async function main() {
 
 main()
   .then(async () => {
-    const [usuarios, solicitudes, fletes] = await Promise.all([
-      prisma.user.count(),
-      prisma.solicitud.count(),
-      prisma.flete.count(),
+    const [usuarios, solicitudes, fletesN] = await Promise.all([
+      contar(sb, "usuarios"),
+      contar(sb, "solicitudes"),
+      contar(sb, "fletes"),
     ]);
-    console.log(`Seed listo: ${usuarios} usuarios, ${solicitudes} solicitudes, ${fletes} fletes.`);
+    console.log(`Seed listo: ${usuarios} usuarios, ${solicitudes} solicitudes, ${fletesN} fletes.`);
     console.log(`Contraseña de todos los usuarios de demo: ${PASSWORD_DEMO}`);
     console.log("  Admin:    admin@demo.test");
     console.log(
@@ -1679,4 +1667,4 @@ main()
     console.error(error);
     process.exitCode = 1;
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => undefined);

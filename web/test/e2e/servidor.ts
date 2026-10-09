@@ -1,11 +1,9 @@
-// Servidor de los e2e: PGlite con las migraciones + el seed de demo, y Next apuntando a esa base.
-// Lo arranca Playwright (webServer). Con E2E_PROD=1 usa `next start` sobre un build previo (CI);
-// si no, `next dev` (local, sin build). También es `npm run dev:local` (con --puerto 3000): la app
-// contra una base en memoria con los datos de demo, sin la latencia de Supabase. Los datos se
-// regeneran cada vez que arranca.
+// Servidor de los e2e: Postgres de prueba + PostgREST, el seed de demo y Next.
+// Lo arranca Playwright. Con E2E_PROD=1 usa `next start` sobre un build previo (CI).
 import { spawn, type SpawnOptions } from "node:child_process";
 import { rmSync } from "node:fs";
-import { levantarPglite } from "../db/pglite";
+import { publicarSupabaseDePrueba } from "../db/puente-supabase";
+import { aplicarSql } from "../db/sql";
 import { ARCHIVO_CORREOS } from "./correos";
 
 const argPuerto = process.argv.indexOf("--puerto");
@@ -25,18 +23,21 @@ function esperar(hijo: ReturnType<typeof npx>): Promise<void> {
 }
 
 async function main() {
-  const { url, cerrar } = await levantarPglite();
+  const url = process.env.TEST_DATABASE_URL;
+  if (!url || !process.env.POSTGREST_URL) {
+    throw new Error("Los e2e necesitan TEST_DATABASE_URL y POSTGREST_URL.");
+  }
+  await aplicarSql(url);
+  await publicarSupabaseDePrueba(url);
   const env = {
     ...process.env,
     DATABASE_URL: url,
-    DIRECT_URL: url,
     NEXTAUTH_URL: `http://localhost:${PUERTO}`,
     NEXTAUTH_SECRET: "secreto-de-e2e-con-mas-de-32-caracteres",
-    // Sin Supabase: el chat por consultas periódicas y sin carga de fotos.
-    SUPABASE_URL: "",
-    SUPABASE_ANON_KEY: "",
-    SUPABASE_SERVICE_ROLE_KEY: "",
-    SUPABASE_JWT_SECRET: "",
+    SUPABASE_URL: process.env.SUPABASE_URL || "",
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || "",
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+    SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || "",
     // Sin Resend: los emails van a un archivo que leen los tests.
     RESEND_API_KEY: "",
     CORREO_ARCHIVO: ARCHIVO_CORREOS,
@@ -51,15 +52,13 @@ async function main() {
     env,
   });
 
-  const terminar = async () => {
+  const terminar = () => {
     next.kill();
-    await cerrar();
     process.exit(0);
   };
   process.on("SIGINT", terminar);
   process.on("SIGTERM", terminar);
-  next.on("exit", async (codigo) => {
-    await cerrar();
+  next.on("exit", (codigo) => {
     process.exit(codigo ?? 1);
   });
 }

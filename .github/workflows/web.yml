@@ -50,8 +50,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      postgrest:
+        image: postgrest/postgrest:v12.2.3
+        env:
+          PGRST_DB_URI: postgres://postgres:postgres@postgres:5432/fletes_test
+          PGRST_DB_SCHEMAS: public
+          PGRST_DB_ANON_ROLE: postgres
+          PGRST_JWT_SECRET: secreto-de-test-jwt-con-mas-de-32-chars
+        ports: ["3001:3000"]
     env:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fletes_test
+      POSTGREST_URL: http://127.0.0.1:3001
+      PGRST_JWT_SECRET: secreto-de-test-jwt-con-mas-de-32-chars
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,10 +72,35 @@ jobs:
       - run: npm ci
       - run: npx vitest run --project db
 
-  # La app compilada para producción, con PGlite + el seed de demo, en Chromium de escritorio y móvil.
+  # La app compilada, contra Postgres + PostgREST y el seed de demo, en Chromium.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fletes_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      postgrest:
+        image: postgrest/postgrest:v12.2.3
+        env:
+          PGRST_DB_URI: postgres://postgres:postgres@postgres:5432/fletes_test
+          PGRST_DB_SCHEMAS: public
+          PGRST_DB_ANON_ROLE: postgres
+          PGRST_JWT_SECRET: secreto-de-test-jwt-con-mas-de-32-chars
+        ports: ["3001:3000"]
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fletes_test
+      POSTGREST_URL: http://127.0.0.1:3001
+      PGRST_JWT_SECRET: secreto-de-test-jwt-con-mas-de-32-chars
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

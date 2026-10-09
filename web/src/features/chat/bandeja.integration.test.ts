@@ -2,15 +2,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
-import type { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { consultaBandeja, consultaTotalNoLeidos, type FilaBandeja } from "./consultas-sql";
+import { consultaBandeja, consultaTotalNoLeidos, type ConsultaSql, type FilaBandeja } from "./consultas-sql";
 
 // Bandeja con SQL real: no leídos contra la marca de lectura de cada lado, último mensaje,
 // orden por actividad, flete del par y aislamiento entre participantes.
 
 let db: PGlite;
-const consultar = async <T>(sql: Prisma.Sql) => (await db.query<T>(sql.text, sql.values as unknown[])).rows;
+const consultar = async <T>(sql: ConsultaSql) => (await db.query<T>(sql.sql, sql.params)).rows;
 
 beforeAll(async () => {
   db = await PGlite.create({ extensions: { postgis } });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { sumarDias, fechaIsoAr } from "@/domain/fechas";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
-import { prisma } from "@/lib/prisma";
+import { numero } from "@/lib/db";
 import {
   crearCliente,
   crearFletero,
@@ -13,6 +13,7 @@ import {
   presupuestar,
 } from "../../../../test/db/fabrica";
 import { comoUsuario } from "../../../../test/db/sesion";
+import { contar, filas, insertar, uno } from "../../../../test/db/tabla";
 import { agregarFotoSolicitud, cancelarSolicitud, crearSolicitud as publicar } from "./actions";
 import type { SolicitudInput } from "./schemas";
 
@@ -61,26 +62,27 @@ describe("publicar una solicitud", () => {
 
   it("guarda la solicitud con los totales de la carga y la distancia calculados en el servidor", async () => {
     const { id } = ok(await publicar(base()));
-    const s = await prisma.solicitud.findUniqueOrThrow({
-      where: { id },
-      select: {
-        estado: true,
-        pesoTotalKg: true,
-        volumenTotalM3: true,
-        itemsSinMedidas: true,
-        distanciaKm: true,
-        destinoPiso: true,
-        items: { orderBy: { orden: "asc" }, select: { nombre: true, fragil: true, estadoInicial: true } },
-      },
-    });
+    const s = await uno<{
+      estado: string;
+      pesoTotalKg: unknown;
+      volumenTotalM3: unknown;
+      itemsSinMedidas: number;
+      distanciaKm: unknown;
+      destinoPiso: number | null;
+    }>("solicitudes", { id });
+    const items = await filas<{ nombre: string; fragil: boolean; estadoInicial: string }>(
+      "items_inventario",
+      { solicitudId: id },
+      { columna: "orden" },
+    );
     expect(s.estado).toBe("ABIERTA");
-    expect(s.pesoTotalKg.toNumber()).toBe(80);
+    expect(numero(s.pesoTotalKg)).toBe(80);
     // 180 × 70 × 70 cm = 0,882 m³, con el 25 % de estiba = 1,1025 → 1,103
-    expect(s.volumenTotalM3.toNumber()).toBeCloseTo(1.103, 3);
+    expect(numero(s.volumenTotalM3)).toBeCloseTo(1.103, 3);
     expect(s.itemsSinMedidas).toBe(1);
-    expect(s.distanciaKm.toNumber()).toBeGreaterThan(2);
+    expect(numero(s.distanciaKm)).toBeGreaterThan(2);
     expect(s.destinoPiso).toBe(3);
-    expect(s.items).toEqual([
+    expect(items.map((i) => ({ nombre: i.nombre, fragil: i.fragil, estadoInicial: i.estadoInicial }))).toEqual([
       { nombre: "Heladera", fragil: true, estadoInicial: "BUENO" },
       { nombre: "Cajas", fragil: false, estadoInicial: "CON_MARCAS" },
     ]);
@@ -113,20 +115,23 @@ describe("cancelar una solicitud", () => {
     comoUsuario(cliente);
     ok(await cancelarSolicitud({ solicitudId: s.id }));
 
-    const final = await prisma.solicitud.findUniqueOrThrow({
-      where: { id: s.id },
-      select: { estado: true, presupuestos: { select: { estado: true } } },
-    });
+    const final = await uno<{ estado: string }>("solicitudes", { id: s.id });
+    const presupuestos = await filas<{ estado: string }>("presupuestos", { solicitudId: s.id });
     expect(final.estado).toBe("CANCELADA");
-    expect(final.presupuestos.map((p) => p.estado)).toEqual(["RECHAZADO", "RECHAZADO"]);
+    expect(presupuestos.map((p) => p.estado)).toEqual(["RECHAZADO", "RECHAZADO"]);
     expect(await eventosDelChat(s.id, f1.fleteroProfile!.id)).toEqual([
       "PRESUPUESTO_ENVIADO",
       "SOLICITUD_CANCELADA",
     ]);
     expect(await eventosDelChat(s.id, f2.fleteroProfile!.id)).toContain("SOLICITUD_CANCELADA");
-    const avisos = await prisma.notificacion.count({
-      where: { userId: { in: [f1.id, f2.id] }, titulo: { contains: "canceló" } },
-    });
+    const avisos = (
+      await Promise.all([
+        filas<{ titulo: string }>("notificaciones", { userId: f1.id }),
+        filas<{ titulo: string }>("notificaciones", { userId: f2.id }),
+      ])
+    )
+      .flat()
+      .filter((n) => n.titulo.includes("canceló")).length;
     expect(avisos).toBe(2);
     // Ya cancelada, no se puede cancelar de nuevo.
     expect(error(await cancelarSolicitud({ solicitudId: s.id }))).toMatch(/ya no se puede cancelar/);
@@ -147,7 +152,7 @@ describe("cancelar una solicitud", () => {
         }),
       ),
     ).toBe("No encontramos esa solicitud.");
-    expect((await prisma.solicitud.findUniqueOrThrow({ where: { id: s.id } })).estado).toBe("ABIERTA");
+    expect((await uno<{ estado: string }>("solicitudes", { id: s.id })).estado).toBe("ABIERTA");
   });
 });
 
@@ -162,26 +167,21 @@ describe("aceptar un presupuesto", () => {
     comoUsuario(cliente);
     const { fleteId } = ok(await aceptarPresupuesto({ presupuestoId }));
 
-    const flete = await prisma.flete.findUniqueOrThrow({
-      where: { id: fleteId },
-      select: { etapa: true, precioAcordado: true, historial: { select: { etapa: true } } },
-    });
+    const flete = await uno<{ etapa: string; precioAcordado: unknown }>("fletes", { id: fleteId });
+    const historial = await filas<{ etapa: string }>("estados_flete", { fleteId });
     expect(flete.etapa).toBe("CONFIRMADO");
-    expect(flete.precioAcordado.toNumber()).toBe(28_000);
-    expect(flete.historial.map((h) => h.etapa)).toEqual(["CONFIRMADO"]);
-    const presupuestos = await prisma.presupuesto.findMany({
-      where: { solicitudId: s.id },
-      select: { id: true, estado: true },
-    });
+    expect(numero(flete.precioAcordado)).toBe(28_000);
+    expect(historial.map((h) => h.etapa)).toEqual(["CONFIRMADO"]);
+    const presupuestos = await filas<{ id: string; estado: string }>("presupuestos", { solicitudId: s.id });
     expect(presupuestos.find((p) => p.id === presupuestoId)?.estado).toBe("ACEPTADO");
     expect(presupuestos.filter((p) => p.estado === "RECHAZADO")).toHaveLength(1);
-    expect((await prisma.solicitud.findUniqueOrThrow({ where: { id: s.id } })).estado).toBe("ADJUDICADA");
+    expect((await uno<{ estado: string }>("solicitudes", { id: s.id })).estado).toBe("ADJUDICADA");
     expect(await eventosDelChat(s.id, elegido.fleteroProfile!.id)).toContain("FLETE_CONFIRMADO");
     expect(await eventosDelChat(s.id, otro.fleteroProfile!.id)).toContain("PRESUPUESTO_NO_ELEGIDO");
 
     // Una segunda aceptación (doble clic, otra pestaña) no crea otro flete.
     expect(error(await aceptarPresupuesto({ presupuestoId }))).toMatch(/ya no está abierta/);
-    expect(await prisma.flete.count({ where: { solicitudId: s.id } })).toBe(1);
+    expect(await contar("fletes", { solicitudId: s.id })).toBe(1);
   });
 
   it("aplica la fecha que se acordó en el chat", async () => {
@@ -189,30 +189,26 @@ describe("aceptar un presupuesto", () => {
     const fletero = await crearFletero();
     const s = await crearSolicitud(cliente, { fecha: dia(3), franja: "MANANA" });
     const { presupuestoId, conversacionId } = await presupuestar(s.id, fletero);
-    const mensaje = await prisma.mensaje.create({
-      data: { conversacionId, tipo: "PROPUESTA", autorId: fletero.id },
-      select: { id: true },
+    const mensaje = await insertar<{ id: string }>("mensajes", {
+      conversacionId,
+      tipo: "PROPUESTA",
+      autorId: fletero.id,
     });
-    await prisma.propuestaHorario.create({
-      data: {
-        mensajeId: mensaje.id,
-        fecha: dia(5),
-        franja: "TARDE",
-        estado: "ACEPTADA",
-        propuestaPorId: fletero.id,
-        respondidaPorId: cliente.id,
-        respondidaEn: new Date(),
-      },
+    await insertar("propuestas_horario", {
+      mensajeId: mensaje.id,
+      fecha: dia(5),
+      franja: "TARDE",
+      estado: "ACEPTADA",
+      propuestaPorId: fletero.id,
+      respondidaPorId: cliente.id,
+      respondidaEn: new Date(),
     });
 
     comoUsuario(cliente);
     ok(await aceptarPresupuesto({ presupuestoId }));
-    const final = await prisma.solicitud.findUniqueOrThrow({
-      where: { id: s.id },
-      select: { fecha: true, franja: true },
-    });
-    expect(final).toEqual({ fecha: dia(5), franja: "TARDE" });
-    const propuesta = await prisma.propuestaHorario.findUniqueOrThrow({ where: { mensajeId: mensaje.id } });
+    const final = await uno<{ fecha: string; franja: string }>("solicitudes", { id: s.id });
+    expect({ fecha: new Date(final.fecha), franja: final.franja }).toEqual({ fecha: dia(5), franja: "TARDE" });
+    const propuesta = await uno<{ aplicadaEn: string | null }>("propuestas_horario", { mensajeId: mensaje.id });
     expect(propuesta.aplicadaEn).not.toBeNull();
   });
 
@@ -228,6 +224,6 @@ describe("aceptar un presupuesto", () => {
     );
     comoUsuario(cliente);
     expect(error(await aceptarPresupuesto({ presupuestoId: vencido.presupuestoId }))).toMatch(/venció/);
-    expect(await prisma.flete.count({ where: { solicitudId: s.id } })).toBe(0);
+    expect(await contar("fletes", { solicitudId: s.id })).toBe(0);
   });
 });
