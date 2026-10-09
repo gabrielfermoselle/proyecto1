@@ -1,5 +1,3 @@
-// Recorrido del flete en pausa. El código queda acá, pero Playwright no lo corre.
-/*
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { type Cuenta, sesionDe } from "./utils";
 
@@ -99,20 +97,22 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
   await expect(florencia).toHaveURL(/\/cliente\/pedido\//);
   await florencia.reload();
   await expect(florencia.locator("#contenido").getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
-  await expect(florencia.getByRole("link", { name: "WhatsApp" })).toBeVisible();
+  await expect(florencia.locator("#contenido").getByRole("link", { name: "WhatsApp" })).toBeVisible();
 
   await carlos.goto("/fletero/trabajos");
-  await carlos.getByRole("link", { name: SOLICITUD }).click();
+  await carlos.locator("#contenido").getByRole("link", { name: SOLICITUD }).click();
   await expect(carlos).toHaveURL(/\/fletero\/pedido\//);
   await expect(carlos.locator("#contenido").getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
   // Con el flete confirmado, el fletero ya ve la dirección exacta.
-  await expect(carlos.getByRole("link", { name: "Cómo llegar" }).first()).toBeVisible();
+  await expect(carlos.locator("#contenido").getByRole("link", { name: "Cómo llegar" }).first()).toBeVisible();
 });
 
 /** Avanza de etapa con el botón principal y lo confirma en el diálogo (firmando, si lo pide). */
 async function avanzar(page: Page, boton: string, etapa: string, { firma = false } = {}) {
   const contenido = page.locator("#contenido");
-  await contenido.getByRole("button", { name: boton, exact: true }).click();
+  const principal = contenido.getByRole("button", { name: boton, exact: true });
+  await expect(principal).toBeEnabled({ timeout: 20_000 });
+  await principal.click();
   const dialogo = page.getByRole("dialog", { name: boton });
   if (firma) {
     const confirmar = dialogo.getByRole("button", { name: "Firmar y confirmar" });
@@ -137,48 +137,51 @@ test("el fletero sale a buscar la carga y la cliente ve el avance", async () => 
 
 test("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", async () => {
   await avanzar(carlos, "Llegué al origen", "Etapa 3 de 7: Cargando");
-  const salir = carlos.getByRole("button", { name: "Terminé de cargar, salgo" });
+  const contenido = carlos.locator("#contenido");
+  const salir = contenido.getByRole("button", { name: "Terminé de cargar, salgo" });
   await expect(salir).toBeDisabled();
 
-  await carlos.getByRole("button", { name: "Cargado: Bicicleta rodado 29" }).click();
+  await contenido.getByRole("button", { name: "Cargado: Bicicleta rodado 29" }).click();
   await expect(salir).toBeDisabled();
-  await carlos.getByRole("button", { name: "Cargado: Caja de herramientas" }).click();
+  await contenido.getByRole("button", { name: "Cargado: Caja de herramientas" }).click();
   await expect(salir).toBeEnabled();
   // Con ítems cargados ya no se puede cancelar.
-  await expect(carlos.getByRole("button", { name: "No puedo hacer este flete" })).toBeHidden();
+  await expect(contenido.getByRole("button", { name: "No puedo hacer este flete" })).toBeHidden();
 
   await avanzar(carlos, "Terminé de cargar, salgo", "Etapa 4 de 7: En traslado");
 });
 
 test("el fletero descarga todo y firma la entrega", async () => {
   await avanzar(carlos, "Llegué al destino", "Etapa 5 de 7: Descargando");
-  await carlos.getByRole("button", { name: "Todo: entregado" }).click();
+  await carlos.locator("#contenido").getByRole("button", { name: "Todo: entregado" }).click();
   await avanzar(carlos, "Terminé de descargar", "Etapa 6 de 7: Entregado", { firma: true });
 });
 
 test("la cliente revisa lo que recibió, cierra el flete y califica", async () => {
   await florencia.reload();
-  await expect(florencia.locator("#contenido").getByText("Etapa 6 de 7: Entregado")).toBeVisible();
-  const cerrar = florencia.getByRole("button", { name: "Cerrar el flete" });
+  const contenido = florencia.locator("#contenido");
+  await expect(contenido.getByText("Etapa 6 de 7: Entregado")).toBeVisible();
+  const cerrar = contenido.getByRole("button", { name: "Cerrar el flete" });
   await expect(cerrar).toBeDisabled();
 
-  await florencia.getByRole("button", { name: "Todo: recibido" }).click();
+  await contenido.getByRole("button", { name: "Todo: recibido" }).click();
   await avanzar(florencia, "Cerrar el flete", "Etapa 7 de 7: Cerrado", { firma: true });
 
-  await florencia.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
+  await florencia.locator("#contenido").getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
   await expect(florencia).toHaveURL(/\/calificar$/);
   // El radio es solo para lectores de pantalla: se toca la estrella (su label).
-  const cinco = florencia.getByRole("radio", { name: "5 estrellas: Excelente" });
-  await florencia.locator("label", { has: cinco }).click();
+  const cinco = florencia.locator("#contenido").getByRole("radio", { name: "5 estrellas: Excelente" });
+  await florencia.locator("#contenido").locator("label", { has: cinco }).click();
   await expect(cinco).toBeChecked();
-  await florencia.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
-  const calificar = florencia.getByRole("button", { name: "Enviar calificación" });
+  await florencia.locator("#contenido").getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
+  const calificar = florencia.locator("#contenido").getByRole("button", { name: "Enviar calificación" });
   await calificar.click();
   await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/);
-  await expect(florencia.getByRole("region", { name: "Tu calificación" })).toBeVisible();
+  await expect(florencia.locator("#contenido").getByRole("region", { name: "Tu calificación" })).toBeVisible();
 
   // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
   await florencia.goto("/cliente/fleteros");
-  await expect(florencia.getByRole("link", { name: /Carlos R\./ })).toContainText("4,7 (3)");
+  await expect(
+    florencia.locator("#contenido").getByRole("link", { name: /Carlos R\./ }).first(),
+  ).toContainText("4,7 (3)");
 });
-*/
