@@ -1,10 +1,10 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
 import { type Cuenta, sesionDe } from "./utils";
 
 // El recorrido central, con dos personas reales en dos navegadores: Florencia (cliente) publicó
 // "Bicicleta y caja de herramientas" en el seed y Carlos (fletero) la tiene a 0 m de su base.
 // Los pasos dependen unos de otros: corren en orden y, si uno falla, se saltean los demás.
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "serial", timeout: 180_000 });
 
 const SOLICITUD = "Bicicleta y caja de herramientas";
 
@@ -113,11 +113,22 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
  */
 async function marcar(page: Page, nombre: string) {
   const boton = page.locator("#contenido").getByRole("button", { name: nombre });
-  const guardado = page.waitForRequest(
-    (pedido) => pedido.method() === "POST" && pedido.headers()["next-action"] !== undefined,
-  );
-  await boton.click();
-  await (await guardado).response();
+  // Un clic antes de que la página se hidrate no hace nada: se repite hasta que salga el guardado.
+  let pedido: Request | undefined;
+  await expect(async () => {
+    [pedido] = await Promise.all([
+      page.waitForRequest(
+        (r) =>
+          r.method() === "POST" &&
+          r.headers()["next-action"] !== undefined &&
+          (r.postData() ?? "").includes('"fase"'),
+        { timeout: 3_000 },
+      ),
+      boton.click({ timeout: 3_000 }),
+    ]);
+  }).toPass({ timeout: 30_000 });
+  const respuesta = await pedido!.response();
+  await respuesta?.finished();
   await page.reload();
 }
 
@@ -126,8 +137,12 @@ async function avanzar(page: Page, boton: string, etapa: string, { firma = false
   const contenido = page.locator("#contenido");
   const principal = contenido.getByRole("button", { name: boton, exact: true });
   await expect(principal).toBeEnabled({ timeout: 20_000 });
-  await principal.click();
   const dialogo = page.getByRole("dialog", { name: boton });
+  // Antes de hidratar el clic no abre el diálogo: se repite hasta que aparezca.
+  await expect(async () => {
+    if (!(await dialogo.isVisible())) await principal.click({ timeout: 3_000 });
+    await expect(dialogo).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   if (firma) {
     const confirmar = dialogo.getByRole("button", { name: "Firmar y confirmar" });
     await expect(confirmar).toBeDisabled();
@@ -184,14 +199,21 @@ test("la cliente revisa lo que recibió, cierra el flete y califica", async () =
   await contenido.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
   await expect(florencia).toHaveURL(/\/calificar$/);
   // El radio es solo para lectores de pantalla: se toca la estrella (el label que lo envuelve).
+  // Antes de hidratar, el navegador tilda el radio pero React no se entera: se toca otra estrella
+  // y después la de 5 hasta que el formulario la tome.
   const cinco = contenido.getByRole("radio", { name: "5 estrellas: Excelente" });
-  await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click();
-  await expect(cinco).toBeChecked();
-  await florencia.locator("#contenido").getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
-  const calificar = florencia.locator("#contenido").getByRole("button", { name: "Enviar calificación" });
+  const calificar = contenido.getByRole("button", { name: "Enviar calificación" });
+  await expect(async () => {
+    await contenido.locator("label", { hasText: "4 estrellas: Bueno" }).click({ timeout: 3_000 });
+    await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click({ timeout: 3_000 });
+    await expect(cinco).toBeChecked({ timeout: 1_000 });
+    await expect(calificar).toBeEnabled({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await contenido.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
   await calificar.click();
-  await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/);
-  await expect(florencia.locator("#contenido").getByRole("region", { name: "Tu calificación" })).toBeVisible();
+  await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/, { timeout: 20_000 });
+  await florencia.reload();
+  await expect(contenido.getByRole("region", { name: "Tu calificación" })).toBeVisible();
 
   // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
   await florencia.goto("/cliente/fleteros");
