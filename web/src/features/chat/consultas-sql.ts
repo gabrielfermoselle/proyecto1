@@ -13,6 +13,8 @@ const COLUMNAS: Record<LadoBandeja, { perfil: Prisma.Sql; leidoHasta: Prisma.Sql
 
 export interface FilaBandeja {
   id: string;
+  solicitudId: string;
+  fleteroId: string;
   ultimaActividadEn: Date;
   titulo: string;
   solicitudEstado: "ABIERTA" | "ADJUDICADA" | "CANCELADA" | "VENCIDA";
@@ -48,7 +50,7 @@ export function consultaBandeja(params: {
   const { lado, perfilId, userId, limite } = params;
   return Prisma.sql`
     SELECT
-      c.id, c."ultimaActividadEn", s.titulo, s.estado::text AS "solicitudEstado",
+      c.id, c."solicitudId", c."fleteroId", c."ultimaActividadEn", s.titulo, s.estado::text AS "solicitudEstado",
       uc.nombre AS "clienteNombre", uc.apellido AS "clienteApellido",
       uf.nombre AS "fleteroNombre", uf.apellido AS "fleteroApellido",
       p.estado::text AS "presupuestoEstado", p."validoHasta" AS "presupuestoValidoHasta",

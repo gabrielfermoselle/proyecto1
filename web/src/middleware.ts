@@ -1,13 +1,13 @@
 import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
 import { NextRequest, NextResponse, type NextFetchEvent } from "next/server";
-import { AREA_POR_ROL, esRol, puedeAcceder, rolDeRuta } from "@/domain/roles";
+import { AREA_POR_ROL, esRol, esRutaPrivada, puedeAcceder } from "@/domain/roles";
 import { HEADER_REQUEST_ID, resolverRequestId } from "@/lib/request-id";
 
 /**
  * Corre en el Edge para todas las rutas:
  *  1. Asigna un id a cada request (x-request-id): llega al servidor, que lo pone en sus logs, y
  *     vuelve en la respuesta para poder reportarlo.
- *  2. Primera barrera de las áreas privadas: sin sesión → /login (con callbackUrl); rol
+ *  2. Primera barrera de las áreas privadas y las secciones comunes (chat, notificaciones, perfil): sin sesión → /login (con callbackUrl); rol
  *     equivocado → su área. No reemplaza la autorización del servidor: cada layout, página y
  *     Server Action vuelve a verificar sesión, rol y pertenencia del recurso contra la base.
  */
@@ -36,10 +36,9 @@ export default async function middleware(req: NextRequest, evento: NextFetchEven
   headers.set(HEADER_REQUEST_ID, requestId);
   const conId = new NextRequest(req, { headers });
 
-  const respuesta =
-    rolDeRuta(req.nextUrl.pathname) === null
-      ? seguir(conId)
-      : ((await areasPrivadas(conId as NextRequestWithAuth, evento)) ?? seguir(conId));
+  const respuesta = !esRutaPrivada(req.nextUrl.pathname)
+    ? seguir(conId)
+    : ((await areasPrivadas(conId as NextRequestWithAuth, evento)) ?? seguir(conId));
   respuesta.headers.set(HEADER_REQUEST_ID, requestId);
   return respuesta;
 }

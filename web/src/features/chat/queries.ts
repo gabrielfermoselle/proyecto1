@@ -11,7 +11,7 @@ import {
 import { ETAPAS_ACTIVAS } from "@/domain/ciclo-flete";
 import { fechaIsoDeDia } from "@/domain/fechas";
 import { getTurnosActivos } from "@/features/fleteros/fletes/queries";
-import { hrefFlete, topicFlete } from "@/features/fletes/rutas";
+import { hrefPedido, topicFlete } from "@/features/fletes/rutas";
 import { urlsFirmadas } from "@/features/uploads/storage";
 import { nombrePublico } from "@/lib/formato";
 import { prisma } from "@/lib/prisma";
@@ -76,7 +76,7 @@ export async function getBandeja(usuario: UsuarioActual, limite = 50) {
     });
     return {
       id: f.id,
-      href: hrefConversacion(perfil.rol, f.id),
+      href: hrefConversacion(perfil.rol, f.solicitudId, f.fleteroId),
       titulo: f.titulo,
       contraparte:
         perfil.rol === "CLIENTE"
@@ -166,8 +166,8 @@ export interface MetaConversacion {
   flete: { id: string; etapa: EtapaFlete } | null;
   /** En negociación: fecha aceptada en el chat, que se aplica si el cliente elige este presupuesto. */
   fechaAcordada: { fecha: string; franja: FranjaHoraria } | null;
-  /** Adónde ir para ver la solicitud o el flete (según el rol). */
-  hrefDetalle: string | null;
+  /** La página del pedido de cada parte (presupuestos o seguimiento del flete). */
+  hrefDetalle: string;
   /** Para el fletero: propuestas pendientes que chocan con otro flete suyo (id → títulos). */
   conflictos: Record<string, string[]>;
 }
@@ -218,11 +218,7 @@ export async function getMetaConversacion(ctx: ContextoChat): Promise<MetaConver
       : null,
     flete: ctx.fleteId && ctx.fleteEtapa ? { id: ctx.fleteId, etapa: ctx.fleteEtapa } : null,
     fechaAcordada: acordada ? { fecha: fechaIsoDeDia(acordada.fecha), franja: acordada.franja } : null,
-    hrefDetalle: ctx.fleteId
-      ? hrefFlete(ctx.miRol, ctx.fleteId)
-      : ctx.miRol === "FLETERO"
-        ? `/fletero/solicitudes/${ctx.solicitudId}`
-        : null,
+    hrefDetalle: hrefPedido(ctx.miRol, ctx.solicitudId),
     conflictos,
   };
 }

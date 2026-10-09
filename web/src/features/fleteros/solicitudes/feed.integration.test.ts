@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { postgis } from "@electric-sql/pglite-postgis";
@@ -10,7 +10,7 @@ import { consultaAccesoSolicitud, consultaConteosFeed, consultaFeed, type FilaFe
 // migración del proyecto aplicada. Verifica radio, compatibilidad, fechas, estados y orden.
 
 const HOY = "2026-10-01";
-const MIGRACION = join(process.cwd(), "prisma/migrations/20261001000000_init/migration.sql");
+const MIGRACIONES = join(process.cwd(), "prisma/migrations");
 
 let db: PGlite;
 
@@ -59,7 +59,13 @@ async function presupuesto(id: string, solicitudId: string, fleteroId: string, v
 
 beforeAll(async () => {
   db = await PGlite.create({ extensions: { postgis } });
-  await db.exec(readFileSync(MIGRACION, "utf8"));
+  // Todas las migraciones, en orden (las carpetas empiezan con la fecha).
+  for (const carpeta of readdirSync(MIGRACIONES, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort()) {
+    await db.exec(readFileSync(join(MIGRACIONES, carpeta, "migration.sql"), "utf8"));
+  }
 
   // Fletero "yo": base en Plaza Independencia, radio 10 km, camioneta de 1000 kg / 3,5 m³
   // (y un camión inactivo, que no tiene que contar). Fletero "otro" con un camión grande.
@@ -141,6 +147,16 @@ describe("feed del fletero (SQL real con PostGIS)", () => {
     expect(ids).toContain("pesada"); // su camión lleva 3500 kg
     expect(ids).toContain("ya-presupuestada"); // la presupuesté yo, no él
     expect(ids).not.toContain("con-competencia"); // esa ya la presupuestó él
+  });
+
+  it("filtra por distancia, fecha y tipo", async () => {
+    const cercanas = (await feed({ filtros: { maxKm: 5 } })).map((f) => f.id);
+    expect(cercanas).not.toContain("media"); // está a ~8 km
+    expect(cercanas).toContain("cerca");
+    const del2 = (await feed({ filtros: { desde: "2026-10-02", hasta: "2026-10-02" } })).map((f) => f.id);
+    expect(del2).toEqual(["media"]);
+    expect(await feed({ filtros: { tipo: "MUDANZA" } })).toEqual([]);
+    expect((await feed({ filtros: { tipo: "MUEBLES" } })).length).toBe(4);
   });
 
   it("los conteos de las pestañas coinciden con las listas", async () => {

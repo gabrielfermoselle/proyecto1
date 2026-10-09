@@ -215,3 +215,51 @@ export async function getSolicitudesAdmin() {
     flete: s.flete,
   }));
 }
+
+/**
+ * Fleteros con el perfil completo para verificar, con su documentación (URLs firmadas: el bucket
+ * es privado). Primero los que tienen más documentos cargados.
+ */
+export async function getFleterosParaVerificar(verificados: boolean) {
+  const fleteros = await prisma.fleteroProfile.findMany({
+    where: { verificado: verificados, onboardingCompletadoEn: { not: null }, user: { activo: true } },
+    orderBy: { onboardingCompletadoEn: "desc" },
+    take: 60,
+    select: {
+      id: true,
+      dni: true,
+      verificado: true,
+      onboardingCompletadoEn: true,
+      ratingPromedio: true,
+      cantidadCalificaciones: true,
+      user: { select: { nombre: true, apellido: true, email: true, telefono: true } },
+      vehiculos: {
+        where: { activo: true },
+        select: { tipo: true, marca: true, modelo: true, patente: true },
+      },
+      documentos: { select: { tipo: true, ruta: true, createdAt: true } },
+    },
+  });
+  const urls = await urlsFirmadas(fleteros.flatMap((f) => f.documentos.map((d) => d.ruta)));
+  return fleteros
+    .map((f) => ({
+      id: f.id,
+      nombre: nombreCompleto(f.user),
+      email: f.user.email,
+      telefono: f.user.telefono,
+      dni: f.dni,
+      verificado: f.verificado,
+      alta: f.onboardingCompletadoEn,
+      rating: f.cantidadCalificaciones > 0 ? f.ratingPromedio.toNumber() : null,
+      calificaciones: f.cantidadCalificaciones,
+      vehiculos: f.vehiculos,
+      documentos: f.documentos.map((d) => ({
+        tipo: d.tipo,
+        subidoEn: d.createdAt,
+        url: urls.get(d.ruta) ?? null,
+      })),
+    }))
+    .sort((a, b) => b.documentos.length - a.documentos.length);
+}
+
+export type FleteroParaVerificar = Awaited<ReturnType<typeof getFleterosParaVerificar>>[number];

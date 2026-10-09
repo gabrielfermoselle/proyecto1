@@ -1,6 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,17 @@ import { calificarFlete } from "../actions";
 const ETIQUETAS = ["Muy malo", "Malo", "Regular", "Bueno", "Excelente"];
 
 /** Calificación del cliente al fletero: de 1 a 5 estrellas y un comentario opcional. */
-export function FormCalificacion({ fleteId, fletero }: { fleteId: string; fletero: string }) {
+export function FormCalificacion({
+  fleteId,
+  fletero,
+  volverA,
+}: {
+  fleteId: string;
+  fletero: string;
+  /** Adónde ir después de calificar. */
+  volverA?: string;
+}) {
+  const router = useRouter();
   const [puntaje, setPuntaje] = useState(0);
   const [comentario, setComentario] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +38,7 @@ export function FormCalificacion({ fleteId, fletero }: { fleteId: string; fleter
         startTransition(async () => {
           const r = await calificarFlete({ fleteId, puntaje, comentario });
           if (!r.ok) setError(r.error);
+          else if (volverA) router.push(volverA);
         });
       }}
     >
@@ -51,7 +63,7 @@ export function FormCalificacion({ fleteId, fletero }: { fleteId: string; fleter
                 <Star
                   aria-hidden="true"
                   className={cn(
-                    "size-9 transition-colors",
+                    "size-11 transition-colors",
                     valor <= puntaje ? "fill-accent text-accent" : "text-muted-foreground/50",
                   )}
                 />
@@ -85,7 +97,7 @@ export function FormCalificacion({ fleteId, fletero }: { fleteId: string; fleter
           {error}
         </p>
       ) : null}
-      <Button type="submit" disabled={puntaje === 0 || pendiente} className="justify-self-start">
+      <Button type="submit" size="lg" disabled={puntaje === 0 || pendiente} className="justify-self-start">
         {pendiente ? "Enviando…" : "Enviar calificación"}
       </Button>
     </form>

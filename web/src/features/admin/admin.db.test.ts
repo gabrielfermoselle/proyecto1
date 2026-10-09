@@ -92,7 +92,7 @@ describe("administración", () => {
       select: { userId: true, href: true },
     });
     expect(avisos).toHaveLength(2);
-    expect(avisos.find((a) => a.userId === cliente.id)?.href).toMatch(/^\/cliente\/fletes\//);
+    expect(avisos.find((a) => a.userId === cliente.id)?.href).toMatch(/^\/cliente\/pedido\//);
   });
 
   it("la base no admite un reclamo resuelto sin resolución", async () => {

@@ -1,12 +1,15 @@
 // Servidor de los e2e: PGlite con las migraciones + el seed de demo, y Next apuntando a esa base.
 // Lo arranca Playwright (webServer). Con E2E_PROD=1 usa `next start` sobre un build previo (CI);
-// si no, `next dev` (local, sin build).
+// si no, `next dev` (local, sin build). También es `npm run dev:local` (con --puerto 3000): la app
+// contra una base en memoria con los datos de demo, sin la latencia de Supabase. Los datos se
+// regeneran cada vez que arranca.
 import { spawn, type SpawnOptions } from "node:child_process";
 import { rmSync } from "node:fs";
 import { levantarPglite } from "../db/pglite";
 import { ARCHIVO_CORREOS } from "./correos";
 
-const PUERTO = process.env.E2E_PUERTO ?? "3100";
+const argPuerto = process.argv.indexOf("--puerto");
+const PUERTO = (argPuerto >= 0 ? process.argv[argPuerto + 1] : undefined) ?? process.env.E2E_PUERTO ?? "3100";
 
 /** `npx …` como proceso hijo. Nunca sincrónico: PGlite atiende las consultas en este mismo proceso. */
 function npx(args: string[], opciones: SpawnOptions) {
@@ -43,7 +46,10 @@ async function main() {
   await esperar(npx(["tsx", "prisma/seed.ts"], { env: { ...env, NODE_ENV: "test" } }));
 
   const prod = process.env.E2E_PROD === "1";
-  const next = npx(["next", prod ? "start" : "dev", "-p", PUERTO], { env });
+  // En desarrollo, Turbopack: compila cada página mucho más rápido que webpack.
+  const next = npx(prod ? ["next", "start", "-p", PUERTO] : ["next", "dev", "--turbopack", "-p", PUERTO], {
+    env,
+  });
 
   const terminar = async () => {
     next.kill();

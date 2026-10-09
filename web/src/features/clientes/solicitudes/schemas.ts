@@ -65,6 +65,7 @@ export const solicitudSchema = z
       .optional()
       .transform((v) => (v ? v : null)),
     ayudantesRequeridos: z.coerce.number().int().min(0).max(10, "Hasta 10 ayudantes"),
+    requiereEmbalaje: z.boolean().default(false),
     items: z
       .array(itemSchema)
       .min(1, "Agregá al menos un ítem")
@@ -82,7 +83,16 @@ export const solicitudSchema = z
 export type SolicitudInput = z.input<typeof solicitudSchema>;
 export type SolicitudDatos = z.output<typeof solicitudSchema>;
 
-export const cancelarSolicitudSchema = z.object({ solicitudId: id });
+export const cancelarSolicitudSchema = z.object({
+  solicitudId: id,
+  /** Lo ven los fleteros que la habían presupuestado. */
+  motivo: z
+    .string()
+    .trim()
+    .max(300, "Usá como máximo 300 caracteres")
+    .optional()
+    .transform((v) => (v ? v : null)),
+});
 
 export const prepararFotoSolicitudSchema = z.object({ solicitudId: id });
 

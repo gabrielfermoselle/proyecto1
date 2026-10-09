@@ -1,45 +1,39 @@
 "use client";
 
-import { CalendarDays, FileText, Inbox, LayoutDashboard, MessagesSquare, UserRound } from "lucide-react";
+import { BriefcaseBusiness, Inbox, MessagesSquare, Truck } from "lucide-react";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
 import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
 
 const secciones = (): SeccionNav[] => [
-  { href: "/fletero", label: "Inicio", Icono: LayoutDashboard, prefijos: [], enInferior: true },
   {
-    href: "/fletero/solicitudes",
-    label: "Solicitudes",
+    href: "/fletero",
+    label: "Pedidos disponibles",
+    labelCorto: "Disponibles",
     Icono: Inbox,
-    prefijos: ["/fletero/solicitudes"],
+    prefijos: ["/fletero/pedido"],
     enInferior: true,
   },
   {
-    href: "/fletero/mensajes",
-    label: "Mensajes",
+    href: "/fletero/trabajos",
+    label: "Mis trabajos",
+    labelCorto: "Trabajos",
+    Icono: BriefcaseBusiness,
+    prefijos: ["/fletero/trabajos"],
+    enInferior: true,
+  },
+  {
+    href: "/chat",
+    label: "Chat",
     Icono: MessagesSquare,
-    prefijos: ["/fletero/mensajes"],
+    prefijos: ["/chat"],
     enInferior: true,
     extra: <NoLeidosBadge />,
   },
   {
-    href: "/fletero/agenda",
-    label: "Agenda",
-    Icono: CalendarDays,
-    prefijos: ["/fletero/agenda", "/fletero/fletes"],
-    enInferior: true,
-  },
-  // En el celular se llega desde Solicitudes → Presupuestadas y desde el panel.
-  {
-    href: "/fletero/presupuestos",
-    label: "Presupuestos",
-    Icono: FileText,
-    prefijos: ["/fletero/presupuestos"],
-    enInferior: false,
-  },
-  {
     href: "/fletero/perfil",
-    label: "Perfil",
-    Icono: UserRound,
+    label: "Vehículo y zona",
+    labelCorto: "Perfil",
+    Icono: Truck,
     prefijos: ["/fletero/perfil"],
     enInferior: true,
   },
@@ -50,5 +44,5 @@ export function FleteroNavTabs() {
 }
 
 export function FleteroNavInferior() {
-  return <NavInferior secciones={secciones()} ocultarEn={/^\/fletero\/mensajes\/[^/]+/} />;
+  return <NavInferior secciones={secciones()} ocultarEn={/^\/chat\/[^/]+/} />;
 }

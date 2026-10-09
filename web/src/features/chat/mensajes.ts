@@ -14,6 +14,8 @@ type Tx = Prisma.TransactionClient;
 /** Quién escribe, a quién le llega y si los datos de contacto ya se pueden mostrar. */
 export interface Emisor {
   conversacionId: string;
+  solicitudId: string;
+  fleteroId: string;
   autorId: string;
   autorRol: RolChat;
   autorNombre: string;
@@ -28,6 +30,8 @@ export function emisorDesdeContexto(
 ): Emisor {
   return {
     conversacionId: ctx.conversacionId,
+    solicitudId: ctx.solicitudId,
+    fleteroId: ctx.fleteroId,
     autorId: ctx.miUserId,
     autorRol: ctx.miRol,
     autorNombre: nombrePublico(autor.nombre, autor.apellido),
@@ -98,7 +102,7 @@ export async function insertarMensaje(
     tipo: "MENSAJE",
     titulo: `Mensajes de ${emisor.autorNombre}`,
     cuerpo: vistaPrevia(contenido, emisor.contactoVisible),
-    href: hrefConversacion(emisor.destinatarioRol, emisor.conversacionId),
+    href: hrefConversacion(emisor.destinatarioRol, emisor.solicitudId, emisor.fleteroId),
     // Una sola notificación por conversación: se actualiza con el último mensaje.
     clave: `chat:${emisor.conversacionId}`,
   });
@@ -142,6 +146,8 @@ export async function crearMensajeDeTexto(
     tx,
     {
       conversacionId,
+      solicitudId: c.solicitudId,
+      fleteroId: c.fleteroId,
       autorId: autor.id,
       autorRol: esCliente ? "CLIENTE" : "FLETERO",
       autorNombre: nombrePublico(autor.nombre, autor.apellido),

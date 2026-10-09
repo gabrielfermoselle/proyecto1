@@ -10,7 +10,7 @@ import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
 import { prisma } from "@/lib/prisma";
 import type { UsuarioActual } from "@/lib/session";
 import { configPublicaSupabase } from "@/lib/supabase";
-import { hrefFlete } from "./rutas";
+import { patronPedido } from "./rutas";
 import {
   avanzarEtapaSchema,
   calificarSchema,
@@ -39,8 +39,10 @@ function actorDe(usuario: UsuarioActual): ActorFlete {
   return { rol: perfil.rol, userId: usuario.id, perfilId: perfil.perfilId };
 }
 
-function refrescar(actor: ActorFlete, fleteId: string) {
-  revalidatePath(hrefFlete(actor.rol, fleteId));
+// Las dos partes ven el cambio: cada una en su página del pedido.
+function refrescar() {
+  revalidatePath(patronPedido("CLIENTE"), "page");
+  revalidatePath(patronPedido("FLETERO"), "page");
 }
 
 const carpetaFotos = (fleteId: string, userId: string) => `fletes/${fleteId}/${userId}`;
@@ -58,7 +60,7 @@ export const avanzarEtapa = createAction({
       ubicacion: ubicacion ?? null,
       conformidad: conformidad ?? false,
     });
-    refrescar(actor, fleteId);
+    refrescar();
     return resultado;
   },
 });
@@ -75,7 +77,7 @@ export const cancelarFlete = createAction({
       motivo,
       ubicacion: ubicacion ?? null,
     });
-    refrescar(actor, fleteId);
+    refrescar();
     return resultado;
   },
 });
@@ -130,7 +132,7 @@ export const registrarControl = createAction({
         throw new ActionError("Ese ítem se acaba de actualizar. Recargá la página.");
       throw error;
     }
-    refrescar(actor, fleteId);
+    refrescar();
     return null;
   },
 });
@@ -141,7 +143,7 @@ export const marcarTodos = createAction({
   handler: async ({ fleteId, fase }, { usuario }) => {
     const actor = actorDe(usuario);
     const cantidad = await marcarTodosServicio({ fleteId, actor, fase });
-    refrescar(actor, fleteId);
+    refrescar();
     return { cantidad };
   },
 });
@@ -152,7 +154,7 @@ export const quitarControl = createAction({
   handler: async ({ fleteId, itemId, fase }, { usuario }) => {
     const actor = actorDe(usuario);
     await quitarControlServicio({ fleteId, actor, itemId, fase });
-    refrescar(actor, fleteId);
+    refrescar();
     return null;
   },
 });
@@ -189,7 +191,7 @@ export const calificarFlete = createAction({
       if (esViolacionUnica(error)) throw new ActionError("Ya calificaste este flete.");
       throw error;
     }
-    refrescar(actor, fleteId);
+    refrescar();
     revalidatePath(`/fleteros/${flete.fleteroId}`);
     return null;
   },

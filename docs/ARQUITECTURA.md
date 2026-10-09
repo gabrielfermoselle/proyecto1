@@ -138,15 +138,22 @@ web/
 │   │   ├── panel/                   redirige al área del rol
 │   │   ├── fleteros/[id]/           perfil público de un fletero
 │   │   ├── cliente/                 ÁREA CLIENTE
-│   │   │   ├── solicitudes/         listado, nueva, detalle con presupuestos recibidos
-│   │   │   ├── fletes/[id]/         seguimiento del flete, recepción, calificación
-│   │   │   ├── fleteros/            buscador (cercanía, precio, calificación)
-│   │   │   ├── perfil/              datos, dirección habitual y contraseña
-│   │   │   └── mensajes/            bandeja y conversación
+│   │   │   ├── page.tsx             mis pedidos (con la barra de estado de cada uno)
+│   │   │   ├── nuevo/               nuevo pedido en 5 pasos
+│   │   │   ├── pedido/[id]/         detalle + presupuestos; con flete, seguimiento y recepción
+│   │   │   │   └── calificar/       calificar al fletero (flete cerrado)
+│   │   │   └── fleteros/            buscador (cercanía, precio, calificación)
 │   │   ├── fletero/                 ÁREA FLETERO
 │   │   │   ├── onboarding/[paso]/   alta guiada: datos, zona, vehículo, tarifas
-│   │   │   └── (app)/               solicitudes (feed), presupuestos, fletes, mensajes, perfil
-│   │   ├── admin/                   ÁREA ADMIN: usuarios, reclamos
+│   │   │   └── (app)/               pedidos disponibles (page), pedido/[id] (ver y presupuestar
+│   │   │                            o gestionar el flete), trabajos (agenda, presupuestos,
+│   │   │                            ganancias), perfil (vehículos, zona, documentos, tarifas)
+│   │   ├── (comun)/                 SECCIONES COMUNES con el marco de cada rol
+│   │   │   ├── chat/[pedidoId]/     chat del pedido (el cliente elige fletero: /[fleteroId])
+│   │   │   ├── notificaciones/      todos los avisos
+│   │   │   └── perfil/              mi cuenta: datos, teléfono, contraseña
+│   │   ├── admin/                   ÁREA ADMIN: fleteros (verificar documentación, cuentas) y
+│   │   │                            reportes (denuncias y pedidos)
 │   │   └── api/                     BACKEND · endpoints HTTP (route handlers)
 │   │       ├── auth/[...nextauth]/  login/logout/sesión (NextAuth)
 │   │       ├── chat/bandeja/        lista de conversaciones
@@ -195,7 +202,6 @@ web/
 ├── test/                            infraestructura de tests (PGlite, sesión simulada, servidor e2e)
 ├── e2e/                             recorridos Playwright (registro, flete, buscador, contraseñas, a11y…)
 ├── .env.example                     variables necesarias (ver sección 7)
-├── vercel.json                      cron diario
 └── DEPLOY.md                        guía de puesta en producción
 ```
 
@@ -464,8 +470,10 @@ deja suscribirse a esos canales.
 ### Autorización en tres capas
 
 1. **Middleware (Edge)**: corre en todas las rutas para asignar el id de request; en
-   `/cliente/*`, `/fletero/*` y `/admin/*` además exige sesión (si no hay, redirige a `/login`) y
-   manda a cada rol a su propia área.
+   `/cliente/*`, `/fletero/*`, `/admin/*` y las secciones comunes (`/chat`, `/notificaciones`,
+   `/perfil`) además exige sesión (si no hay, redirige a `/login`) y manda a cada rol a su propia
+   área. Las rutas anteriores (`/cliente/solicitudes`, `/fletero/agenda`, `/cliente/mensajes/:id`…)
+   redirigen a las nuevas (`next.config.ts` y páginas de redirección por id).
 2. **Página o layout**: `requireRol(...)`, `requireCliente()` y `requireFletero()` vuelven a leer
    el usuario **desde la base**. Si un admin lo desactiva, le cambia el rol o el usuario cambió su
    contraseña, aplica en el siguiente request, aunque el JWT siga vigente.
@@ -746,9 +754,10 @@ Detalle paso a paso en `web/DEPLOY.md`. En resumen:
    anotar las credenciales.
 2. **Migraciones**: `npm run db:deploy` (crea tablas, índices GIST, CHECKs, políticas de Realtime
    y buckets). **No** correr el seed en producción.
-3. **Vercel**: proyecto con **Root Directory `web`** y las variables de entorno de la sección 7.
+3. **Vercel**: proyecto con Root Directory en la raíz del repo (el `vercel.json` de la raíz compila `web/`)
+   y las variables de entorno de la sección 7.
    Cada push a `main` despliega a producción y cada PR genera un *preview*.
-4. **Cron**: `web/vercel.json` corre el mantenimiento a las 06:00 UTC (03:00 en Tucumán).
+4. **Cron**: `vercel.json` (raíz) corre el mantenimiento a las 06:00 UTC (03:00 en Tucumán).
 5. **Verificación**: checklist manual en `DEPLOY.md` (dos navegadores, Realtime, fotos, PDF,
    admin, cron).
 
@@ -794,7 +803,7 @@ accesibilidad, guía de deploy.
 ### Sprint 7 — Brechas frente al enunciado ✅
 | Ítem | Estado | Detalle |
 |---|---|---|
-| Perfil del **cliente** | ✅ | `/cliente/perfil`: nombre, apellido, teléfono opcional y **dirección habitual** con mapa |
+| Perfil del **cliente** | ✅ | `/perfil`: nombre, apellido, teléfono opcional y **dirección habitual** con mapa |
 | Búsqueda de fleteros **por cercanía** | ✅ | Desde la dirección habitual, el origen de una solicitud o una dirección escrita; "que lleguen a ese punto" (radio del fletero) o hasta N km; orden por distancia (PostGIS sobre GIST) |
 | Filtro por **precio** | ✅ | Tope de precio mínimo siempre; con una solicitud de referencia, **precio estimado** por fletero y orden por ese precio |
 | Filtro por **calificación mínima** | ✅ | 3, 4 o 4,5 estrellas o más (sin calificaciones no pasa el filtro) |
@@ -817,6 +826,19 @@ accesibilidad, guía de deploy.
   (`it.fails` en `perfil.db.test.ts`).
 - Dos claves foráneas hacia `vehiculos` no tienen índice propio (`invariantes-base.db.test.ts`).
 - `npm audit` informa vulnerabilidades en dependencias (revisar antes de producción).
+
+### Sprint 9 — Organización por rol y rediseño ✅
+| Ítem | Estado | Detalle |
+|---|---|---|
+| Rutas por rol | ✅ | Cliente: `/cliente`, `/cliente/nuevo`, `/cliente/pedido/:id`, `/cliente/pedido/:id/calificar`. Fletero: `/fletero`, `/fletero/pedido/:id`, `/fletero/trabajos`, `/fletero/perfil`. Comunes: `/chat/:pedidoId`, `/notificaciones`, `/perfil`. Admin: `/admin/fleteros`, `/admin/reportes` |
+| Estado del pedido siempre visible | ✅ | Barra Esperando ▸ Aceptado ▸ En camino ▸ Finalizado (`domain/pedido.ts`) en la lista y en el detalle |
+| Nuevo pedido paso a paso | ✅ | Tipo · origen y destino (distancia automática) · qué llevás · fecha y franja · extras (ayudantes, **embalaje**) |
+| Presupuesto con **hora de llegada** | ✅ | Validada contra la franja pedida (`horaEnFranja`) |
+| Filtros del feed | ✅ | Zona (distancia a la base), fecha y tipo, en la URL |
+| **Documentos** del fletero | ✅ | DNI, licencia y seguro en el bucket privado; el admin los revisa y verifica |
+| Cancelar pedido **con motivo** | ✅ | Lo reciben en el chat los fleteros que habían presupuestado |
+| Contacto directo | ✅ | Con el flete confirmado, WhatsApp y llamada en la página del pedido (antes, solo chat) |
+| Migración | ✅ | `20261008000000_esquema_por_rol`: hay que correr `db:deploy` en Supabase |
 
 ### Fuera de alcance (trabajo futuro)
 - **Pagos dentro de la app** (por ejemplo Mercado Pago, con retención hasta la confirmación de

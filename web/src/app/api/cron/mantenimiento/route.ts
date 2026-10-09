@@ -16,7 +16,7 @@ function autorizado(header: string | null): boolean {
   return esperado.length === recibido.length && timingSafeEqual(esperado, recibido);
 }
 
-/** Mantenimiento diario. Lo dispara Vercel Cron (ver vercel.json) con `Authorization: Bearer <CRON_SECRET>`. */
+/** Mantenimiento diario. Lo dispara Vercel Cron (ver el vercel.json de la raíz) con `Authorization: Bearer <CRON_SECRET>`. */
 export async function GET(request: Request) {
   const logger = await logDelRequest();
   if (!autorizado(request.headers.get("authorization"))) {

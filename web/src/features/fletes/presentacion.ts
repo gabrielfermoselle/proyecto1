@@ -20,13 +20,6 @@ export function pasosTimeline(
   }));
 }
 
-/** Solo el tramo del flete (desde CONFIRMADO), para la barra de progreso. */
-export function pasosDelFlete(pasos: PasoCiclo[]): PasoTimeline[] {
-  return pasos
-    .filter((p) => p.etapa === "CANCELADO" || (RECORRIDO_FLETE as readonly string[]).includes(p.etapa))
-    .map((p) => ({ clave: p.etapa, titulo: ETIQUETA_CICLO[p.etapa], estado: p.estado }));
-}
-
 export interface TextosFase {
   titulo: string;
   ayuda: string;
@@ -117,4 +110,16 @@ export function tonoResultado(r: ResultadoControl): "ok" | "alerta" | "neutro" {
   if (r === "CON_DANO" || r === "FALTANTE" || r === "RECLAMO") return "alerta";
   if (r === "NO_CARGADO") return "neutro";
   return "ok";
+}
+
+/** La etapa en la que está el flete dentro de su recorrido (desde CONFIRMADO), para mostrarla en texto. */
+export function etapaEnCurso(pasos: PasoCiclo[]): { numero: number; total: number; titulo: string } | null {
+  const tramo = pasos.filter((p) => (RECORRIDO_FLETE as readonly string[]).includes(p.etapa));
+  if (pasos.some((p) => p.etapa === "CANCELADO")) return null;
+  const actual = tramo.findIndex((p) => p.estado === "actual");
+  const indice = actual >= 0 ? actual : tramo.length - 1;
+  const paso = tramo[indice];
+  return paso
+    ? { numero: indice + 1, total: RECORRIDO_FLETE.length, titulo: ETIQUETA_CICLO[paso.etapa] }
+    : null;
 }

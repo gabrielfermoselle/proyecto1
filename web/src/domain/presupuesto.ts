@@ -29,3 +29,14 @@ export function esPrecioMuyBajo(monto: number, sugerido: number): boolean {
 export function estaVencido(validoHasta: Date, ahora: Date = new Date()): boolean {
   return validoHasta.getTime() < ahora.getTime();
 }
+
+/** "HH:MM" de 00:00 a 23:59. */
+export const FORMATO_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** La hora de llegada tiene que caer dentro de la franja que pidió el cliente (bordes incluidos). */
+export function horaEnFranja(hora: string, franja: { desde: number; hasta: number }): boolean {
+  if (!FORMATO_HORA.test(hora)) return false;
+  const [h, m] = hora.split(":").map(Number) as [number, number];
+  const minutos = h * 60 + m;
+  return minutos >= franja.desde * 60 && minutos <= franja.hasta * 60;
+}

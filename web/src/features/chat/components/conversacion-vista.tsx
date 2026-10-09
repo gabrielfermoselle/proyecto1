@@ -139,7 +139,7 @@ export function ConversacionVista({ inicial, fotosHabilitadas, hrefBandeja }: Co
       className="flex h-full min-h-0 flex-col bg-background"
     >
       <header className="flex items-center gap-2 border-b bg-card px-2 py-2">
-        <Button asChild variant="ghost" size="icon" className="md:hidden">
+        <Button asChild variant="ghost" size="icon" className="lg:hidden">
           <Link href={hrefBandeja}>
             <ArrowLeft aria-hidden="true" />
             <span className="sr-only">Volver a los mensajes</span>
@@ -169,7 +169,7 @@ export function ConversacionVista({ inicial, fotosHabilitadas, hrefBandeja }: Co
         {meta.hrefDetalle ? (
           <Button asChild variant="ghost" size="sm">
             <Link href={meta.hrefDetalle}>
-              <span className="hidden sm:inline">Ver detalle</span>
+              <span className="sr-only sm:not-sr-only">Ver el pedido</span>
               <ExternalLink aria-hidden="true" />
             </Link>
           </Button>

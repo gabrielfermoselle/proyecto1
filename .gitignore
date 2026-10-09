@@ -5,3 +5,4 @@ dist/
 
 # caché local del detector de diseño (impeccable)
 .impeccable/hook.cache.json
+.vercel/

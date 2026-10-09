@@ -37,7 +37,8 @@ export const ESQUEMAS_EVENTO = {
   RECEPCION_CONFIRMADA: vacio,
   FLETE_CANCELADO: z.object({ motivo: z.string().max(300), por: z.enum(["CLIENTE", "FLETERO"]) }),
   FECHA_ACORDADA: z.object({ fecha: fechaIso, franja, aplicada: z.boolean() }),
-  SOLICITUD_CANCELADA: vacio,
+  /** El motivo es opcional: las cancelaciones anteriores no lo tienen. */
+  SOLICITUD_CANCELADA: z.object({ motivo: z.string().max(300).optional() }),
 } as const;
 
 export type EventoChat = keyof typeof ESQUEMAS_EVENTO;
@@ -89,7 +90,7 @@ const TEXTOS: { [E in EventoChat]: (d: DatosEvento<E>) => string } = {
     d.aplicada
       ? `Nueva fecha acordada: ${cuando(d.fecha, d.franja)}.`
       : `Fecha acordada: ${cuando(d.fecha, d.franja)}. Se aplica si el cliente elige este presupuesto.`,
-  SOLICITUD_CANCELADA: () => "El cliente canceló la solicitud.",
+  SOLICITUD_CANCELADA: (d) => `El cliente canceló la solicitud${d.motivo ? `: «${d.motivo}»` : "."}`,
 };
 
 export function esEventoChat(valor: string): valor is EventoChat {

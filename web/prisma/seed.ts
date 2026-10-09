@@ -19,6 +19,7 @@ import bcrypt from "bcryptjs";
 import { resumirCarga, type ItemCarga } from "../src/domain/carga";
 import { haversineKm, redondear, type Coordenadas } from "../src/domain/geo";
 import { precioSugerido, type Tarifas } from "../src/domain/precio";
+import { FRANJA } from "../src/domain/catalogos";
 import { fechaIsoDeDia } from "../src/domain/fechas";
 import { resumenInventario, textoConformidad } from "../src/domain/ciclo-flete";
 import type { DatosEvento, EventoChat } from "../src/features/chat/eventos-catalogo";
@@ -216,6 +217,7 @@ interface SolicitudSeed {
   franja: FranjaHoraria;
   tipoVehiculoSugerido?: TipoVehiculo;
   ayudantesRequeridos?: number;
+  requiereEmbalaje?: boolean;
   items: ItemSeed[];
   creadaHaceDias: number;
 }
@@ -250,6 +252,8 @@ async function crearSolicitud(
       franja: s.franja,
       tipoVehiculoSugerido: s.tipoVehiculoSugerido ?? null,
       ayudantesRequeridos: s.ayudantesRequeridos ?? 0,
+      // Las mudanzas de la demo piden embalaje: así se ve el extra en el feed y en los presupuestos.
+      requiereEmbalaje: s.requiereEmbalaje ?? s.tipoFlete === "MUDANZA",
       estado,
       createdAt: hace(s.creadaHaceDias),
       items: {
@@ -296,8 +300,13 @@ async function presupuestar(
   // Los pendientes siguen vigentes; el resto venció hace rato.
   const validoHasta =
     estado === "PENDIENTE" ? new Date(Date.now() + 2 * DIA) : new Date(creado.getTime() + 2 * DIA);
+  // Hora de llegada dentro de la franja pedida (la flexible no la fija).
+  const desde = FRANJA[solicitud.seed.franja].desde;
+  const horaLlegada =
+    solicitud.seed.franja === "FLEXIBLE" ? null : `${String(desde + 1).padStart(2, "0")}:00`;
   const presupuesto = await prisma.presupuesto.create({
     data: {
+      horaLlegada,
       solicitudId: solicitud.id,
       fleteroId: fletero.fleteroId,
       vehiculoId: opciones.vehiculoId ?? fletero.vehiculoId,

@@ -46,7 +46,7 @@ test.describe("sin dirección habitual", () => {
     await expect(page.getByText("Todavía no cargaste tu dirección.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Cargala en tu perfil" })).toHaveAttribute(
       "href",
-      "/cliente/perfil#direccion",
+      "/perfil#direccion",
     );
     await expect(page.getByText(/^Desde \$/).first()).toBeVisible();
     await expect(page.getByText(/^A [\d,]+ (km|m)$/)).toHaveCount(0);

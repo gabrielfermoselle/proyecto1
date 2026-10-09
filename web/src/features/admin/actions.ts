@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { hrefFlete, topicFlete } from "@/features/fletes/rutas";
+import { hrefPedido, topicFlete } from "@/features/fletes/rutas";
 import { notificar } from "@/features/notificaciones/servidor";
 import { ActionError, createAction } from "@/lib/action";
 import { prisma } from "@/lib/prisma";
@@ -66,6 +66,7 @@ export const resolverReclamo = createAction({
           flete: {
             select: {
               id: true,
+              solicitudId: true,
               cliente: { select: { userId: true } },
               fletero: { select: { userId: true } },
             },
@@ -83,7 +84,7 @@ export const resolverReclamo = createAction({
             tipo: "FLETE",
             titulo: `Se resolvió el reclamo por «${reclamo.item.nombre}»`,
             cuerpo: resolucion,
-            href: hrefFlete(rol, flete.id),
+            href: hrefPedido(rol, flete.solicitudId),
           })),
         );
       }

@@ -94,3 +94,30 @@ export type EstadoReclamo = (typeof ESTADOS_RECLAMO)[number];
 
 export const ESTADOS_PRESUPUESTO = ["PENDIENTE", "ACEPTADO", "RECHAZADO", "RETIRADO"] as const;
 export type EstadoPresupuesto = (typeof ESTADOS_PRESUPUESTO)[number];
+
+/** Ayuda corta de cada tipo, para elegirlo al publicar. */
+export const AYUDA_TIPO_FLETE: Record<TipoFlete, string> = {
+  MUDANZA: "Casa, departamento u oficina",
+  MUEBLES: "Un mueble suelto o un electrodoméstico",
+  COMPRAS: "Materiales, compras del corralón o del mayorista",
+  PAQUETERIA: "Cajas y bultos chicos",
+  OTRO: "Cualquier otra cosa",
+};
+
+export const TIPOS_DOCUMENTO = ["DNI_FRENTE", "DNI_DORSO", "LICENCIA", "SEGURO"] as const;
+export type TipoDocumento = (typeof TIPOS_DOCUMENTO)[number];
+
+export const ETIQUETA_DOCUMENTO: Record<TipoDocumento, string> = {
+  DNI_FRENTE: "DNI (frente)",
+  DNI_DORSO: "DNI (dorso)",
+  LICENCIA: "Licencia de conducir",
+  SEGURO: "Seguro del vehículo",
+};
+
+/** Motivos para cancelar un pedido sin flete. "Otro" pide escribirlo. */
+export const MOTIVOS_CANCELACION = [
+  "Ya lo resolví por otro lado",
+  "Cambió la fecha o ya no lo necesito",
+  "Los presupuestos son muy caros",
+  "Otro",
+] as const;

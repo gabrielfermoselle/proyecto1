@@ -26,13 +26,13 @@ test.afterAll(async () => {
   await carlos.context().close();
 });
 
-test("el fletero ve la solicitud cerca suyo y presupuesta", async () => {
-  await carlos.goto("/fletero/solicitudes");
+test("el fletero ve el pedido cerca suyo y presupuesta", async () => {
+  await carlos.goto("/fletero");
   await carlos.getByRole("link", { name: SOLICITUD }).click();
   await expect(carlos.getByRole("heading", { level: 1 })).toHaveText(SOLICITUD);
   // La dirección exacta no se muestra hasta que acepten el presupuesto.
   await expect(
-    carlos.getByText("La dirección exacta aparece si el cliente acepta tu presupuesto."),
+    carlos.getByText(/La dirección exacta y el teléfono aparecen si el cliente acepta tu presupuesto\./),
   ).toBeVisible();
 
   await carlos.getByLabel("Tu precio ($)").fill("23500");
@@ -41,19 +41,19 @@ test("el fletero ve la solicitud cerca suyo y presupuesta", async () => {
   await enviar.click();
   await expect(enviar).toBeHidden();
 
-  await carlos.goto("/fletero/presupuestos");
+  await carlos.goto("/fletero/trabajos?tab=presupuestos");
   await expect(carlos.getByRole("heading", { name: SOLICITUD })).toBeVisible();
 });
 
 test("la cliente recibe el presupuesto y lo consulta por chat", async () => {
-  await florencia.goto("/cliente/solicitudes");
+  await florencia.goto("/cliente");
   await florencia.getByRole("link", { name: new RegExp(SOLICITUD) }).click();
-  const presupuestos = florencia.getByRole("region", { name: "Presupuestos (1)" });
+  const presupuestos = florencia.getByRole("region", { name: "Presupuestos recibidos (1)" });
   await expect(presupuestos).toContainText("Carlos R.");
   await expect(presupuestos).toContainText("$ 23.500");
   await expect(presupuestos).toContainText("Llevo la bici parada y atada.");
 
-  await presupuestos.getByRole("link", { name: "Chatear" }).click();
+  await presupuestos.getByRole("link", { name: "Chat", exact: true }).click();
   await florencia.getByRole("textbox", { name: "Mensaje" }).fill("¿Podés pasar después de las 17?");
   await florencia.getByRole("button", { name: "Enviar" }).click();
   await expect(florencia.getByRole("list", { name: "Mensajes" })).toContainText(
@@ -62,7 +62,7 @@ test("la cliente recibe el presupuesto y lo consulta por chat", async () => {
 });
 
 test("el fletero lee el mensaje y responde; la cliente ve la respuesta", async () => {
-  await carlos.goto("/fletero/mensajes");
+  await carlos.goto("/chat");
   await carlos.getByRole("link", { name: new RegExp(`Florencia L\\..*${SOLICITUD}`) }).click();
   const mensajes = carlos.getByRole("list", { name: "Mensajes" });
   await expect(mensajes).toContainText("¿Podés pasar después de las 17?");
@@ -81,24 +81,26 @@ test("el fletero lee el mensaje y responde; la cliente ve la respuesta", async (
 });
 
 test("la cliente acepta y se crea el flete para los dos", async () => {
-  await florencia.goto("/cliente/solicitudes");
+  await florencia.goto("/cliente");
   await florencia.getByRole("link", { name: new RegExp(SOLICITUD) }).click();
   await florencia
-    .getByRole("region", { name: "Presupuestos (1)" })
-    .getByRole("button", { name: "Aceptar" })
+    .getByRole("region", { name: "Presupuestos recibidos (1)" })
+    .getByRole("button", { name: /^Aceptar/ })
     .click();
   const dialogo = florencia.getByRole("dialog", { name: "¿Aceptar este presupuesto?" });
   await expect(dialogo).toContainText("Carlos R.");
   await expect(dialogo).toContainText("$ 23.500");
   await dialogo.getByRole("button", { name: "Aceptar y confirmar" }).click();
 
-  await expect(florencia).toHaveURL(/\/cliente\/fletes\//);
-  await expect(florencia.getByText("Paso 1 de 7: Confirmado")).toBeVisible();
+  // El pedido sigue en la misma página, ahora con el flete y el contacto directo.
+  await expect(florencia).toHaveURL(/\/cliente\/pedido\//);
+  await expect(florencia.getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
+  await expect(florencia.getByRole("link", { name: "WhatsApp" })).toBeVisible();
 
-  await carlos.goto("/fletero/agenda");
+  await carlos.goto("/fletero/trabajos");
   await carlos.getByRole("link", { name: SOLICITUD }).click();
-  await expect(carlos).toHaveURL(/\/fletero\/fletes\//);
-  await expect(carlos.getByText("Paso 1 de 7: Confirmado")).toBeVisible();
+  await expect(carlos).toHaveURL(/\/fletero\/pedido\//);
+  await expect(carlos.getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
   // Con el flete confirmado, el fletero ya ve la dirección exacta.
   await expect(carlos.getByRole("link", { name: "Cómo llegar" }).first()).toBeVisible();
 });
@@ -119,14 +121,14 @@ async function avanzar(page: Page, boton: string, etapa: string, { firma = false
 }
 
 test("el fletero sale a buscar la carga y la cliente ve el avance", async () => {
-  await avanzar(carlos, "Salgo a buscar la carga", "Paso 2 de 7: En camino al origen");
+  await avanzar(carlos, "Salgo a buscar la carga", "Etapa 2 de 7: En camino al origen");
 
   await florencia.reload();
-  await expect(florencia.getByText("Paso 2 de 7: En camino al origen")).toBeVisible();
+  await expect(florencia.getByText("Etapa 2 de 7: En camino al origen")).toBeVisible();
 });
 
 test("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", async () => {
-  await avanzar(carlos, "Llegué al origen", "Paso 3 de 7: Cargando");
+  await avanzar(carlos, "Llegué al origen", "Etapa 3 de 7: Cargando");
   const salir = carlos.getByRole("button", { name: "Terminé de cargar, salgo" });
   await expect(salir).toBeDisabled();
 
@@ -137,24 +139,26 @@ test("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", 
   // Con ítems cargados ya no se puede cancelar.
   await expect(carlos.getByRole("button", { name: "No puedo hacer este flete" })).toBeHidden();
 
-  await avanzar(carlos, "Terminé de cargar, salgo", "Paso 4 de 7: En traslado");
+  await avanzar(carlos, "Terminé de cargar, salgo", "Etapa 4 de 7: En traslado");
 });
 
 test("el fletero descarga todo y firma la entrega", async () => {
-  await avanzar(carlos, "Llegué al destino", "Paso 5 de 7: Descargando");
+  await avanzar(carlos, "Llegué al destino", "Etapa 5 de 7: Descargando");
   await carlos.getByRole("button", { name: "Todo: entregado" }).click();
-  await avanzar(carlos, "Terminé de descargar", "Paso 6 de 7: Entregado", { firma: true });
+  await avanzar(carlos, "Terminé de descargar", "Etapa 6 de 7: Entregado", { firma: true });
 });
 
 test("la cliente revisa lo que recibió, cierra el flete y califica", async () => {
   await florencia.reload();
-  await expect(florencia.getByText("Paso 6 de 7: Entregado")).toBeVisible();
+  await expect(florencia.getByText("Etapa 6 de 7: Entregado")).toBeVisible();
   const cerrar = florencia.getByRole("button", { name: "Cerrar el flete" });
   await expect(cerrar).toBeDisabled();
 
   await florencia.getByRole("button", { name: "Todo: recibido" }).click();
-  await avanzar(florencia, "Cerrar el flete", "Paso 7 de 7: Cerrado", { firma: true });
+  await avanzar(florencia, "Cerrar el flete", "Etapa 7 de 7: Cerrado", { firma: true });
 
+  await florencia.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
+  await expect(florencia).toHaveURL(/\/calificar$/);
   // El radio es solo para lectores de pantalla: se toca la estrella (su label).
   const cinco = florencia.getByRole("radio", { name: "5 estrellas: Excelente" });
   await florencia.locator("label", { has: cinco }).click();
@@ -162,7 +166,8 @@ test("la cliente revisa lo que recibió, cierra el flete y califica", async () =
   await florencia.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
   const calificar = florencia.getByRole("button", { name: "Enviar calificación" });
   await calificar.click();
-  await expect(calificar).toBeHidden();
+  await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/);
+  await expect(florencia.getByRole("region", { name: "Tu calificación" })).toBeVisible();
 
   // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
   await florencia.goto("/cliente/fleteros");

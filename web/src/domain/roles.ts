@@ -14,6 +14,19 @@ export const AREA_POR_ROL = {
   ADMIN: "/admin",
 } as const satisfies Record<Rol, string>;
 
+/**
+ * Secciones privadas que comparten los roles (chat, notificaciones y cuenta): piden sesión,
+ * pero no pertenecen a un área. Cada página decide qué ve cada rol.
+ */
+export const RUTAS_COMUNES = ["/chat", "/notificaciones", "/perfil"] as const;
+
+/** Roles que entran a cada sección común (el admin no tiene chat). */
+const ROLES_DE_RUTA_COMUN: Record<(typeof RUTAS_COMUNES)[number], readonly Rol[]> = {
+  "/chat": ["CLIENTE", "FLETERO"],
+  "/notificaciones": ["CLIENTE", "FLETERO", "ADMIN"],
+  "/perfil": ["CLIENTE", "FLETERO", "ADMIN"],
+};
+
 export function esRol(valor: unknown): valor is Rol {
   return typeof valor === "string" && (ROLES as readonly string[]).includes(valor);
 }
@@ -26,15 +39,28 @@ export function rolDeRuta(pathname: string): Rol | null {
   return ROLES.find((rol) => perteneceA(pathname, AREA_POR_ROL[rol])) ?? null;
 }
 
-/** Cada rol entra solo a su área. Las rutas que no son de ningún área son libres. */
+/** Sección común a la que pertenece la ruta, o `null`. */
+export function rutaComun(pathname: string): (typeof RUTAS_COMUNES)[number] | null {
+  return RUTAS_COMUNES.find((r) => perteneceA(pathname, r)) ?? null;
+}
+
+/** Necesita sesión: un área de rol o una sección común. */
+export const esRutaPrivada = (pathname: string) =>
+  rolDeRuta(pathname) !== null || rutaComun(pathname) !== null;
+
+/** Cada rol entra solo a su área y a las secciones comunes que le tocan. Lo demás es libre. */
 export function puedeAcceder(rol: Rol, pathname: string): boolean {
+  const comun = rutaComun(pathname);
+  if (comun) return ROLES_DE_RUTA_COMUN[comun].includes(rol);
   const duenio = rolDeRuta(pathname);
   return duenio === null || duenio === rol;
 }
 
-/** Evita open redirects: solo se aceptan rutas internas a las que el rol puede entrar. */
+/** Evita open redirects: solo se aceptan rutas internas y privadas a las que el rol puede entrar. */
 export function destinoSeguro(rol: Rol, callbackUrl: string | null | undefined): string {
   const esInterna =
     typeof callbackUrl === "string" && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//");
-  return esInterna && rolDeRuta(callbackUrl) === rol ? callbackUrl : AREA_POR_ROL[rol];
+  return esInterna && esRutaPrivada(callbackUrl) && puedeAcceder(rol, callbackUrl)
+    ? callbackUrl
+    : AREA_POR_ROL[rol];
 }

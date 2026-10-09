@@ -1,107 +1,150 @@
-import { ChevronRight, Plus, Truck } from "lucide-react";
+import { ArrowRight, ChevronRight, ClipboardList, Plus, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
+import { EstadoPedidoMini } from "@/components/shared/estado-pedido";
 import { PageHeader } from "@/components/shared/page-header";
-import { Badge } from "@/components/ui/badge";
+import { TipoFleteIcono } from "@/components/shared/tipo-flete-icono";
 import { Button } from "@/components/ui/button";
-import { ETIQUETA_ETAPA, FRANJA } from "@/domain/catalogos";
-import { esEtapaActiva } from "@/domain/ciclo-flete";
-import { hrefFlete } from "@/features/fletes/rutas";
-import { getFletesDelCliente } from "@/features/fletes/queries";
-import { formatearDia, formatearPesos } from "@/lib/formato";
-import { requireRol } from "@/lib/session";
+import { ETIQUETA_TIPO_FLETE, FRANJA } from "@/domain/catalogos";
+import { estadoPedido, pedidoEnCurso } from "@/domain/pedido";
+import { getSolicitudesDelCliente, type SolicitudDeLista } from "@/features/clientes/solicitudes/queries";
+import { hrefPedido } from "@/features/fletes/rutas";
+import { formatearDia, formatearKm, formatearPesos } from "@/lib/formato";
+import { requireCliente } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Mis fletes" };
+export const metadata: Metadata = { title: "Mis pedidos" };
 
-type FleteLista = Awaited<ReturnType<typeof getFletesDelCliente>>[number];
+/** Lo que el cliente tiene que hacer con el pedido, si hay algo. */
+function pendienteDe(p: SolicitudDeLista): string | null {
+  if (p.estado === "ABIERTA" && p.presupuestosPendientes > 0) {
+    const n = p.presupuestosPendientes;
+    return `${n} ${n === 1 ? "presupuesto" : "presupuestos"} para comparar · desde ${formatearPesos(p.presupuestoMinimo!)}`;
+  }
+  if (p.flete?.etapa === "ENTREGADO") return "Revisá lo que llegó y confirmá la recepción";
+  if (p.flete?.etapa === "CERRADO" && !p.flete.calificado) return "Calificá al fletero";
+  return null;
+}
 
-function FilaFlete({ f }: { f: FleteLista }) {
-  const pendienteDeCalificar = f.etapa === "CERRADO" && !f.calificado;
+function TarjetaPedido({ p }: { p: SolicitudDeLista }) {
+  const pendiente = pendienteDe(p);
+  const estado = { solicitudEstado: p.estado, fleteEtapa: p.flete?.etapa ?? null };
   return (
     <li>
       <Link
-        href={hrefFlete("CLIENTE", f.id)}
-        className="flex items-center gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        href={hrefPedido("CLIENTE", p.id)}
+        // Son pocos: se precargan enteros y abrir uno es instantáneo.
+        prefetch
+        className="group grid gap-4 rounded-xl border bg-card p-4 shadow-sm transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5 md:grid-cols-[minmax(0,1fr)_11rem_auto] md:items-center md:gap-6"
       >
-        <div className="grid min-w-0 flex-1 gap-1">
-          <p className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold">{f.titulo}</span>
-            <Badge
-              variant={
-                f.etapa === "CANCELADO" ? "destructive" : f.etapa === "CERRADO" ? "success" : "default"
-              }
-            >
-              {ETIQUETA_ETAPA[f.etapa]}
-            </Badge>
-            {f.etapa === "ENTREGADO" ? <Badge variant="warning">Revisá la recepción</Badge> : null}
-            {pendienteDeCalificar ? <Badge variant="warning">Calificá al fletero</Badge> : null}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {formatearDia(f.fecha)} · {FRANJA[f.franja].etiqueta} · {f.fletero} ·{" "}
-            {formatearPesos(f.precioAcordado)}
-          </p>
-          <p className="truncate text-sm text-muted-foreground">
-            {f.origen} → {f.destino}
-          </p>
+        <div className="flex min-w-0 gap-4">
+          <TipoFleteIcono tipo={p.tipoFlete} />
+          <div className="grid min-w-0 gap-1">
+            <p className="text-sm text-muted-foreground">
+              {ETIQUETA_TIPO_FLETE[p.tipoFlete]} · {formatearDia(p.fecha)} · {FRANJA[p.franja].etiqueta}
+            </p>
+            <h3 className="truncate text-lg font-bold leading-snug">{p.titulo}</h3>
+            <p className="flex min-w-0 items-center gap-1.5 text-sm">
+              <span className="truncate">{p.origen}</span>
+              <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-label="hasta" />
+              <span className="truncate">{p.destino}</span>
+              <span className="shrink-0 text-muted-foreground">· {formatearKm(p.distanciaKm)}</span>
+            </p>
+            {pendiente ? (
+              <p className="mt-1 justify-self-start rounded-md bg-accent/20 px-2.5 py-1 text-sm font-semibold text-foreground">
+                {pendiente}
+              </p>
+            ) : null}
+          </div>
         </div>
-        <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <EstadoPedidoMini estado={estado} />
+        <div className="flex items-center justify-between gap-3 border-t pt-3 md:border-0 md:pt-0">
+          <span className="text-sm text-muted-foreground md:text-right">
+            {p.flete ? (
+              <>
+                <span className="block font-heading text-lg font-extrabold tabular-nums text-foreground">
+                  {formatearPesos(p.flete.precioAcordado)}
+                </span>
+                acordado
+              </>
+            ) : (
+              `${p.items} ${p.items === 1 ? "ítem" : "ítems"}`
+            )}
+          </span>
+          <ChevronRight
+            className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </div>
       </Link>
     </li>
   );
 }
 
-export default async function ClienteInicioPage() {
-  const usuario = await requireRol("CLIENTE");
-  const fletes = usuario.clienteProfile ? await getFletesDelCliente(usuario.clienteProfile.id) : [];
-  const enCurso = fletes.filter((f) => esEtapaActiva(f.etapa));
-  const anteriores = fletes.filter((f) => !esEtapaActiva(f.etapa));
+function Seccion({ id, titulo, pedidos }: { id: string; titulo: string; pedidos: SolicitudDeLista[] }) {
+  if (pedidos.length === 0) return null;
+  return (
+    <section aria-labelledby={id} className="grid gap-3">
+      <h2 id={id} className="text-lg font-bold">
+        {titulo} <span className="font-normal text-muted-foreground">({pedidos.length})</span>
+      </h2>
+      <ul className="grid gap-3">
+        {pedidos.map((p) => (
+          <TarjetaPedido key={p.id} p={p} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export default async function MisPedidosPage() {
+  const { usuario, clienteId } = await requireCliente();
+  const pedidos = await getSolicitudesDelCliente(clienteId);
+  const activo = (p: SolicitudDeLista) =>
+    pedidoEnCurso(estadoPedido({ solicitudEstado: p.estado, fleteEtapa: p.flete?.etapa ?? null })) ||
+    pendienteDe(p) !== null;
+  const enCurso = pedidos.filter(activo);
+  const anteriores = pedidos.filter((p) => !activo(p));
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-8">
       <PageHeader
-        title={`Hola, ${usuario.nombre}`}
-        description="Acá seguís tus fletes: en qué etapa están, el inventario y la recepción."
-        actions={
-          <Button asChild>
-            <Link href="/cliente/solicitudes/nueva">
-              <Plus aria-hidden="true" />
-              Publicar un flete
-            </Link>
-          </Button>
-        }
+        title="Mis pedidos"
+        description={`Hola, ${usuario.nombre}. Acá ves los presupuestos que te llegan y en qué está cada flete.`}
       />
-      {fletes.length === 0 ? (
+
+      {pedidos.length === 0 ? (
         <EmptyState
-          icon={<Truck />}
-          title="Todavía no tenés fletes"
-          description="Publicá qué necesitás trasladar: cuando aceptes el presupuesto de un fletero, lo seguís desde acá."
+          icon={<ClipboardList />}
+          title="Todavía no pediste ningún flete"
+          description="Contá qué necesitás mover y los fleteros de la zona te mandan presupuestos para que elijas."
+          action={
+            <Button asChild size="lg">
+              <Link href="/cliente/nuevo">
+                <Plus aria-hidden="true" />
+                Pedir un flete
+              </Link>
+            </Button>
+          }
         />
       ) : null}
-      {enCurso.length > 0 ? (
-        <section aria-labelledby="titulo-en-curso" className="grid gap-3">
-          <h2 id="titulo-en-curso" className="text-lg font-bold">
-            En curso
-          </h2>
-          <ul className="grid gap-2">
-            {enCurso.map((f) => (
-              <FilaFlete key={f.id} f={f} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      {anteriores.length > 0 ? (
-        <section aria-labelledby="titulo-anteriores" className="grid gap-3">
-          <h2 id="titulo-anteriores" className="text-lg font-bold">
-            Anteriores
-          </h2>
-          <ul className="grid gap-2">
-            {anteriores.map((f) => (
-              <FilaFlete key={f.id} f={f} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+
+      <Seccion id="titulo-en-curso" titulo="En curso" pedidos={enCurso} />
+      <Seccion id="titulo-anteriores" titulo="Anteriores" pedidos={anteriores} />
+
+      <Link
+        href="/cliente/fleteros"
+        className="group flex items-center gap-4 rounded-xl border border-dashed p-4 text-sm transition-colors hover:border-primary/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="flex-1">
+          <strong>¿Ya conocés a un fletero?</strong> Buscalo por zona, vehículo y calificación.
+        </span>
+        <ArrowRight
+          className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+          aria-hidden="true"
+        />
+      </Link>
     </div>
   );
 }

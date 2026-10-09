@@ -171,6 +171,11 @@ export function ChatProvider({
     };
   }, [modo, refrescarBandeja, refrescarNotificaciones]);
 
+  // Funciones estables para el contexto: si cambiaran en cada render, los efectos que dependen de
+  // ellas (la bandeja la pide al montarse) se volverían a disparar con cada respuesta, en bucle.
+  const pedirBandeja = useCallback(() => void refrescarBandeja(), [refrescarBandeja]);
+  const pedirNotificaciones = useCallback(() => void refrescarNotificaciones(), [refrescarNotificaciones]);
+
   const valor = useMemo<ValorChat>(
     () => ({
       miUserId,
@@ -181,8 +186,8 @@ export function ChatProvider({
       bandeja,
       noLeidos,
       notificaciones,
-      refrescarBandeja: () => void refrescarBandeja(),
-      refrescarNotificaciones: () => void refrescarNotificaciones(),
+      refrescarBandeja: pedirBandeja,
+      refrescarNotificaciones: pedirNotificaciones,
     }),
     [
       miUserId,
@@ -193,8 +198,8 @@ export function ChatProvider({
       bandeja,
       noLeidos,
       notificaciones,
-      refrescarBandeja,
-      refrescarNotificaciones,
+      pedirBandeja,
+      pedirNotificaciones,
     ],
   );
 

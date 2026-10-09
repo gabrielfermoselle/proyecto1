@@ -24,7 +24,7 @@ Two roles on one platform:
 
 What it adds over asking around or posting in groups:
 1. **Organization:** all freight information (items, photos, route, quotes, status) in one place.
-2. **Communication:** in-app chat per request and fletero, without exposing phone or email.
+2. **Communication:** in-app chat per request and fletero; phone and WhatsApp are shared only once a quote is accepted.
 3. **Control:** a digital inventory where each item is registered as loaded and unloaded.
 4. **Tracking:** the client sees each stage and confirms delivery; ratings are only possible after a confirmed delivery.
 
@@ -48,7 +48,7 @@ Core flow: client publishes request → nearby fleteros send quotes → client c
 
 1. The client decides: quotes are compared side by side, never auto-assigned.
 2. Control over the load: nothing leaves without registered loading, nothing is "delivered" without registered unloading.
-3. Privacy by design: contact info stays off the platform; coordination happens in the chat.
+3. Privacy until commitment: before a quote is accepted, coordination happens in the chat and contact info is hidden; once the client accepts, both parties see each other's phone with WhatsApp and call buttons.
 4. Proximity is a first-class input: distance to the origin is visible wherever fleteros or requests are listed.
 5. Trust is earned: ratings only come from clients who confirmed a real delivery.
 

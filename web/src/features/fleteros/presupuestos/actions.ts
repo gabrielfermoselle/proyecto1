@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { evaluarCompatibilidad, ETIQUETA_COMPATIBILIDAD, puedeLlevar } from "@/domain/compatibilidad";
 import { fechaIsoAr, fechaIsoDeDia } from "@/domain/fechas";
 import { precioSugerido } from "@/domain/precio";
-import { calcularValidoHasta } from "@/domain/presupuesto";
+import { FRANJA, type FranjaHoraria } from "@/domain/catalogos";
+import { calcularValidoHasta, horaEnFranja } from "@/domain/presupuesto";
 import { conEventos } from "@/features/chat/eventos";
 import { crearMensajeDeTexto } from "@/features/chat/mensajes";
 import { consultaAccesoSolicitud } from "@/features/fleteros/solicitudes/consultas-sql";
@@ -22,7 +23,7 @@ const YA_PRESUPUESTADA = "Ya enviaste un presupuesto para esta solicitud.";
 export const enviarPresupuesto = createFleteroAction({
   schema: presupuestoSchema,
   handler: async (
-    { solicitudId, vehiculoId, monto, ayudantes, validez, mensaje },
+    { solicitudId, vehiculoId, monto, ayudantes, horaLlegada, validez, mensaje },
     { fleteroId, usuario },
   ) => {
     const hoy = fechaIsoAr();
@@ -59,16 +60,22 @@ export const enviarPresupuesto = createFleteroAction({
         const [solicitud] = await tx.$queryRaw<
           {
             fecha: Date;
+            franja: FranjaHoraria;
             distanciaKm: number;
             pesoTotalKg: number;
             volumenTotalM3: number;
             itemsSinMedidas: number;
           }[]
-        >`SELECT fecha, "distanciaKm"::float8 AS "distanciaKm", "pesoTotalKg"::float8 AS "pesoTotalKg",
+        >`SELECT fecha, franja::text AS franja, "distanciaKm"::float8 AS "distanciaKm", "pesoTotalKg"::float8 AS "pesoTotalKg",
                  "volumenTotalM3"::float8 AS "volumenTotalM3", "itemsSinMedidas"
           FROM solicitudes WHERE id = ${solicitudId} AND estado = 'ABIERTA' AND fecha >= ${hoy}::date
           FOR SHARE`;
         if (!solicitud) throw new ActionError("Esta solicitud ya no recibe presupuestos.");
+        if (horaLlegada && !horaEnFranja(horaLlegada, FRANJA[solicitud.franja])) {
+          const { desde, hasta } = FRANJA[solicitud.franja];
+          const motivo = `El cliente lo pidió entre las ${desde} y las ${hasta} h: elegí una hora en esa franja.`;
+          throw new ActionError(motivo, { horaLlegada: [motivo] });
+        }
 
         const compatibilidad = evaluarCompatibilidad(solicitud, {
           capacidadKg: vehiculo.capacidadKg,
@@ -98,6 +105,7 @@ export const enviarPresupuesto = createFleteroAction({
             monto,
             montoSugerido,
             incluyeAyudantes: ayudantes,
+            horaLlegada,
             mensaje,
             validoHasta,
           },

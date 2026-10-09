@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma, TipoNotificacion } from "@prisma/client";
 import { notificar } from "@/features/notificaciones/servidor";
 import { formatearPesos, nombrePublico } from "@/lib/formato";
-import { hrefFlete } from "@/features/fletes/rutas";
+import { hrefPedido } from "@/features/fletes/rutas";
 import { prisma } from "@/lib/prisma";
 import { publicar, type Publicacion } from "@/lib/supabase";
 import { hrefConversacion } from "./acceso";
@@ -202,7 +202,9 @@ export async function registrarEvento<E extends EventoChat>(
     tipo: config.tipo,
     titulo: config.titulo(partes, e.datos),
     cuerpo: solicitud.titulo,
-    href: flete ? hrefFlete(destinatario, flete.id) : hrefConversacion(destinatario, conversacion.id),
+    href: flete
+      ? hrefPedido(destinatario, e.solicitudId)
+      : hrefConversacion(destinatario, e.solicitudId, e.fleteroId),
   });
 
   // Los mensajes de sistema no tienen datos de contacto ni fotos: no hace falta ocultar ni firmar.

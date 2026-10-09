@@ -29,7 +29,7 @@ test("un cliente se registra y entra a su panel", async ({ page }) => {
     clave: "ClaveSegura1",
   });
   await expect(page).toHaveURL("/cliente");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Hola, Prueba");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mis pedidos");
 });
 
 test("un fletero se registra y arranca el onboarding", async ({ page }) => {

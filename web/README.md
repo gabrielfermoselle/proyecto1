@@ -60,7 +60,7 @@ src/app/           rutas: (auth), cliente/, fletero/, admin/, panel/
 - **Áreas**: el cliente publica solicitudes, compara presupuestos y sigue sus fletes; el fletero
   presupuesta y opera el flete desde el celular; el admin gestiona cuentas, verifica fleteros y
   resuelve reclamos.
-- **Mantenimiento diario** (`features/mantenimiento`, cron en `vercel.json`): vence solicitudes,
+- **Mantenimiento diario** (`features/mantenimiento`, cron en el `vercel.json` de la raíz): vence solicitudes,
   avisa por fletes demorados, borra fotos abandonadas (cada subida firmada queda registrada como
   pendiente hasta que se adjunta) y limpia el limitador.
 - **Tests de integración** (`*.db.test.ts`): `test/db/global-setup.ts` levanta PGlite + PostGIS con

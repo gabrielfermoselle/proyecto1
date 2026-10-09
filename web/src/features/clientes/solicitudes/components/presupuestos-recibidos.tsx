@@ -1,39 +1,43 @@
 "use client";
 
-import { BadgeCheck, MessagesSquare, Truck } from "lucide-react";
+import { BadgeCheck, Clock, MessagesSquare, Package, Star, Truck, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { Estrellas } from "@/components/shared/estrellas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ETIQUETA_VEHICULO } from "@/domain/catalogos";
 import { destacados, ordenarPresupuestos, type CriterioOrden } from "@/domain/solicitud";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
-import { hrefFlete } from "@/features/fletes/rutas";
+import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { formatearFechaHora, formatearPesos, formatearRating } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import type { PresupuestoRecibido } from "../queries";
 
 const CRITERIOS: { valor: CriterioOrden; etiqueta: string }[] = [
-  { valor: "precio", etiqueta: "Más baratos" },
-  { valor: "calificacion", etiqueta: "Mejor calificados" },
+  { valor: "precio", etiqueta: "Precio" },
+  { valor: "calificacion", etiqueta: "Calificación" },
   { valor: "vencimiento", etiqueta: "Por vencer" },
 ];
 
 /**
- * Presupuestos pendientes, comparables: se ordenan por precio, calificación (ponderada por la
- * cantidad de reseñas) o vencimiento, y se destacan el más barato y el mejor calificado.
+ * Presupuestos pendientes, comparables en filas: fletero (calificación, viajes y verificación),
+ * vehículo, precio y acciones. Se ordenan por precio, calificación (ponderada por la cantidad de
+ * reseñas) o vencimiento, y se marcan el más barato y el mejor calificado.
  */
 export function PresupuestosRecibidos({
+  solicitudId,
   presupuestos,
   textoCuando,
   puedeAceptar,
+  pideEmbalaje,
 }: {
+  solicitudId: string;
   presupuestos: PresupuestoRecibido[];
   textoCuando: string;
   puedeAceptar: boolean;
+  pideEmbalaje: boolean;
 }) {
   const router = useRouter();
   const [criterio, setCriterio] = useState<CriterioOrden>("precio");
@@ -44,30 +48,41 @@ export function PresupuestosRecibidos({
 
   if (vigentes.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-        Todavía no hay presupuestos vigentes. Les avisamos a los fleteros de la zona; cuando llegue uno, te
-        notificamos.
-      </p>
+      <div className="grid justify-items-center gap-2 rounded-xl border border-dashed bg-card/60 px-6 py-10 text-center">
+        <span className="relative grid size-12 place-items-center rounded-full bg-accent/20 text-foreground">
+          <Clock className="size-6" aria-hidden="true" />
+        </span>
+        <p className="font-bold">Esperando presupuestos</p>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Ya les avisamos a los fleteros de la zona. Cuando llegue el primero te mandamos una notificación.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="grid gap-3">
       {vigentes.length > 1 ? (
-        <div role="group" aria-label="Ordenar presupuestos" className="flex flex-wrap gap-2">
-          {CRITERIOS.map((c) => (
-            <Button
-              key={c.valor}
-              type="button"
-              size="sm"
-              variant="outline"
-              aria-pressed={criterio === c.valor}
-              className={cn(criterio === c.valor && "border-primary bg-primary/5")}
-              onClick={() => setCriterio(c.valor)}
-            >
-              {c.etiqueta}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <span id="ordenar-por" className="text-sm text-muted-foreground">
+            Ordenar por
+          </span>
+          <div role="group" aria-labelledby="ordenar-por" className="inline-flex rounded-lg bg-muted p-1">
+            {CRITERIOS.map((c) => (
+              <button
+                key={c.valor}
+                type="button"
+                aria-pressed={criterio === c.valor}
+                onClick={() => setCriterio(c.valor)}
+                className={cn(
+                  "h-8 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  criterio === c.valor ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {c.etiqueta}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
       {error ? (
@@ -78,58 +93,115 @@ export function PresupuestosRecibidos({
           {error}
         </p>
       ) : null}
+      {pideEmbalaje ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Package className="size-4 shrink-0" aria-hidden="true" />
+          Pediste embalaje: confirmá con cada fletero por el chat si lo incluye.
+        </p>
+      ) : null}
       <ul className="grid gap-3">
         {ordenados.map((p) => (
-          <li key={p.id} className="grid gap-3 rounded-lg border bg-card p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="grid gap-1">
-                <p className="flex flex-wrap items-center gap-2">
-                  <Link
-                    href={`/fleteros/${p.fletero.id}`}
-                    className="font-bold underline-offset-2 hover:underline"
-                  >
-                    {p.fletero.nombre}
-                  </Link>
-                  {p.fletero.verificado ? (
-                    <BadgeCheck className="size-4 text-success" aria-label="Fletero verificado" />
-                  ) : null}
-                  {marcas.masBarato === p.id ? <Badge variant="success">Más barato</Badge> : null}
-                  {marcas.mejorCalificado === p.id ? (
-                    <Badge variant="secondary">Mejor calificado</Badge>
-                  ) : null}
-                </p>
-                <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  {p.rating !== null ? (
-                    <>
-                      <Estrellas puntaje={p.rating} />
-                      <span>
-                        {formatearRating(p.rating)} ({p.calificaciones})
-                      </span>
-                    </>
-                  ) : (
-                    <span>Sin calificaciones todavía</span>
-                  )}
-                  <span>
-                    · {p.fletesCompletados} {p.fletesCompletados === 1 ? "flete hecho" : "fletes hechos"}
-                  </span>
-                </p>
-              </div>
-              <p className="text-right">
-                <span className="block font-heading text-2xl font-extrabold">{formatearPesos(p.monto)}</span>
-                <span className="text-xs text-muted-foreground">
-                  vale hasta el {formatearFechaHora(p.validoHasta)}
+          <li
+            key={p.id}
+            className={cn(
+              "grid gap-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5",
+              marcas.masBarato === p.id && criterio === "precio" && "border-success/50",
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="grid size-12 shrink-0 place-items-center rounded-full bg-secondary font-heading text-lg font-extrabold text-secondary-foreground"
+                >
+                  {p.fletero.nombre.charAt(0)}
                 </span>
-              </p>
+                <div className="grid min-w-0 gap-1">
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Link
+                      href={`/fleteros/${p.fletero.id}`}
+                      className="truncate text-lg font-bold underline-offset-2 hover:underline"
+                    >
+                      {p.fletero.nombre}
+                    </Link>
+                    {p.fletero.verificado ? (
+                      <Badge variant="success">
+                        <BadgeCheck aria-hidden="true" />
+                        Verificado
+                      </Badge>
+                    ) : null}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+                    {p.rating !== null ? (
+                      <>
+                        <Star className="size-4 fill-accent text-accent" aria-hidden="true" />
+                        <span className="font-semibold text-foreground">{formatearRating(p.rating)}</span>
+                        <span>
+                          ({p.calificaciones} {p.calificaciones === 1 ? "reseña" : "reseñas"})
+                        </span>
+                      </>
+                    ) : (
+                      <span>Sin reseñas</span>
+                    )}
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {p.fletesCompletados} {p.fletesCompletados === 1 ? "viaje" : "viajes"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="grid justify-items-start gap-1 sm:justify-items-end sm:text-right">
+                <p className="font-heading text-3xl font-extrabold tabular-nums leading-none">
+                  {formatearPesos(p.monto)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  vale hasta el {formatearFechaHora(p.validoHasta)}
+                </p>
+                {marcas.masBarato === p.id || marcas.mejorCalificado === p.id ? (
+                  <p className="flex flex-wrap gap-1.5">
+                    {marcas.masBarato === p.id ? <Badge variant="success">Más barato</Badge> : null}
+                    {marcas.mejorCalificado === p.id ? (
+                      <Badge variant="secondary">Mejor calificado</Badge>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            <p className="flex flex-wrap items-center gap-2 text-sm">
-              <Truck className="size-4 text-muted-foreground" aria-hidden="true" />
-              {ETIQUETA_VEHICULO[p.vehiculo.tipo]} · {p.vehiculo.marca} {p.vehiculo.modelo}
-              {p.ayudantes ? ` · ${p.ayudantes} ${p.ayudantes === 1 ? "ayudante" : "ayudantes"}` : ""}
-            </p>
+
+            <ul className="flex flex-wrap gap-x-5 gap-y-1.5 border-t pt-3 text-sm">
+              <li className="flex items-center gap-2">
+                <Truck className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                {ETIQUETA_VEHICULO[p.vehiculo.tipo]} · {p.vehiculo.marca} {p.vehiculo.modelo}
+              </li>
+              <li className="flex items-center gap-2">
+                <Users className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                {p.ayudantes
+                  ? `Incluye ${p.ayudantes} ${p.ayudantes === 1 ? "ayudante" : "ayudantes"}`
+                  : "Sin ayudantes"}
+              </li>
+              {p.horaLlegada ? (
+                <li className="flex items-center gap-2">
+                  <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  Llega a las {p.horaLlegada} h
+                </li>
+              ) : null}
+            </ul>
+
             {p.mensaje ? (
-              <p className="whitespace-pre-line rounded-md bg-muted/40 p-3 text-sm">«{p.mensaje}»</p>
+              <p className="whitespace-pre-line rounded-lg bg-muted/50 px-4 py-3 text-sm">
+                <span className="sr-only">Mensaje de {p.fletero.nombre}: </span>«{p.mensaje}»
+              </p>
             ) : null}
-            <div className="flex flex-wrap gap-2">
+
+            <div className="flex flex-wrap justify-end gap-2">
+              {p.conversacionId ? (
+                <Button asChild variant="outline" className="max-sm:flex-1">
+                  <Link href={hrefConversacion("CLIENTE", solicitudId, p.fletero.id)}>
+                    <MessagesSquare aria-hidden="true" />
+                    Chat
+                  </Link>
+                </Button>
+              ) : null}
               {puedeAceptar ? (
                 <ConfirmDialog
                   title="¿Aceptar este presupuesto?"
@@ -137,7 +209,7 @@ export function PresupuestosRecibidos({
                     <>
                       Confirmás el flete con <strong>{p.fletero.nombre}</strong> por{" "}
                       <strong>{formatearPesos(p.monto)}</strong> para el <strong>{textoCuando}</strong>. Los
-                      demás presupuestos se rechazan.
+                      demás presupuestos se rechazan y se habilita el contacto por WhatsApp o teléfono.
                     </>
                   }
                   confirmLabel="Aceptar y confirmar"
@@ -148,22 +220,14 @@ export function PresupuestosRecibidos({
                       setError(r.error);
                       return;
                     }
-                    router.push(hrefFlete("CLIENTE", r.data.fleteId));
+                    router.refresh();
                   }}
                   trigger={(abrir) => (
-                    <Button type="button" onClick={abrir}>
-                      Aceptar
+                    <Button type="button" onClick={abrir} className="max-sm:flex-1">
+                      Aceptar {formatearPesos(p.monto)}
                     </Button>
                   )}
                 />
-              ) : null}
-              {p.conversacionId ? (
-                <Button asChild variant="secondary">
-                  <Link href={`/cliente/mensajes/${p.conversacionId}`}>
-                    <MessagesSquare aria-hidden="true" />
-                    Chatear
-                  </Link>
-                </Button>
               ) : null}
             </div>
           </li>

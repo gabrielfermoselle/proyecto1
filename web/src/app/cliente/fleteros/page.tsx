@@ -48,7 +48,7 @@ export default async function FleterosPage({ searchParams }: Props) {
         description="Compará por cercanía, precio y calificación. Para recibir presupuestos, publicá tu flete: les llega a los de tu zona."
         actions={
           <Button asChild>
-            <Link href="/cliente/solicitudes/nueva">Publicar un flete</Link>
+            <Link href="/cliente/nuevo">Pedir un flete</Link>
           </Button>
         }
       />
@@ -64,7 +64,9 @@ export default async function FleterosPage({ searchParams }: Props) {
           ? null
           : `${fleteros.length} ${fleteros.length === 1 ? "fletero" : "fleteros"}`}
         {referencia.etiqueta && fleteros.length > 0 ? ` cerca de ${referencia.etiqueta}` : null}
-        {referencia.carga && fleteros.length > 0 ? ". El precio estimado sale de las tarifas de cada fletero." : null}
+        {referencia.carga && fleteros.length > 0
+          ? ". El precio estimado sale de las tarifas de cada fletero."
+          : null}
       </p>
 
       {fleteros.length === 0 ? (

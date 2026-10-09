@@ -257,7 +257,7 @@ export const responderPropuesta = createAction({
             tipo: "PROPUESTA",
             titulo: `${nombrePublico(usuario.nombre, usuario.apellido)} no aceptó la fecha propuesta`,
             cuerpo: ctx.titulo,
-            href: hrefConversacion(ctx.otro.rol, ctx.conversacionId),
+            href: hrefConversacion(ctx.otro.rol, ctx.solicitudId, ctx.fleteroId),
           }),
         );
       }

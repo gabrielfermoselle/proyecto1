@@ -7,6 +7,16 @@ import { Prisma } from "@prisma/client";
 export type TabFeed = "nuevas" | "presupuestadas";
 export type OrdenFeed = "distancia" | "fecha";
 
+/** Filtros opcionales del feed: más cerca que el radio, un rango de días o un tipo. */
+export interface FiltrosFeed {
+  /** Distancia máxima del origen a la base (dentro del radio de cobertura). */
+  maxKm?: number | null;
+  /** Rango de fechas ISO, inclusive. */
+  desde?: string | null;
+  hasta?: string | null;
+  tipo?: string | null;
+}
+
 export interface ParametrosFeed {
   fleteroId: string;
   /** Fecha ISO de hoy en Tucumán: no se muestran solicitudes de días pasados. */
@@ -14,6 +24,16 @@ export interface ParametrosFeed {
   tab: TabFeed;
   orden: OrdenFeed;
   limite: number;
+  filtros?: FiltrosFeed;
+}
+
+/** Condiciones de los filtros: cada una es un fragmento parametrizado o nada. */
+function condicionFiltros(f: FiltrosFeed = {}): Prisma.Sql {
+  return Prisma.sql`
+    ${f.maxKm ? Prisma.sql`AND ST_DWithin(s."origenGeo", f."baseGeo", ${f.maxKm * 1000})` : Prisma.empty}
+    ${f.desde ? Prisma.sql`AND s.fecha >= ${f.desde}::date` : Prisma.empty}
+    ${f.hasta ? Prisma.sql`AND s.fecha <= ${f.hasta}::date` : Prisma.empty}
+    ${f.tipo ? Prisma.sql`AND s."tipoFlete"::text = ${f.tipo}` : Prisma.empty}`;
 }
 
 export interface FilaFeed {
@@ -31,6 +51,7 @@ export interface FilaFeed {
   volumenTotalM3: number;
   itemsSinMedidas: number;
   ayudantesRequeridos: number;
+  requiereEmbalaje: boolean;
   distanciaBaseKm: number;
   cantidadItems: number;
   itemsFragiles: number;
@@ -64,7 +85,7 @@ function condicionTab(tab: TabFeed): Prisma.Sql {
     )`;
 }
 
-export function consultaFeed({ fleteroId, hoy, tab, orden, limite }: ParametrosFeed): Prisma.Sql {
+export function consultaFeed({ fleteroId, hoy, tab, orden, limite, filtros }: ParametrosFeed): Prisma.Sql {
   return Prisma.sql`
     SELECT
       s.id, s.titulo, s."tipoFlete"::text AS "tipoFlete",
@@ -73,7 +94,7 @@ export function consultaFeed({ fleteroId, hoy, tab, orden, limite }: ParametrosF
       s."distanciaKm"::float8 AS "distanciaKm",
       s."pesoTotalKg"::float8 AS "pesoTotalKg",
       s."volumenTotalM3"::float8 AS "volumenTotalM3",
-      s."itemsSinMedidas", s."ayudantesRequeridos",
+      s."itemsSinMedidas", s."ayudantesRequeridos", s."requiereEmbalaje",
       (ST_Distance(s."origenGeo", f."baseGeo") / 1000)::float8 AS "distanciaBaseKm",
       (SELECT count(*)::int FROM items_inventario i WHERE i."solicitudId" = s.id) AS "cantidadItems",
       (SELECT count(*)::int FROM items_inventario i WHERE i."solicitudId" = s.id AND i.fragil) AS "itemsFragiles",
@@ -85,6 +106,7 @@ export function consultaFeed({ fleteroId, hoy, tab, orden, limite }: ParametrosF
     WHERE s.estado = 'ABIERTA'
       AND s.fecha >= ${hoy}::date
       AND ${condicionTab(tab)}
+      ${condicionFiltros(filtros)}
     ORDER BY ${ORDEN[orden]}
     LIMIT ${limite}`;
 }

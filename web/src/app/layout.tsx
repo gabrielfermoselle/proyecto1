@@ -17,7 +17,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ede4cf",
+  // El toldo verde del encabezado: la barra del navegador en el celular sigue al encabezado.
+  themeColor: "#1c3d32",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

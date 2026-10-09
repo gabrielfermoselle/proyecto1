@@ -31,8 +31,9 @@ Para tener un administrador, registrá una cuenta común y cambiale el rol desde
 
 ## 3. Vercel
 
-1. **Add New → Project**, importar el repositorio y elegir **Root Directory: `web`**.
-   El `vercel.json` de la raíz es de la app anterior y no se usa.
+1. **Add New → Project** e importar el repositorio, con **Root Directory en la raíz** (el valor por
+   defecto). El `vercel.json` de la raíz instala y compila `web/` y toma `web/.next` como salida;
+   además enlaza `web/node_modules` en la raíz, porque Vercel busca `next` desde ahí.
 2. **Environment Variables** (Production):
 
    | Variable                    | Valor                                                            |
@@ -49,7 +50,7 @@ Para tener un administrador, registrá una cuenta común y cambiale el rol desde
    | `RESEND_API_KEY`            | Resend → API Keys (emails de recuperar contraseña)               |
    | `CORREO_REMITENTE`          | `Fletes Tucumán <no-responder@tu-dominio>` (dominio verificado)  |
 
-3. Deploy. `web/vercel.json` programa el mantenimiento diario a las 06:00 UTC (03:00 en Tucumán):
+3. Deploy. El `vercel.json` de la raíz programa el mantenimiento diario a las 06:00 UTC (03:00 en Tucumán):
    vence solicitudes, avisa por fletes demorados y borra fotos abandonadas. Vercel lo llama con
    `Authorization: Bearer $CRON_SECRET`; sin esa variable, el endpoint responde 401.
 

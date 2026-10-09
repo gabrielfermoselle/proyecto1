@@ -4,6 +4,8 @@
   "description": "Atajos para correr la app de web/ desde la raíz del repositorio",
   "scripts": {
     "dev": "npm --prefix web run dev",
+    "dev:local": "npm --prefix web run dev:local",
+    "preview": "npm --prefix web run preview",
     "build": "npm --prefix web run build",
     "start": "npm --prefix web run start",
     "lint": "npm --prefix web run lint",
