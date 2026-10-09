@@ -55,8 +55,20 @@ export async function insertarVarios(
   filas: Record<string, unknown>[],
 ): Promise<void> {
   if (filas.length === 0) return;
-  const { error } = await cliente.from(tabla).insert(filas.map((fila) => preparar(tabla, fila)));
-  fallar(tabla, error);
+  // PostgREST, en un insert de varias filas, pone null en las columnas que faltan
+  // en alguna fila. Cada grupo comparte las mismas claves para que el default de
+  // Postgres (por ejemplo createdAt) siga aplicando.
+  const grupos = new Map<string, Record<string, unknown>[]>();
+  for (const fila of filas.map((datos) => preparar(tabla, datos))) {
+    const clave = Object.keys(fila).sort().join("\0");
+    const grupo = grupos.get(clave);
+    if (grupo) grupo.push(fila);
+    else grupos.set(clave, [fila]);
+  }
+  for (const grupo of grupos.values()) {
+    const { error } = await cliente.from(tabla).insert(grupo);
+    fallar(tabla, error);
+  }
 }
 
 function filtrar<T>(consulta: T, filtros: Record<string, unknown>): T {

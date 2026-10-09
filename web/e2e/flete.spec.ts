@@ -55,7 +55,7 @@ test("la cliente recibe el presupuesto y lo consulta por chat", async () => {
 
   await presupuestos.getByRole("link", { name: "Chat", exact: true }).click();
   await florencia.getByRole("textbox", { name: "Mensaje" }).fill("¿Podés pasar después de las 17?");
-  await florencia.getByRole("button", { name: "Enviar" }).click();
+  await florencia.getByRole("button", { name: "Enviar", exact: true }).click();
   await expect(florencia.getByRole("list", { name: "Mensajes" })).toContainText(
     "¿Podés pasar después de las 17?",
   );
@@ -71,7 +71,7 @@ test("el fletero lee el mensaje y responde; la cliente ve la respuesta", async (
   await expect(carlos.getByText(/Los teléfonos y emails se ocultan/)).toBeVisible();
 
   await carlos.getByRole("textbox", { name: "Mensaje" }).fill("Sí, paso 17:30.");
-  await carlos.getByRole("button", { name: "Enviar" }).click();
+  await carlos.getByRole("button", { name: "Enviar", exact: true }).click();
   await expect(mensajes).toContainText("Sí, paso 17:30.");
 
   // Sin Supabase el chat se actualiza por consultas periódicas: llega sin recargar.

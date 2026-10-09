@@ -129,6 +129,7 @@ export function Composer({
               ref={selectorFoto}
               type="file"
               accept="image/*"
+              aria-label="Seleccionar una foto"
               className="sr-only"
               tabIndex={-1}
               onChange={(e) => {

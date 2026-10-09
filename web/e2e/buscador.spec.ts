@@ -43,8 +43,9 @@ test.describe("sin dirección habitual", () => {
     await ingresar(page, "paula@demo.test");
     await expect(page).toHaveURL("/cliente");
     await page.goto("/cliente/fleteros");
-    await expect(page.getByText("Todavía no cargaste tu dirección.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cargala en tu perfil" })).toHaveAttribute(
+    const cerca = page.getByRole("group", { name: "Buscar cerca de" });
+    await expect(cerca.getByText("Todavía no cargaste tu dirección.")).toBeVisible();
+    await expect(cerca.getByRole("link", { name: "Cargala en tu perfil" })).toHaveAttribute(
       "href",
       "/perfil#direccion",
     );
