@@ -22,13 +22,21 @@ test("con una solicitud de referencia muestra el precio estimado y ordena por pr
   await expect(page).toHaveURL(/ref=solicitud/);
   await expect(page.getByText("Estimado").first()).toBeVisible();
 
+  // Un monto por tarjeta: el precio estimado. Si el locator agarra un li de más, el mismo
+  // número entra dos veces y el orden deja de verse ordenado.
   const montos = await page
-    .locator("li")
+    .getByRole("main")
+    .locator("ul")
     .filter({ hasText: "Estimado" })
-    .locator(".tabular-nums")
-    .allTextContents();
-  const numeros = montos.map((m) => Number(m.replace(/\D/g, "")));
-  expect(numeros).toEqual([...numeros].sort((a, b) => a - b));
+    .first()
+    .locator("> li")
+    .evaluateAll((tarjetas) =>
+      tarjetas.map((li) =>
+        Number((li.querySelector(".tabular-nums")?.textContent ?? "").replace(/\D/g, "")),
+      ),
+    );
+  expect(montos.length).toBeGreaterThan(1);
+  expect(montos).toEqual([...montos].sort((a, b) => a - b));
 });
 
 test("un tope de precio imposible deja la lista vacía", async ({ page }) => {

@@ -68,6 +68,7 @@ export async function publicar(publicaciones: Publicacion[]): Promise<void> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ messages: publicaciones.map((p) => ({ ...p, private: true })) }),
+      signal: AbortSignal.timeout(2_000),
     });
     if (!respuesta.ok) log.warn("realtime.publicar_fallo", { estado: respuesta.status, cantidad: publicaciones.length });
   } catch (error) {

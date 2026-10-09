@@ -91,9 +91,11 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
   await expect(dialogo).toContainText("Carlos R.");
   await expect(dialogo).toContainText("$ 23.500");
   await dialogo.getByRole("button", { name: "Aceptar y confirmar" }).click();
+  await expect(dialogo).toBeHidden();
 
   // El pedido sigue en la misma página, ahora con el flete y el contacto directo.
   await expect(florencia).toHaveURL(/\/cliente\/pedido\//);
+  await florencia.reload();
   await expect(florencia.getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
   await expect(florencia.getByRole("link", { name: "WhatsApp" })).toBeVisible();
 
