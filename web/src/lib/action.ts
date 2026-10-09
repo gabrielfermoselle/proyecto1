@@ -1,5 +1,4 @@
 import "server-only";
-import { Prisma } from "@prisma/client";
 import type { z } from "zod";
 import type { Rol } from "@/domain/roles";
 import { getUsuarioActual, type UsuarioActual } from "./session";
@@ -20,12 +19,18 @@ export class ActionError extends Error {
   }
 }
 
-/** El error es una violación de un índice único (P2002), opcionalmente sobre un campo. */
+/** El error es una violación de un índice único, opcionalmente sobre un campo. */
 export function esViolacionUnica(error: unknown, campo?: string): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false;
+  if (!error || typeof error !== "object" || !("code" in error)) return false;
+  const code = String((error as { code?: unknown }).code);
+  if (code !== "23505" && code !== "P2002") return false;
   if (!campo) return true;
-  const target = error.meta?.target;
-  return Array.isArray(target) ? target.includes(campo) : String(target ?? "").includes(campo);
+  const info = error as { details?: unknown; message?: unknown; meta?: { target?: unknown } };
+  const target = info.meta?.target;
+  const texto = Array.isArray(target)
+    ? target.join(" ")
+    : String(target ?? info.details ?? info.message ?? "");
+  return texto.includes(campo);
 }
 
 const MENSAJE_INESPERADO = "Algo salió mal. Probá de nuevo en unos minutos.";

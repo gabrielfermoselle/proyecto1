@@ -12,7 +12,7 @@ import {
   urlPublica,
 } from "@/features/uploads/storage";
 import { ActionError, createFleteroAction, esViolacionUnica } from "@/lib/action";
-import { prisma } from "@/lib/prisma";
+import { ahoraIso, db, fallar, nuevoId } from "@/lib/db";
 import { getPerfilFletero } from "./queries";
 import {
   datosSchema,
@@ -42,15 +42,27 @@ function refrescar() {
   revalidatePath("/perfil");
 }
 
+async function contarVehiculos(filtro: { fleteroId: string; activo?: boolean; exceptoId?: string }) {
+  let q = db().from("vehiculos").select("id", { count: "exact", head: true }).eq("fleteroId", filtro.fleteroId);
+  if (filtro.activo !== undefined) q = q.eq("activo", filtro.activo);
+  if (filtro.exceptoId) q = q.neq("id", filtro.exceptoId);
+  const { count, error } = await q;
+  fallar(error);
+  return count ?? 0;
+}
+
 export const guardarDatos = createFleteroAction({
   schema: datosSchema,
   requiereOnboarding: false,
   handler: async ({ nombre, apellido, telefono, dni, bio }, { usuario, fleteroId }) => {
     try {
-      await prisma.$transaction([
-        prisma.user.update({ where: { id: usuario.id }, data: { nombre, apellido, telefono } }),
-        prisma.fleteroProfile.update({ where: { id: fleteroId }, data: { dni, bio } }),
-      ]);
+      const { error: errorUsuario } = await db()
+        .from("usuarios")
+        .update({ nombre, apellido, telefono, updatedAt: ahoraIso() })
+        .eq("id", usuario.id);
+      fallar(errorUsuario);
+      const { error: errorPerfil } = await db().from("perfiles_fletero").update({ dni, bio }).eq("id", fleteroId);
+      fallar(errorPerfil);
     } catch (error) {
       if (esViolacionUnica(error, "dni")) {
         throw new ActionError("Ese DNI ya está registrado.", { dni: ["Ese DNI ya está registrado."] });
@@ -66,12 +78,14 @@ export const crearVehiculo = createFleteroAction({
   schema: vehiculoSchema,
   requiereOnboarding: false,
   handler: async (datos, { fleteroId }) => {
-    const cantidad = await prisma.vehiculo.count({ where: { fleteroId } });
+    const cantidad = await contarVehiculos({ fleteroId });
     if (cantidad >= MAX_VEHICULOS) throw new ActionError(`Podés cargar hasta ${MAX_VEHICULOS} vehículos.`);
     try {
-      const vehiculo = await prisma.vehiculo.create({ data: { ...datos, fleteroId }, select: { id: true } });
+      const id = nuevoId();
+      const { error } = await db().from("vehiculos").insert({ id, ...datos, fleteroId });
+      fallar(error);
       refrescar();
-      return vehiculo;
+      return { id };
     } catch (error) {
       if (esViolacionUnica(error, "patente"))
         throw new ActionError(PATENTE_EN_USO, { patente: [PATENTE_EN_USO] });
@@ -85,8 +99,14 @@ export const actualizarVehiculo = createFleteroAction({
   requiereOnboarding: false,
   handler: async ({ id, ...datos }, { fleteroId }) => {
     try {
-      const { count } = await prisma.vehiculo.updateMany({ where: { id, fleteroId }, data: datos });
-      if (count === 0) throw new ActionError(VEHICULO_NO_ENCONTRADO);
+      const { data, error } = await db()
+        .from("vehiculos")
+        .update(datos)
+        .eq("id", id)
+        .eq("fleteroId", fleteroId)
+        .select("id");
+      fallar(error);
+      if (!data || data.length === 0) throw new ActionError(VEHICULO_NO_ENCONTRADO);
     } catch (error) {
       if (esViolacionUnica(error, "patente"))
         throw new ActionError(PATENTE_EN_USO, { patente: [PATENTE_EN_USO] });
@@ -103,12 +123,18 @@ export const cambiarEstadoVehiculo = createFleteroAction({
   requiereOnboarding: false,
   handler: async ({ id, activo }, { usuario, fleteroId }) => {
     if (!activo && usuario.fleteroProfile?.onboardingCompletadoEn) {
-      const activos = await prisma.vehiculo.count({ where: { fleteroId, activo: true, id: { not: id } } });
+      const activos = await contarVehiculos({ fleteroId, activo: true, exceptoId: id });
       if (activos === 0)
         throw new ActionError("Tenés que tener al menos un vehículo activo para recibir solicitudes.");
     }
-    const { count } = await prisma.vehiculo.updateMany({ where: { id, fleteroId }, data: { activo } });
-    if (count === 0) throw new ActionError(VEHICULO_NO_ENCONTRADO);
+    const { data, error } = await db()
+      .from("vehiculos")
+      .update({ activo })
+      .eq("id", id)
+      .eq("fleteroId", fleteroId)
+      .select("id");
+    fallar(error);
+    if (!data || data.length === 0) throw new ActionError(VEHICULO_NO_ENCONTRADO);
     refrescar();
     return null;
   },
@@ -118,7 +144,8 @@ export const guardarZona = createFleteroAction({
   schema: zonaSchema,
   requiereOnboarding: false,
   handler: async (zona, { fleteroId }) => {
-    await prisma.fleteroProfile.update({ where: { id: fleteroId }, data: zona });
+    const { error } = await db().from("perfiles_fletero").update(zona).eq("id", fleteroId);
+    fallar(error);
     refrescar();
     return null;
   },
@@ -132,14 +159,16 @@ export const guardarTarifas = createFleteroAction({
   schema: tarifasSchema,
   requiereOnboarding: false,
   handler: async (tarifas, { fleteroId }) => {
-    await prisma.fleteroProfile.update({ where: { id: fleteroId }, data: tarifas });
+    const { error } = await db().from("perfiles_fletero").update(tarifas).eq("id", fleteroId);
+    fallar(error);
     const { progreso, onboardingCompleto } = await getPerfilFletero(fleteroId);
     const pendiente = primerPasoPendiente(progreso);
     if (!pendiente && !onboardingCompleto) {
-      await prisma.fleteroProfile.update({
-        where: { id: fleteroId },
-        data: { onboardingCompletadoEn: new Date() },
-      });
+      const { error: errorOnboarding } = await db()
+        .from("perfiles_fletero")
+        .update({ onboardingCompletadoEn: ahoraIso() })
+        .eq("id", fleteroId);
+      fallar(errorOnboarding);
     }
     refrescar();
     const completos = pasosCompletos(progreso);
@@ -150,7 +179,8 @@ export const guardarTarifas = createFleteroAction({
 export const guardarDisponibilidad = createFleteroAction({
   schema: disponibilidadSchema,
   handler: async ({ disponible }, { fleteroId }) => {
-    await prisma.fleteroProfile.update({ where: { id: fleteroId }, data: { disponible } });
+    const { error } = await db().from("perfiles_fletero").update({ disponible }).eq("id", fleteroId);
+    fallar(error);
     refrescar();
     return { disponible };
   },
@@ -159,12 +189,16 @@ export const guardarDisponibilidad = createFleteroAction({
 // --- Fotos de vehículos (requieren Supabase Storage configurado; bucket público) ---
 
 async function assertVehiculoPropio(vehiculoId: string, fleteroId: string) {
-  const vehiculo = await prisma.vehiculo.findFirst({
-    where: { id: vehiculoId, fleteroId },
-    select: { _count: { select: { fotos: true } } },
-  });
-  if (!vehiculo) throw new ActionError(VEHICULO_NO_ENCONTRADO);
-  return vehiculo._count.fotos;
+  const { data, error } = await db()
+    .from("vehiculos")
+    .select("id, fotos:fotos!fotos_vehiculoId_fkey(id)")
+    .eq("id", vehiculoId)
+    .eq("fleteroId", fleteroId)
+    .maybeSingle();
+  fallar(error);
+  if (!data) throw new ActionError(VEHICULO_NO_ENCONTRADO);
+  const fotos = (data as { fotos: { id: string }[] | null }).fotos;
+  return fotos?.length ?? 0;
 }
 
 export const firmarSubidaFotoVehiculo = createFleteroAction({
@@ -189,12 +223,11 @@ export const agregarFotoVehiculo = createFleteroAction({
       throw new ActionError(`Podés subir hasta ${MAX_FOTOS_POR_VEHICULO} fotos.`);
     if (!(await rutaSubidaValida(BUCKET_PUBLICO, ruta, carpetaFotos(fleteroId))))
       throw new ActionError("La foto no es válida.");
-    const foto = await prisma.foto.create({
-      data: { vehiculoId, ruta, ancho, alto },
-      select: { id: true, ruta: true, ancho: true, alto: true },
-    });
+    const id = nuevoId();
+    const { error } = await db().from("fotos").insert({ id, vehiculoId, ruta, ancho, alto });
+    fallar(error);
     refrescar();
-    return { ...foto, url: urlPublica(foto.ruta) };
+    return { id, ruta, ancho, alto, url: urlPublica(ruta) };
   },
 });
 
@@ -202,12 +235,17 @@ export const eliminarFotoVehiculo = createFleteroAction({
   schema: z.object({ fotoId: z.string().min(1).max(40) }),
   requiereOnboarding: false,
   handler: async ({ fotoId }, { fleteroId }) => {
-    const foto = await prisma.foto.findFirst({
-      where: { id: fotoId, vehiculo: { fleteroId } },
-      select: { id: true, ruta: true },
-    });
+    const { data, error } = await db()
+      .from("fotos")
+      .select("id, ruta, vehiculo:vehiculos!fotos_vehiculoId_fkey!inner(fleteroId)")
+      .eq("id", fotoId)
+      .eq("vehiculo.fleteroId", fleteroId)
+      .maybeSingle();
+    fallar(error);
+    const foto = data as { id: string; ruta: string } | null;
     if (!foto) throw new ActionError("No encontramos esa foto.");
-    await prisma.foto.delete({ where: { id: foto.id } });
+    const { error: errorBorrar } = await db().from("fotos").delete().eq("id", foto.id);
+    fallar(errorBorrar);
     await eliminarArchivos(BUCKET_PUBLICO, [foto.ruta]);
     refrescar();
     return null;
@@ -235,15 +273,23 @@ export const guardarDocumento = createFleteroAction({
   handler: async ({ tipo, ruta }, { fleteroId }) => {
     if (!(await rutaSubidaValida(BUCKET_PRIVADO, ruta, carpetaDocumentos(fleteroId))))
       throw new ActionError("La foto no es válida.");
-    const anterior = await prisma.documentoFletero.findUnique({
-      where: { fleteroId_tipo: { fleteroId, tipo } },
-      select: { ruta: true },
-    });
-    await prisma.documentoFletero.upsert({
-      where: { fleteroId_tipo: { fleteroId, tipo } },
-      create: { fleteroId, tipo, ruta },
-      update: { ruta, createdAt: new Date() },
-    });
+    const { data: anterior, error: errorBusqueda } = await db()
+      .from("documentos_fletero")
+      .select("id, ruta")
+      .eq("fleteroId", fleteroId)
+      .eq("tipo", tipo)
+      .maybeSingle();
+    fallar(errorBusqueda);
+    if (anterior) {
+      const { error } = await db()
+        .from("documentos_fletero")
+        .update({ ruta, createdAt: ahoraIso() })
+        .eq("id", anterior.id);
+      fallar(error);
+    } else {
+      const { error } = await db().from("documentos_fletero").insert({ id: nuevoId(), fleteroId, tipo, ruta });
+      fallar(error);
+    }
     if (anterior) await eliminarArchivos(BUCKET_PRIVADO, [anterior.ruta]);
     refrescar();
     revalidatePath("/admin/fleteros");
@@ -255,12 +301,16 @@ export const eliminarDocumento = createFleteroAction({
   schema: tipoDocumentoSchema,
   requiereOnboarding: false,
   handler: async ({ tipo }, { fleteroId }) => {
-    const documento = await prisma.documentoFletero.findUnique({
-      where: { fleteroId_tipo: { fleteroId, tipo } },
-      select: { id: true, ruta: true },
-    });
+    const { data: documento, error } = await db()
+      .from("documentos_fletero")
+      .select("id, ruta")
+      .eq("fleteroId", fleteroId)
+      .eq("tipo", tipo)
+      .maybeSingle();
+    fallar(error);
     if (!documento) throw new ActionError("No encontramos ese documento.");
-    await prisma.documentoFletero.delete({ where: { id: documento.id } });
+    const { error: errorBorrar } = await db().from("documentos_fletero").delete().eq("id", documento.id);
+    fallar(errorBorrar);
     await eliminarArchivos(BUCKET_PRIVADO, [documento.ruta]);
     refrescar();
     revalidatePath("/admin/fleteros");

@@ -155,7 +155,7 @@ model User {
   conformidades           Conformidad[]
   tokensRecuperacion      TokenRecuperacion[]
 
-  @@map("users")
+  @@map("usuarios")
 }
 
 /// Recuperación de contraseña por email: de un solo uso y con vencimiento. Se guarda el hash
@@ -186,7 +186,7 @@ model ClienteProfile {
   calificaciones    Calificacion[]
   conversaciones    Conversacion[]
 
-  @@map("cliente_profiles")
+  @@map("perfiles_cliente")
 }
 
 model FleteroProfile {
@@ -221,8 +221,8 @@ model FleteroProfile {
   documentos             DocumentoFletero[]
 
   @@index([disponible, ratingPromedio])
-  @@index([baseGeo], map: "fletero_profiles_baseGeo_gix", type: Gist)
-  @@map("fletero_profiles")
+  @@index([baseGeo], map: "perfiles_fletero_baseGeo_gix", type: Gist)
+  @@map("perfiles_fletero")
 }
 
 /// Documentación que el fletero sube para que la administración lo verifique.

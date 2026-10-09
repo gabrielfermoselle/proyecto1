@@ -234,7 +234,7 @@ describe("zona de trabajo", () => {
 
     const [fila] = await prisma.$queryRaw<{ lat: number; lng: number }[]>`
       SELECT ST_Y("baseGeo"::geometry) AS lat, ST_X("baseGeo"::geometry) AS lng
-      FROM fletero_profiles WHERE id = ${f.fleteroProfile!.id}`;
+      FROM perfiles_fletero WHERE id = ${f.fleteroProfile!.id}`;
     expect(fila!.lat).toBeCloseTo(zona.baseLat, 5);
     expect(fila!.lng).toBeCloseTo(zona.baseLng, 5);
   });

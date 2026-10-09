@@ -4,30 +4,33 @@ import { env } from "./env";
 import { firmarJwtHs256 } from "./jwt";
 import { log } from "./log";
 
-// Supabase se usa solo para Realtime y Storage (los datos van por Prisma). Todo es opcional:
-// sin configuración, las funciones devuelven null o no hacen nada y la app sigue funcionando.
+// Los datos se leen y escriben con el cliente de Supabase (service_role, solo en el servidor).
+// Realtime y Storage siguen siendo opcionales: sin anon key y JWT el chat en vivo y las fotos
+// se degradan, pero las consultas a la base siguen funcionando.
 
 interface ConfigSupabase {
   url: string;
-  anonKey: string;
+  anonKey?: string;
   serviceRoleKey: string;
-  jwtSecret: string;
+  jwtSecret?: string;
 }
 
 function config(): ConfigSupabase | null {
   const { SUPABASE_URL: url, SUPABASE_ANON_KEY: anonKey, SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey } = env;
   const jwtSecret = env.SUPABASE_JWT_SECRET;
-  return url && anonKey && serviceRoleKey && jwtSecret ? { url, anonKey, serviceRoleKey, jwtSecret } : null;
+  if (!url || !serviceRoleKey) return null;
+  return { url, serviceRoleKey, ...(anonKey ? { anonKey } : {}), ...(jwtSecret ? { jwtSecret } : {}) };
 }
 
 export function supabaseHabilitado(): boolean {
-  return config() !== null;
+  const c = config();
+  return Boolean(c?.anonKey && c.jwtSecret);
 }
 
 /** Lo que el navegador necesita para conectarse (la anon key es pública por diseño). */
 export function configPublicaSupabase(): { url: string; anonKey: string } | null {
   const c = config();
-  return c ? { url: c.url, anonKey: c.anonKey } : null;
+  return c?.anonKey ? { url: c.url, anonKey: c.anonKey } : null;
 }
 
 let admin: SupabaseClient | null = null;
@@ -83,7 +86,7 @@ export function firmarTokenRealtime(
   topics: string[],
 ): { token: string; expiraEn: number } | null {
   const c = config();
-  if (!c) return null;
+  if (!c?.jwtSecret) return null;
   const ahora = Math.floor(Date.now() / 1000);
   const expiraEn = ahora + DURACION_TOKEN_REALTIME_S;
   const token = firmarJwtHs256(

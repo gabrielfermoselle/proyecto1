@@ -2,17 +2,23 @@
 
 import { z } from "zod";
 import { createAction } from "@/lib/action";
-import { prisma } from "@/lib/prisma";
+import { ahoraIso, db, fallar } from "@/lib/db";
 
 /** Marca como leídas las notificaciones indicadas (o todas). Solo las propias. */
 export const marcarNotificacionesLeidas = createAction({
   schema: z.object({ ids: z.array(z.string().min(1).max(40)).max(100).optional() }),
   roles: ["CLIENTE", "FLETERO", "ADMIN"],
   handler: async ({ ids }, { usuario }) => {
-    const { count } = await prisma.notificacion.updateMany({
-      where: { userId: usuario.id, leidaEn: null, ...(ids ? { id: { in: ids } } : {}) },
-      data: { leidaEn: new Date() },
-    });
-    return { marcadas: count };
+    if (ids && ids.length === 0) return { marcadas: 0 };
+    const leidaEn = ahoraIso();
+    let q = db()
+      .from("notificaciones")
+      .update({ leidaEn, updatedAt: leidaEn })
+      .eq("userId", usuario.id)
+      .is("leidaEn", null);
+    if (ids) q = q.in("id", ids);
+    const { data, error } = await q.select("id");
+    fallar(error);
+    return { marcadas: data?.length ?? 0 };
   },
 });

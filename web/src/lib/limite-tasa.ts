@@ -1,7 +1,6 @@
 import "server-only";
 import { ActionError } from "./action";
-import { consultaConsumir, consultaLimpiar, inicioVentana } from "./limite-tasa-sql";
-import { prisma } from "./prisma";
+import { consumirVentana, inicioVentana, limpiarVentanasViejas } from "./limite-tasa-sql";
 
 export interface Limite {
   clave: string;
@@ -81,13 +80,10 @@ export const LIMITES = {
 export async function consumirLimite(...limites: Limite[]): Promise<void> {
   const ahora = new Date();
   for (const limite of limites) {
-    const [fila] = await prisma.$queryRaw<{ cantidad: number }[]>(
-      consultaConsumir(limite.clave, inicioVentana(ahora, limite.ventanaSegundos)),
-    );
-    if ((fila?.cantidad ?? 0) > limite.maximo) throw new ActionError(limite.mensaje);
+    const cantidad = await consumirVentana(limite.clave, inicioVentana(ahora, limite.ventanaSegundos));
+    if (cantidad > limite.maximo) throw new ActionError(limite.mensaje);
   }
-  // Limpieza ocasional de ventanas viejas, sin bloquear la respuesta.
   if (Math.random() < 0.01) {
-    prisma.$executeRaw(consultaLimpiar(new Date(ahora.getTime() - 24 * 3600 * 1000))).catch(() => undefined);
+    limpiarVentanasViejas(new Date(ahora.getTime() - 24 * 3600 * 1000)).catch(() => undefined);
   }
 }

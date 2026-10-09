@@ -5,8 +5,8 @@ import { AppShell } from "@/components/shared/app-shell";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CampanaNotificaciones } from "@/features/notificaciones/components/campana-notificaciones";
 import { getNotificaciones } from "@/features/notificaciones/queries";
+import { db, fallar, relacion } from "@/lib/db";
 import { nombrePublico } from "@/lib/formato";
-import { prisma } from "@/lib/prisma";
 import { supabaseHabilitado } from "@/lib/supabase";
 import type { UsuarioActual } from "@/lib/session";
 import { MessagesSquare } from "lucide-react";
@@ -102,18 +102,36 @@ export async function PaginaConversacion({
 async function conversacionesDelPedido(solicitudId: string, usuario: UsuarioActual) {
   const perfil = perfilChat(usuario);
   if (!perfil) return [];
-  return prisma.conversacion.findMany({
-    where: {
-      solicitudId,
-      ...(perfil.rol === "CLIENTE" ? { clienteId: perfil.perfilId } : { fleteroId: perfil.perfilId }),
-    },
-    orderBy: { ultimaActividadEn: "desc" },
-    select: {
-      id: true,
-      fleteroId: true,
-      solicitud: { select: { titulo: true } },
-      fletero: { select: { user: { select: { nombre: true, apellido: true } } } },
-    },
+  const columna = perfil.rol === "CLIENTE" ? "clienteId" : "fleteroId";
+  const { data, error } = await db()
+    .from("conversaciones")
+    .select(
+      `id, fleteroId,
+       solicitud:solicitudes!conversaciones_solicitudId_fkey(titulo),
+       fletero:perfiles_fletero!conversaciones_fleteroId_fkey(user:usuarios!fletero_profiles_userId_fkey(nombre, apellido))`,
+    )
+    .eq("solicitudId", solicitudId)
+    .eq(columna, perfil.perfilId)
+    .order("ultimaActividadEn", { ascending: false });
+  fallar(error);
+  return (data ?? []).flatMap((fila) => {
+    const solicitud = relacion(fila.solicitud as { titulo: string } | { titulo: string }[] | null);
+    const fletero = relacion(
+      fila.fletero as
+        | { user: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] }
+        | { user: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] }[]
+        | null,
+    );
+    const user = relacion(fletero?.user ?? null);
+    if (!solicitud || !user) return [];
+    return [
+      {
+        id: fila.id as string,
+        fleteroId: fila.fleteroId as string,
+        solicitud,
+        fletero: { user },
+      },
+    ];
   });
 }
 

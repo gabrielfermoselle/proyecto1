@@ -5,7 +5,7 @@ import { cache } from "react";
 import { AREA_POR_ROL, type Rol } from "@/domain/roles";
 import { sesionVigente } from "@/domain/sesion";
 import { authOptions } from "./auth";
-import { prisma } from "./prisma";
+import { db, fallar, relacion } from "./db";
 
 /**
  * Usuario de la sesión, leído de la base (no solo del JWT): si un admin lo desactiva o le
@@ -16,23 +16,35 @@ export const getUsuarioActual = cache(async () => {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      email: true,
-      nombre: true,
-      apellido: true,
-      rol: true,
-      activo: true,
-      credencialesCambiadasEn: true,
-      clienteProfile: { select: { id: true } },
-      fleteroProfile: { select: { id: true, onboardingCompletadoEn: true } },
-    },
-  });
-  if (!user?.activo) return null;
-  const { credencialesCambiadasEn, ...usuario } = user;
-  return sesionVigente(session.autenticadoEn, credencialesCambiadasEn) ? usuario : null;
+  const { data, error } = await db()
+    .from("usuarios")
+    .select(
+      "id, email, nombre, apellido, rol, activo, credencialesCambiadasEn, perfiles_cliente(id), perfiles_fletero(id, onboardingCompletadoEn)",
+    )
+    .eq("id", session.user.id)
+    .maybeSingle();
+  fallar(error);
+  if (!data?.activo) return null;
+
+  const user = {
+    id: data.id as string,
+    email: data.email as string,
+    nombre: data.nombre as string,
+    apellido: data.apellido as string,
+    rol: data.rol as Rol,
+    activo: data.activo as boolean,
+    clienteProfile: relacion(data.perfiles_cliente as { id: string } | { id: string }[] | null),
+    fleteroProfile: relacion(
+      data.perfiles_fletero as
+        | { id: string; onboardingCompletadoEn: string | null }
+        | { id: string; onboardingCompletadoEn: string | null }[]
+        | null,
+    ),
+  };
+  const credencialesCambiadasEn = data.credencialesCambiadasEn
+    ? new Date(data.credencialesCambiadasEn as string)
+    : null;
+  return sesionVigente(session.autenticadoEn, credencialesCambiadasEn) ? user : null;
 });
 
 export type UsuarioActual = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;

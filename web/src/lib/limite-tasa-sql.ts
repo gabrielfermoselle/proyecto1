@@ -1,7 +1,7 @@
 // Limitador por ventana fija en Postgres: un upsert atómico por (clave, ventana). Sin Redis, y
 // correcto con varias instancias serverless porque la base serializa el incremento de la fila.
 
-import { Prisma } from "@prisma/client";
+import { db, fallar } from "./db";
 
 /** Comienzo de la ventana que contiene a `ahora` (alineada a múltiplos de `segundos`). */
 export function inicioVentana(ahora: Date, segundos: number): Date {
@@ -10,14 +10,16 @@ export function inicioVentana(ahora: Date, segundos: number): Date {
 }
 
 /** Suma 1 al contador de la ventana y devuelve el total (incluido este intento). */
-export function consultaConsumir(clave: string, ventana: Date): Prisma.Sql {
-  return Prisma.sql`
-    INSERT INTO limites_tasa (clave, ventana, cantidad)
-    VALUES (${clave}, ${ventana.toISOString()}::timestamp, 1)
-    ON CONFLICT (clave, ventana) DO UPDATE SET cantidad = limites_tasa.cantidad + 1
-    RETURNING cantidad`;
+export async function consumirVentana(clave: string, ventana: Date): Promise<number> {
+  const { data, error } = await db().rpc("consumir_limite", {
+    p_clave: clave,
+    p_ventana: ventana.toISOString(),
+  });
+  fallar(error);
+  return Number(data ?? 0);
 }
 
-export function consultaLimpiar(antesDe: Date): Prisma.Sql {
-  return Prisma.sql`DELETE FROM limites_tasa WHERE ventana < ${antesDe.toISOString()}::timestamp`;
+export async function limpiarVentanasViejas(antesDe: Date): Promise<void> {
+  const { error } = await db().from("limites_tasa").delete().lt("ventana", antesDe.toISOString());
+  fallar(error);
 }

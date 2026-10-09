@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { perfilChat } from "@/features/chat/acceso";
 import { hrefPedido } from "@/features/fletes/rutas";
-import { prisma } from "@/lib/prisma";
+import { db, fallar } from "@/lib/db";
 import type { UsuarioActual } from "@/lib/session";
 
 // Las rutas viejas por id de flete o de conversación (notificaciones guardadas, links compartidos)
@@ -14,26 +14,32 @@ const delUsuario = (usuario: UsuarioActual) => {
   if (!perfil) notFound();
   return {
     perfil,
-    filtro: perfil.rol === "CLIENTE" ? { clienteId: perfil.perfilId } : { fleteroId: perfil.perfilId },
+    columna: perfil.rol === "CLIENTE" ? ("clienteId" as const) : ("fleteroId" as const),
   };
 };
 
 export async function redirigirFlete(fleteId: string, usuario: UsuarioActual): Promise<never> {
-  const { perfil, filtro } = delUsuario(usuario);
-  const flete = await prisma.flete.findFirst({
-    where: { id: fleteId, ...filtro },
-    select: { solicitudId: true },
-  });
-  if (!flete) notFound();
-  redirect(hrefPedido(perfil.rol, flete.solicitudId));
+  const { perfil, columna } = delUsuario(usuario);
+  const { data, error } = await db()
+    .from("fletes")
+    .select("solicitudId")
+    .eq("id", fleteId)
+    .eq(columna, perfil.perfilId)
+    .maybeSingle();
+  fallar(error);
+  if (!data) notFound();
+  redirect(hrefPedido(perfil.rol, data.solicitudId));
 }
 
 export async function redirigirConversacion(conversacionId: string, usuario: UsuarioActual): Promise<never> {
-  const { perfil, filtro } = delUsuario(usuario);
-  const c = await prisma.conversacion.findFirst({
-    where: { id: conversacionId, ...filtro },
-    select: { solicitudId: true, fleteroId: true },
-  });
-  if (!c) notFound();
-  redirect(hrefConversacion(perfil.rol, c.solicitudId, c.fleteroId));
+  const { perfil, columna } = delUsuario(usuario);
+  const { data, error } = await db()
+    .from("conversaciones")
+    .select("solicitudId, fleteroId")
+    .eq("id", conversacionId)
+    .eq(columna, perfil.perfilId)
+    .maybeSingle();
+  fallar(error);
+  if (!data) notFound();
+  redirect(hrefConversacion(perfil.rol, data.solicitudId, data.fleteroId));
 }

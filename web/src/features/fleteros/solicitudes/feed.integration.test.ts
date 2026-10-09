@@ -70,12 +70,12 @@ beforeAll(async () => {
   // Fletero "yo": base en Plaza Independencia, radio 10 km, camioneta de 1000 kg / 3,5 m³
   // (y un camión inactivo, que no tiene que contar). Fletero "otro" con un camión grande.
   await db.exec(`
-    insert into users (id, email, "passwordHash", nombre, apellido, rol, "updatedAt") values
+    insert into usuarios (id, email, "passwordHash", nombre, apellido, rol, "updatedAt") values
       ('u-cli', 'c@x', 'h', 'C', 'C', 'CLIENTE', now()),
       ('u-yo', 'yo@x', 'h', 'Y', 'O', 'FLETERO', now()),
       ('u-otro', 'otro@x', 'h', 'O', 'T', 'FLETERO', now());
-    insert into cliente_profiles (id, "userId") values ('c1', 'u-cli');
-    insert into fletero_profiles (id, "userId", "baseLat", "baseLng", "radioCoberturaKm") values
+    insert into perfiles_cliente (id, "userId") values ('c1', 'u-cli');
+    insert into perfiles_fletero (id, "userId", "baseLat", "baseLng", "radioCoberturaKm") values
       ('yo', 'u-yo', -26.8303, -65.2038, 10),
       ('otro', 'u-otro', -26.8303, -65.2038, 50);
     insert into vehiculos (id, "fleteroId", tipo, marca, modelo, patente, "capacidadKg", "volumenM3", activo) values

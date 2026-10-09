@@ -1,4 +1,4 @@
-import type { FaseControl, ResultadoControl } from "@prisma/client";
+import type { FaseControl, ResultadoControl } from "@/domain/catalogos";
 import type { ControlRegistrado, ItemControlado } from "@/domain/ciclo-flete";
 
 // De las filas de controles_item a la forma que usa el dominio (un control por fase).

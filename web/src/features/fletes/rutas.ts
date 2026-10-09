@@ -1,4 +1,4 @@
-import type { Rol } from "@prisma/client";
+import type { Rol } from "@/domain/roles";
 
 type RolPedido = Extract<Rol, "CLIENTE" | "FLETERO">;
 

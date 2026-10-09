@@ -1,8 +1,6 @@
-// Consulta SQL del buscador de fleteros del cliente. Se arma con `Prisma.sql` (parametrizada, sin
-// concatenar input) y no depende de la conexión: el test de integración la corre contra PGlite +
-// PostGIS y la app con `prisma.$queryRaw`.
+// Consulta SQL del buscador de fleteros del cliente. Los valores van en `params` ($1, $2, …)
+// y no se concatenan al texto. ORDER BY es un fragmento fijo elegido por `orden`.
 
-import { Prisma } from "@prisma/client";
 import type { Coordenadas } from "@/domain/geo";
 
 export type OrdenBuscador = "distancia" | "calificacion" | "experiencia" | "precio";
@@ -43,35 +41,96 @@ export interface FilaBuscador {
   precioPorAyudante: number;
 }
 
+interface Fragmento {
+  sql: string;
+  params: unknown[];
+}
+
+function frag(sql: string, ...params: unknown[]): Fragmento {
+  return { sql, params };
+}
+
+/** Une texto fijo y fragmentos. Los `$n` de cada fragmento se renumeran según el orden. */
+function pegar(piezas: readonly (string | Fragmento)[]): Fragmento {
+  let sql = "";
+  const params: unknown[] = [];
+  for (const pieza of piezas) {
+    if (typeof pieza === "string") {
+      sql += pieza;
+      continue;
+    }
+    const base = params.length;
+    sql += pieza.sql.replace(/\$(\d+)/g, (_, n: string) => `$${base + Number(n)}`);
+    params.push(...pieza.params);
+  }
+  return { sql, params };
+}
+
+function y(condiciones: Fragmento[]): Fragmento {
+  return pegar(condiciones.flatMap((condicion, i) => (i === 0 ? [condicion] : [" AND ", condicion])));
+}
+
 /**
  * Precio estimado en SQL, solo para ORDENAR: la misma fórmula que `domain/precio` sin el
  * redondeo a $100. El monto que se muestra se calcula con el dominio.
  */
-function precioEstimado(c: CargaReferencia, factorRuta: number): Prisma.Sql {
-  return Prisma.sql`(GREATEST(f."precioMinimo",
-      ${c.distanciaKm}::float8 * ${factorRuta}::float8 * f."precioPorKm" + ${c.volumenTotalM3}::float8 * f."precioPorM3")
-    + ${c.ayudantes}::int * f."precioPorAyudante")`;
+function precioEstimado(c: CargaReferencia, factorRuta: number): Fragmento {
+  return frag(
+    `(GREATEST(f."precioMinimo",
+      $1::float8 * $2::float8 * f."precioPorKm" + $3::float8 * f."precioPorM3")
+    + $4::int * f."precioPorAyudante")`,
+    c.distanciaKm,
+    factorRuta,
+    c.volumenTotalM3,
+    c.ayudantes,
+  );
 }
 
-// El ORDER BY no admite parámetros: se elige entre fragmentos fijos (y el precio con parámetros
-// tipados), nunca input del usuario. El id al final hace el orden estable.
-function ordenar(p: ParametrosBuscador): Prisma.Sql {
-  const desempate = Prisma.sql`f.id ASC`;
-  const calificacion = Prisma.sql`f."ratingPromedio" DESC, f."cantidadCalificaciones" DESC`;
+// El ORDER BY no admite parámetros de orden: se elige entre fragmentos fijos (el precio lleva
+// sus números como $n). El id al final hace el orden estable.
+function ordenar(p: ParametrosBuscador): Fragmento {
+  const desempate = frag(`f.id ASC`);
+  const calificacion = frag(`f."ratingPromedio" DESC, f."cantidadCalificaciones" DESC`);
+  const lista = (...partes: Fragmento[]) =>
+    pegar(partes.flatMap((parte, i) => (i === 0 ? [parte] : [", ", parte])));
   switch (p.orden) {
     case "distancia":
       return p.punto
-        ? Prisma.sql`"distanciaKm" ASC, ${calificacion}, ${desempate}`
-        : Prisma.sql`${calificacion}, ${desempate}`;
+        ? lista(frag(`"distanciaKm" ASC`), calificacion, desempate)
+        : lista(calificacion, desempate);
     case "precio":
       return p.carga
-        ? Prisma.sql`${precioEstimado(p.carga, p.factorRuta)} ASC, ${calificacion}, ${desempate}`
-        : Prisma.sql`f."precioMinimo" ASC, ${calificacion}, ${desempate}`;
+        ? lista(precioEstimado(p.carga, p.factorRuta), calificacion, desempate)
+        : lista(frag(`f."precioMinimo" ASC`), calificacion, desempate);
     case "experiencia":
-      return Prisma.sql`f."cantidadCalificaciones" DESC, f."ratingPromedio" DESC, ${desempate}`;
+      return frag(`f."cantidadCalificaciones" DESC, f."ratingPromedio" DESC, f.id ASC`);
     case "calificacion":
-      return Prisma.sql`${calificacion}, ${desempate}`;
+      return lista(calificacion, desempate);
   }
+}
+
+function puntoGeo(punto: Coordenadas): Fragmento {
+  return frag(`ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography`, punto.lng, punto.lat);
+}
+
+function existeVehiculo(p: ParametrosBuscador): Fragmento {
+  const piezas: (string | Fragmento)[] = [
+    `EXISTS (
+      SELECT 1 FROM vehiculos v
+      WHERE v."fleteroId" = f.id AND v.activo`,
+  ];
+  if (p.tipoVehiculo) piezas.push(frag(` AND v.tipo::text = $1`, p.tipoVehiculo));
+  if (p.carga) {
+    piezas.push(
+      frag(
+        ` AND v."capacidadKg" >= $1::float8 AND v."volumenM3" >= $2::float8`,
+        p.carga.pesoTotalKg,
+        p.carga.volumenTotalM3,
+      ),
+    );
+  }
+  piezas.push(`)`);
+  return pegar(piezas);
 }
 
 /**
@@ -80,54 +139,57 @@ function ordenar(p: ParametrosBuscador): Prisma.Sql {
  * la carga (mismo criterio que `domain/compatibilidad` y el feed del fletero).
  * La cercanía usa ST_DWithin sobre el índice GIST de "baseGeo".
  */
-export function consultaBuscador(p: ParametrosBuscador): Prisma.Sql {
-  const punto = p.punto
-    ? Prisma.sql`ST_SetSRID(ST_MakePoint(${p.punto.lng}::float8, ${p.punto.lat}::float8), 4326)::geography`
-    : null;
+export function consultaBuscador(p: ParametrosBuscador): { sql: string; params: unknown[] } {
+  const punto = p.punto ? puntoGeo(p.punto) : null;
 
-  const condiciones: Prisma.Sql[] = [
-    Prisma.sql`f."onboardingCompletadoEn" IS NOT NULL`,
-    Prisma.sql`u.activo`,
-    Prisma.sql`EXISTS (
-      SELECT 1 FROM vehiculos v
-      WHERE v."fleteroId" = f.id AND v.activo
-        ${p.tipoVehiculo ? Prisma.sql`AND v.tipo::text = ${p.tipoVehiculo}` : Prisma.empty}
-        ${
-          p.carga
-            ? Prisma.sql`AND v."capacidadKg" >= ${p.carga.pesoTotalKg}::float8
-                         AND v."volumenM3" >= ${p.carga.volumenTotalM3}::float8`
-            : Prisma.empty
-        }
-    )`,
+  const condiciones: Fragmento[] = [
+    frag(`f."onboardingCompletadoEn" IS NOT NULL`),
+    frag(`u.activo`),
+    existeVehiculo(p),
   ];
-  if (p.soloDisponibles) condiciones.push(Prisma.sql`f.disponible`);
-  if (p.precioMaximo !== null) condiciones.push(Prisma.sql`f."precioMinimo" <= ${p.precioMaximo}::float8`);
+  if (p.soloDisponibles) condiciones.push(frag(`f.disponible`));
+  if (p.precioMaximo !== null) condiciones.push(frag(`f."precioMinimo" <= $1::float8`, p.precioMaximo));
   if (p.ratingMinimo !== null) {
     condiciones.push(
-      Prisma.sql`f."cantidadCalificaciones" > 0 AND f."ratingPromedio" >= ${p.ratingMinimo}::float8`,
+      frag(`f."cantidadCalificaciones" > 0 AND f."ratingPromedio" >= $1::float8`, p.ratingMinimo),
     );
   }
   if (punto) {
-    condiciones.push(Prisma.sql`f."baseGeo" IS NOT NULL`);
+    condiciones.push(frag(`f."baseGeo" IS NOT NULL`));
     if (p.radio === "zona") {
-      condiciones.push(Prisma.sql`ST_DWithin(f."baseGeo", ${punto}, f."radioCoberturaKm" * 1000)`);
+      condiciones.push(pegar([`ST_DWithin(f."baseGeo", `, punto, `, f."radioCoberturaKm" * 1000)`]));
     } else if (typeof p.radio === "number") {
-      condiciones.push(Prisma.sql`ST_DWithin(f."baseGeo", ${punto}, ${p.radio * 1000}::float8)`);
+      condiciones.push(
+        pegar([`ST_DWithin(f."baseGeo", `, punto, `, `, frag(`$1::float8`, p.radio * 1000), `)`]),
+      );
     }
   }
 
-  return Prisma.sql`
+  const distancia = punto
+    ? pegar([`(ST_Distance(f."baseGeo", `, punto, `) / 1000)::float8`])
+    : frag(`NULL::float8`);
+
+  return pegar([
+    `
     SELECT
       f.id,
-      ${punto ? Prisma.sql`(ST_Distance(f."baseGeo", ${punto}) / 1000)::float8` : Prisma.sql`NULL::float8`} AS "distanciaKm",
+      `,
+    distancia,
+    ` AS "distanciaKm",
       f."radioCoberturaKm",
       f."precioMinimo"::float8 AS "precioMinimo",
       f."precioPorKm"::float8 AS "precioPorKm",
       f."precioPorM3"::float8 AS "precioPorM3",
       f."precioPorAyudante"::float8 AS "precioPorAyudante"
-    FROM fletero_profiles f
-    JOIN users u ON u.id = f."userId"
-    WHERE ${Prisma.join(condiciones, " AND ")}
-    ORDER BY ${ordenar(p)}
-    LIMIT ${p.limite}`;
+    FROM perfiles_fletero f
+    JOIN usuarios u ON u.id = f."userId"
+    WHERE `,
+    y(condiciones),
+    `
+    ORDER BY `,
+    ordenar(p),
+    `
+    LIMIT `,
+    frag(`$1`, p.limite),
+  ]);
 }

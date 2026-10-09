@@ -53,12 +53,12 @@ interface FleteroFixture {
 
 async function fletero(f: FleteroFixture) {
   await db.query(
-    `insert into users (id, email, "passwordHash", nombre, apellido, rol, activo, "updatedAt")
+    `insert into usuarios (id, email, "passwordHash", nombre, apellido, rol, activo, "updatedAt")
      values ($1, $2, 'h', 'N', 'A', 'FLETERO', $3, now())`,
     [`u-${f.id}`, `${f.id}@x`, f.activo ?? true],
   );
   await db.query(
-    `insert into fletero_profiles (id, "userId", "baseLat", "baseLng", "radioCoberturaKm", "precioMinimo",
+    `insert into perfiles_fletero (id, "userId", "baseLat", "baseLng", "radioCoberturaKm", "precioMinimo",
        "precioPorKm", "precioPorM3", "ratingPromedio", "cantidadCalificaciones", disponible, "onboardingCompletadoEn")
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
@@ -148,9 +148,9 @@ describe("buscador de fleteros (SQL real con PostGIS)", () => {
   });
 
   it("sin calificaciones no pasa un filtro de calificación", async () => {
-    await db.query(`update fletero_profiles set "ratingPromedio" = 0, "cantidadCalificaciones" = 0 where id = 'yb'`);
+    await db.query(`update perfiles_fletero set "ratingPromedio" = 0, "cantidadCalificaciones" = 0 where id = 'yb'`);
     expect(ids(await buscar({ ratingMinimo: 3 }))).toEqual(["norte", "tafi"]);
-    await db.query(`update fletero_profiles set "ratingPromedio" = 4.2, "cantidadCalificaciones" = 5 where id = 'yb'`);
+    await db.query(`update perfiles_fletero set "ratingPromedio" = 4.2, "cantidadCalificaciones" = 5 where id = 'yb'`);
   });
 
   it("ordena por precio mínimo sin solicitud de referencia", async () => {

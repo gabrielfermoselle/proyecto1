@@ -10,10 +10,19 @@ import { conEventos } from "@/features/chat/eventos";
 import { crearMensajeDeTexto } from "@/features/chat/mensajes";
 import { consultaAccesoSolicitud } from "@/features/fleteros/solicitudes/consultas-sql";
 import { ActionError, createFleteroAction, esViolacionUnica } from "@/lib/action";
-import { prisma } from "@/lib/prisma";
+import { ahoraIso, consulta, db, fallar, nuevoId, numero } from "@/lib/db";
 import { presupuestoSchema, retirarPresupuestoSchema } from "./schemas";
 
 const YA_PRESUPUESTADA = "Ya enviaste un presupuesto para esta solicitud.";
+
+interface SolicitudAbierta {
+  fecha: string;
+  franja: FranjaHoraria;
+  distanciaKm: number | string;
+  pesoTotalKg: number | string;
+  volumenTotalM3: number | string;
+  itemsSinMedidas: number | string;
+}
 
 /**
  * Envía un presupuesto. Todo lo que importa se recalcula en el servidor: el acceso (radio y
@@ -27,23 +36,38 @@ export const enviarPresupuesto = createFleteroAction({
     { fleteroId, usuario },
   ) => {
     const hoy = fechaIsoAr();
-    const [perfil, [acceso], vehiculo] = await Promise.all([
-      prisma.fleteroProfile.findUniqueOrThrow({
-        where: { id: fleteroId },
-        select: {
-          disponible: true,
-          precioMinimo: true,
-          precioPorKm: true,
-          precioPorM3: true,
-          precioPorAyudante: true,
-        },
-      }),
-      prisma.$queryRaw<{ permitido: boolean }[]>(consultaAccesoSolicitud(fleteroId, solicitudId, hoy)),
-      prisma.vehiculo.findFirst({
-        where: { id: vehiculoId, fleteroId, activo: true },
-        select: { capacidadKg: true, volumenM3: true },
-      }),
+    const accesoSql = consultaAccesoSolicitud(fleteroId, solicitudId, hoy);
+    const [perfil, accesoFilas, vehiculo] = await Promise.all([
+      (async () => {
+        const { data, error } = await db()
+          .from("perfiles_fletero")
+          .select("disponible, precioMinimo, precioPorKm, precioPorM3, precioPorAyudante")
+          .eq("id", fleteroId)
+          .single();
+        fallar(error);
+        if (!data) throw new Error("No se encontró el registro");
+        return data as {
+          disponible: boolean;
+          precioMinimo: number | string;
+          precioPorKm: number | string;
+          precioPorM3: number | string;
+          precioPorAyudante: number | string;
+        };
+      })(),
+      consulta<{ permitido: boolean }>(accesoSql.sql, accesoSql.params),
+      (async () => {
+        const { data, error } = await db()
+          .from("vehiculos")
+          .select("capacidadKg, volumenM3")
+          .eq("id", vehiculoId)
+          .eq("fleteroId", fleteroId)
+          .eq("activo", true)
+          .maybeSingle();
+        fallar(error);
+        return data as { capacidadKg: number; volumenM3: number | string } | null;
+      })(),
     ]);
+    const acceso = accesoFilas[0];
 
     if (!perfil.disponible)
       throw new ActionError("Estás en pausa. Activá tu disponibilidad para enviar presupuestos.");
@@ -55,21 +79,18 @@ export const enviarPresupuesto = createFleteroAction({
 
     try {
       await conEventos(async (tx, { emitir, publicarDespues }) => {
-        // Bloquea la solicitud mientras se crea el presupuesto: si el cliente está aceptando
-        // otro en este momento, una de las dos operaciones espera a la otra.
-        const [solicitud] = await tx.$queryRaw<
-          {
-            fecha: Date;
-            franja: FranjaHoraria;
-            distanciaKm: number;
-            pesoTotalKg: number;
-            volumenTotalM3: number;
-            itemsSinMedidas: number;
-          }[]
-        >`SELECT fecha, franja::text AS franja, "distanciaKm"::float8 AS "distanciaKm", "pesoTotalKg"::float8 AS "pesoTotalKg",
-                 "volumenTotalM3"::float8 AS "volumenTotalM3", "itemsSinMedidas"
-          FROM solicitudes WHERE id = ${solicitudId} AND estado = 'ABIERTA' AND fecha >= ${hoy}::date
-          FOR SHARE`;
+        // Sin FOR SHARE: el update condicional reclama la fila solo si sigue abierta y vigente.
+        // Después de insertar se relee el estado; si el cliente la adjudicó en el medio, se borra el presupuesto.
+        const { data: reclamada, error: errorReclamo } = await tx
+          .from("solicitudes")
+          .update({ updatedAt: ahoraIso() })
+          .eq("id", solicitudId)
+          .eq("estado", "ABIERTA")
+          .gte("fecha", hoy)
+          .select("fecha, franja, distanciaKm, pesoTotalKg, volumenTotalM3, itemsSinMedidas")
+          .maybeSingle();
+        fallar(errorReclamo);
+        const solicitud = reclamada as SolicitudAbierta | null;
         if (!solicitud) throw new ActionError("Esta solicitud ya no recibe presupuestos.");
         if (horaLlegada && !horaEnFranja(horaLlegada, FRANJA[solicitud.franja])) {
           const { desde, hasta } = FRANJA[solicitud.franja];
@@ -77,39 +98,62 @@ export const enviarPresupuesto = createFleteroAction({
           throw new ActionError(motivo, { horaLlegada: [motivo] });
         }
 
-        const compatibilidad = evaluarCompatibilidad(solicitud, {
-          capacidadKg: vehiculo.capacidadKg,
-          volumenM3: vehiculo.volumenM3.toNumber(),
-        });
+        const compatibilidad = evaluarCompatibilidad(
+          {
+            pesoTotalKg: numero(solicitud.pesoTotalKg),
+            volumenTotalM3: numero(solicitud.volumenTotalM3),
+            itemsSinMedidas: numero(solicitud.itemsSinMedidas),
+          },
+          {
+            capacidadKg: numero(vehiculo.capacidadKg),
+            volumenM3: numero(vehiculo.volumenM3),
+          },
+        );
         if (!puedeLlevar(compatibilidad)) {
           const motivo = `${ETIQUETA_COMPATIBILIDAD[compatibilidad]}: elegí otro vehículo.`;
           throw new ActionError(motivo, { vehiculoId: [motivo] });
         }
 
+        const distanciaKm = numero(solicitud.distanciaKm);
+        const volumenM3 = numero(solicitud.volumenTotalM3);
         const montoSugerido = precioSugerido(
-          { distanciaLinealKm: solicitud.distanciaKm, volumenM3: solicitud.volumenTotalM3, ayudantes },
+          { distanciaLinealKm: distanciaKm, volumenM3, ayudantes },
           {
-            precioMinimo: perfil.precioMinimo.toNumber(),
-            precioPorKm: perfil.precioPorKm.toNumber(),
-            precioPorM3: perfil.precioPorM3.toNumber(),
-            precioPorAyudante: perfil.precioPorAyudante.toNumber(),
+            precioMinimo: numero(perfil.precioMinimo),
+            precioPorKm: numero(perfil.precioPorKm),
+            precioPorM3: numero(perfil.precioPorM3),
+            precioPorAyudante: numero(perfil.precioPorAyudante),
           },
         );
 
-        const validoHasta = calcularValidoHasta(validez, fechaIsoDeDia(solicitud.fecha));
-        await tx.presupuesto.create({
-          data: {
-            solicitudId,
-            fleteroId,
-            vehiculoId,
-            monto,
-            montoSugerido,
-            incluyeAyudantes: ayudantes,
-            horaLlegada,
-            mensaje,
-            validoHasta,
-          },
+        const validoHasta = calcularValidoHasta(validez, fechaIsoDeDia(new Date(solicitud.fecha)));
+        const presupuestoId = nuevoId();
+        const { error: errorInsert } = await tx.from("presupuestos").insert({
+          id: presupuestoId,
+          solicitudId,
+          fleteroId,
+          vehiculoId,
+          monto,
+          montoSugerido,
+          incluyeAyudantes: ayudantes,
+          horaLlegada,
+          mensaje,
+          validoHasta: validoHasta.toISOString(),
+          updatedAt: ahoraIso(),
         });
+        fallar(errorInsert);
+
+        const { data: vigente, error: errorVigente } = await tx
+          .from("solicitudes")
+          .select("estado")
+          .eq("id", solicitudId)
+          .maybeSingle();
+        fallar(errorVigente);
+        if ((vigente as { estado: string } | null)?.estado !== "ABIERTA") {
+          const { error: errorBorrar } = await tx.from("presupuestos").delete().eq("id", presupuestoId);
+          fallar(errorBorrar);
+          throw new ActionError("Esta solicitud ya no recibe presupuestos.");
+        }
 
         // Presupuestar habilita el chat: crea la conversación y deja el aviso del sistema.
         const conversacionId = await emitir({
@@ -138,15 +182,17 @@ export const retirarPresupuesto = createFleteroAction({
   schema: retirarPresupuestoSchema,
   handler: async ({ presupuestoId }, { fleteroId }) => {
     await conEventos(async (tx, { emitir }) => {
-      const presupuesto = await tx.presupuesto.findFirst({
-        where: { id: presupuestoId, fleteroId, estado: "PENDIENTE" },
-        select: { solicitudId: true },
-      });
-      const { count } = await tx.presupuesto.updateMany({
-        where: { id: presupuestoId, fleteroId, estado: "PENDIENTE" },
-        data: { estado: "RETIRADO" },
-      });
-      if (!presupuesto || count === 0) throw new ActionError("Ese presupuesto ya no se puede retirar.");
+      const { data, error } = await tx
+        .from("presupuestos")
+        .update({ estado: "RETIRADO", updatedAt: ahoraIso() })
+        .eq("id", presupuestoId)
+        .eq("fleteroId", fleteroId)
+        .eq("estado", "PENDIENTE")
+        .select("solicitudId")
+        .maybeSingle();
+      fallar(error);
+      const presupuesto = data as { solicitudId: string } | null;
+      if (!presupuesto) throw new ActionError("Ese presupuesto ya no se puede retirar.");
       await emitir({
         solicitudId: presupuesto.solicitudId,
         fleteroId,

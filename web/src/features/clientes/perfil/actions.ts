@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClienteAction } from "@/lib/action";
-import { prisma } from "@/lib/prisma";
+import { ahoraIso, db, fallar } from "@/lib/db";
 import { datosClienteSchema, direccionHabitualSchema } from "./schemas";
 
 // Las dos acciones operan sobre el usuario y el perfil de la sesión: no reciben IDs.
@@ -10,7 +10,11 @@ import { datosClienteSchema, direccionHabitualSchema } from "./schemas";
 export const guardarDatosCliente = createClienteAction({
   schema: datosClienteSchema,
   handler: async ({ nombre, apellido, telefono }, { usuario }) => {
-    await prisma.user.update({ where: { id: usuario.id }, data: { nombre, apellido, telefono } });
+    const { error } = await db()
+      .from("usuarios")
+      .update({ nombre, apellido, telefono, updatedAt: ahoraIso() })
+      .eq("id", usuario.id);
+    fallar(error);
     revalidatePath("/cliente", "layout");
     revalidatePath("/perfil");
     return null;
@@ -21,7 +25,11 @@ export const guardarDatosCliente = createClienteAction({
 export const guardarDireccionHabitual = createClienteAction({
   schema: direccionHabitualSchema,
   handler: async ({ direccionHabitual, lat, lng }, { clienteId }) => {
-    await prisma.clienteProfile.update({ where: { id: clienteId }, data: { direccionHabitual, lat, lng } });
+    const { error } = await db()
+      .from("perfiles_cliente")
+      .update({ direccionHabitual, lat, lng })
+      .eq("id", clienteId);
+    fallar(error);
     revalidatePath("/cliente", "layout");
     revalidatePath("/perfil");
     return null;

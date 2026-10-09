@@ -1,5 +1,5 @@
 import "server-only";
-import type { FranjaHoraria, TipoFlete } from "@/domain/catalogos";
+import type { EstadoPresupuesto, FranjaHoraria, TipoFlete, TipoVehiculo } from "@/domain/catalogos";
 import { conflictosCon } from "@/domain/agenda";
 import {
   evaluarCompatibilidad,
@@ -14,7 +14,7 @@ import { precioSugerido } from "@/domain/precio";
 import { getTurnosActivos } from "@/features/fleteros/fletes/queries";
 import { urlsFirmadas } from "@/features/uploads/storage";
 import { nombrePublico } from "@/lib/formato";
-import { prisma } from "@/lib/prisma";
+import { consulta, db, fallar, numero, relacion } from "@/lib/db";
 import {
   consultaAccesoSolicitud,
   consultaConteosFeed,
@@ -27,13 +27,93 @@ import {
 
 export const POR_PAGINA = 20;
 
+type EstadoSolicitud = "ABIERTA" | "ADJUDICADA" | "CANCELADA" | "VENCIDA";
+
+interface FotoFila {
+  id: string;
+  ruta: string;
+  ancho: number | null;
+  alto: number | null;
+}
+
+interface ItemFila {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  largoCm: number | null;
+  anchoCm: number | null;
+  altoCm: number | null;
+  pesoKgAprox: number | string | null;
+  fragil: boolean;
+  notas: string | null;
+  orden: number;
+  fotos: FotoFila[] | null;
+}
+
+interface PresupuestoFila {
+  id: string;
+  fleteroId: string;
+  monto: number | string;
+  estado: string;
+  validoHasta: string;
+  mensaje: string | null;
+  incluyeAyudantes: number;
+  horaLlegada: string | null;
+}
+
+interface SolicitudFila {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  tipoFlete: string;
+  estado: string;
+  fecha: string;
+  franja: string;
+  origenDireccion: string;
+  origenLat: number;
+  origenLng: number;
+  origenPiso: number | null;
+  origenAscensor: boolean;
+  destinoDireccion: string;
+  destinoLat: number;
+  destinoLng: number;
+  destinoPiso: number | null;
+  destinoAscensor: boolean;
+  distanciaKm: number | string;
+  pesoTotalKg: number | string;
+  volumenTotalM3: number | string;
+  itemsSinMedidas: number;
+  ayudantesRequeridos: number;
+  requiereEmbalaje: boolean;
+  motivoCancelacion: string | null;
+  tipoVehiculoSugerido: string | null;
+  createdAt: string;
+  cliente:
+    | { user: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null }
+    | { user: { nombre: string; apellido: string } | { nombre: string; apellido: string }[] | null }[]
+    | null;
+  fotos: FotoFila[] | null;
+  items: ItemFila[] | null;
+  flete: { id: string; fleteroId: string } | { id: string; fleteroId: string }[] | null;
+  presupuestos: PresupuestoFila[] | null;
+}
+
 async function getVehiculosActivos(fleteroId: string) {
-  const vehiculos = await prisma.vehiculo.findMany({
-    where: { fleteroId, activo: true },
-    orderBy: { volumenM3: "asc" },
-    select: { id: true, tipo: true, marca: true, modelo: true, capacidadKg: true, volumenM3: true },
-  });
-  return vehiculos.map((v) => ({ ...v, volumenM3: v.volumenM3.toNumber() }));
+  const { data, error } = await db()
+    .from("vehiculos")
+    .select("id, tipo, marca, modelo, capacidadKg, volumenM3")
+    .eq("fleteroId", fleteroId)
+    .eq("activo", true)
+    .order("volumenM3", { ascending: true });
+  fallar(error);
+  return ((data ?? []) as {
+    id: string;
+    tipo: string;
+    marca: string;
+    modelo: string;
+    capacidadKg: number;
+    volumenM3: number | string;
+  }[]).map((v) => ({ ...v, tipo: v.tipo as TipoVehiculo, volumenM3: numero(v.volumenM3) }));
 }
 
 type VehiculoActivo = Awaited<ReturnType<typeof getVehiculosActivos>>[number];
@@ -41,9 +121,9 @@ type VehiculoActivo = Awaited<ReturnType<typeof getVehiculosActivos>>[number];
 /** Lo que se muestra de una solicitud antes de la adjudicación: zona, no dirección exacta. */
 function aTarjeta(fila: FilaFeed, vehiculos: VehiculoActivo[]) {
   const carga = {
-    pesoTotalKg: fila.pesoTotalKg,
-    volumenTotalM3: fila.volumenTotalM3,
-    itemsSinMedidas: fila.itemsSinMedidas,
+    pesoTotalKg: numero(fila.pesoTotalKg),
+    volumenTotalM3: numero(fila.volumenTotalM3),
+    itemsSinMedidas: numero(fila.itemsSinMedidas),
   };
   const sugerido = vehiculoSugerido(carga, vehiculos);
   return {
@@ -54,16 +134,16 @@ function aTarjeta(fila: FilaFeed, vehiculos: VehiculoActivo[]) {
     franja: fila.franja as FranjaHoraria,
     zonaOrigen: direccionAproximada(fila.origenDireccion),
     zonaDestino: direccionAproximada(fila.destinoDireccion),
-    ubicacion: aproximarCoordenadas({ lat: fila.origenLat, lng: fila.origenLng }),
-    distanciaBaseKm: fila.distanciaBaseKm,
-    recorridoKm: fila.distanciaKm * FACTOR_RUTA_URBANA,
+    ubicacion: aproximarCoordenadas({ lat: numero(fila.origenLat), lng: numero(fila.origenLng) }),
+    distanciaBaseKm: numero(fila.distanciaBaseKm),
+    recorridoKm: numero(fila.distanciaKm) * FACTOR_RUTA_URBANA,
     ...carga,
-    cantidadItems: fila.cantidadItems,
-    itemsFragiles: fila.itemsFragiles,
-    ayudantesRequeridos: fila.ayudantesRequeridos,
+    cantidadItems: numero(fila.cantidadItems),
+    itemsFragiles: numero(fila.itemsFragiles),
+    ayudantesRequeridos: numero(fila.ayudantesRequeridos),
     requiereEmbalaje: fila.requiereEmbalaje,
-    presupuestosRecibidos: fila.presupuestosRecibidos,
-    miMonto: fila.miMonto,
+    presupuestosRecibidos: numero(fila.presupuestosRecibidos),
+    miMonto: fila.miMonto == null ? null : numero(fila.miMonto),
     vehiculoSugerido: sugerido ? `${sugerido.marca} ${sugerido.modelo}` : null,
   };
 }
@@ -76,35 +156,50 @@ export async function getFeed(
 ) {
   const hoy = fechaIsoAr();
   const limite = POR_PAGINA * opciones.pagina;
+  const feedSql = consultaFeed({
+    fleteroId,
+    hoy,
+    tab: opciones.tab,
+    orden: opciones.orden,
+    limite: limite + 1,
+    ...(opciones.filtros ? { filtros: opciones.filtros } : {}),
+  });
+  const conteosSql = consultaConteosFeed({ fleteroId, hoy });
   const [filas, conteos, perfil, vehiculos] = await Promise.all([
-    prisma.$queryRaw<FilaFeed[]>(
-      consultaFeed({
-        fleteroId,
-        hoy,
-        tab: opciones.tab,
-        orden: opciones.orden,
-        limite: limite + 1,
-        ...(opciones.filtros ? { filtros: opciones.filtros } : {}),
-      }),
-    ),
-    prisma.$queryRaw<{ nuevas: number; presupuestadas: number }[]>(consultaConteosFeed({ fleteroId, hoy })),
-    prisma.fleteroProfile.findUniqueOrThrow({
-      where: { id: fleteroId },
-      select: { disponible: true, radioCoberturaKm: true, baseLat: true, baseLng: true },
-    }),
+    consulta<FilaFeed>(feedSql.sql, feedSql.params),
+    consulta<{ nuevas: number; presupuestadas: number }>(conteosSql.sql, conteosSql.params),
+    (async () => {
+      const { data, error } = await db()
+        .from("perfiles_fletero")
+        .select("disponible, radioCoberturaKm, baseLat, baseLng")
+        .eq("id", fleteroId)
+        .single();
+      fallar(error);
+      if (!data) throw new Error("No se encontró el registro");
+      return data as {
+        disponible: boolean;
+        radioCoberturaKm: number;
+        baseLat: number | null;
+        baseLng: number | null;
+      };
+    })(),
     getVehiculosActivos(fleteroId),
   ]);
+  const conteo = conteos[0];
 
   return {
     solicitudes: filas.slice(0, limite).map((fila) => aTarjeta(fila, vehiculos)),
     hayMas: filas.length > limite,
-    conteos: conteos[0] ?? { nuevas: 0, presupuestadas: 0 },
+    conteos: {
+      nuevas: numero(conteo?.nuevas ?? 0),
+      presupuestadas: numero(conteo?.presupuestadas ?? 0),
+    },
     perfil: {
       disponible: perfil.disponible,
       radioKm: perfil.radioCoberturaKm,
       base:
         perfil.baseLat !== null && perfil.baseLng !== null
-          ? { lat: perfil.baseLat, lng: perfil.baseLng }
+          ? { lat: numero(perfil.baseLat), lng: numero(perfil.baseLng) }
           : null,
     },
   };
@@ -116,126 +211,108 @@ export async function getFeed(
  */
 export async function getSolicitudParaFletero(fleteroId: string, solicitudId: string) {
   const hoy = fechaIsoAr();
-  const [acceso] = await prisma.$queryRaw<{ permitido: boolean; distanciaBaseKm: number }[]>(
-    consultaAccesoSolicitud(fleteroId, solicitudId, hoy),
+  const accesoSql = consultaAccesoSolicitud(fleteroId, solicitudId, hoy);
+  const [acceso] = await consulta<{ permitido: boolean; distanciaBaseKm: number | null }>(
+    accesoSql.sql,
+    accesoSql.params,
   );
   if (!acceso?.permitido) return null;
 
-  const [s, perfil, vehiculos, turnos, conversacion] = await Promise.all([
-    prisma.solicitud.findUniqueOrThrow({
-      where: { id: solicitudId },
-      select: {
-        id: true,
-        titulo: true,
-        descripcion: true,
-        tipoFlete: true,
-        estado: true,
-        fecha: true,
-        franja: true,
-        origenDireccion: true,
-        origenLat: true,
-        origenLng: true,
-        origenPiso: true,
-        origenAscensor: true,
-        destinoDireccion: true,
-        destinoLat: true,
-        destinoLng: true,
-        destinoPiso: true,
-        destinoAscensor: true,
-        distanciaKm: true,
-        pesoTotalKg: true,
-        volumenTotalM3: true,
-        itemsSinMedidas: true,
-        ayudantesRequeridos: true,
-        requiereEmbalaje: true,
-        motivoCancelacion: true,
-        tipoVehiculoSugerido: true,
-        createdAt: true,
-        cliente: { select: { user: { select: { nombre: true, apellido: true } } } },
-        fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
-        items: {
-          orderBy: { orden: "asc" },
-          select: {
-            id: true,
-            nombre: true,
-            cantidad: true,
-            largoCm: true,
-            anchoCm: true,
-            altoCm: true,
-            pesoKgAprox: true,
-            fragil: true,
-            notas: true,
-            fotos: { select: { id: true, ruta: true, ancho: true, alto: true } },
-          },
-        },
-        flete: { select: { id: true, fleteroId: true } },
-        presupuestos: {
-          where: { fleteroId },
-          select: {
-            id: true,
-            monto: true,
-            estado: true,
-            validoHasta: true,
-            mensaje: true,
-            incluyeAyudantes: true,
-            horaLlegada: true,
-          },
-        },
-        _count: { select: { presupuestos: { where: { estado: "PENDIENTE" } } } },
-      },
-    }),
-    prisma.fleteroProfile.findUniqueOrThrow({
-      where: { id: fleteroId },
-      select: {
-        disponible: true,
-        precioMinimo: true,
-        precioPorKm: true,
-        precioPorM3: true,
-        precioPorAyudante: true,
-      },
-    }),
+  const [solicitudRaw, perfil, vehiculos, turnos, conversacion] = await Promise.all([
+    (async () => {
+      const { data, error } = await db()
+        .from("solicitudes")
+        .select(
+          `id, titulo, descripcion, tipoFlete, estado, fecha, franja,
+           origenDireccion, origenLat, origenLng, origenPiso, origenAscensor,
+           destinoDireccion, destinoLat, destinoLng, destinoPiso, destinoAscensor,
+           distanciaKm, pesoTotalKg, volumenTotalM3, itemsSinMedidas, ayudantesRequeridos, requiereEmbalaje,
+           motivoCancelacion, tipoVehiculoSugerido, createdAt,
+           cliente:perfiles_cliente!solicitudes_clienteId_fkey(user:usuarios!cliente_profiles_userId_fkey(nombre, apellido)),
+           fotos!fotos_solicitudId_fkey(id, ruta, ancho, alto),
+           items:items_inventario!items_inventario_solicitudId_fkey(id, nombre, cantidad, largoCm, anchoCm, altoCm, pesoKgAprox, fragil, notas, orden, fotos!fotos_itemId_fkey(id, ruta, ancho, alto)),
+           flete:fletes!fletes_solicitudId_fkey(id, fleteroId),
+           presupuestos!presupuestos_solicitudId_fkey(id, fleteroId, monto, estado, validoHasta, mensaje, incluyeAyudantes, horaLlegada)`,
+        )
+        .eq("id", solicitudId)
+        .single();
+      fallar(error);
+      if (!data) throw new Error("No se encontró el registro");
+      return data as SolicitudFila;
+    })(),
+    (async () => {
+      const { data, error } = await db()
+        .from("perfiles_fletero")
+        .select("disponible, precioMinimo, precioPorKm, precioPorM3, precioPorAyudante")
+        .eq("id", fleteroId)
+        .single();
+      fallar(error);
+      if (!data) throw new Error("No se encontró el registro");
+      return data as {
+        disponible: boolean;
+        precioMinimo: number | string;
+        precioPorKm: number | string;
+        precioPorM3: number | string;
+        precioPorAyudante: number | string;
+      };
+    })(),
     getVehiculosActivos(fleteroId),
     getTurnosActivos(fleteroId),
-    prisma.conversacion.findUnique({
-      where: { solicitudId_fleteroId: { solicitudId, fleteroId } },
-      select: { id: true },
-    }),
+    (async () => {
+      const { data, error } = await db()
+        .from("conversaciones")
+        .select("id")
+        .eq("solicitudId", solicitudId)
+        .eq("fleteroId", fleteroId)
+        .maybeSingle();
+      fallar(error);
+      return data as { id: string } | null;
+    })(),
   ]);
 
-  const esMiFlete = s.flete?.fleteroId === fleteroId;
+  const s = solicitudRaw;
+  const flete = relacion(s.flete);
+  const clientePerfil = relacion(s.cliente);
+  const clienteUser = relacion(clientePerfil?.user ?? null);
+  if (!clienteUser) throw new Error("No se encontró el registro");
+
+  const esMiFlete = flete?.fleteroId === fleteroId;
   const ubicar = (direccion: string, punto: Coordenadas) =>
     esMiFlete
       ? { direccion, punto, exacta: true }
       : { direccion: direccionAproximada(direccion), punto: aproximarCoordenadas(punto), exacta: false };
 
   const carga = {
-    pesoTotalKg: s.pesoTotalKg.toNumber(),
-    volumenTotalM3: s.volumenTotalM3.toNumber(),
+    pesoTotalKg: numero(s.pesoTotalKg),
+    volumenTotalM3: numero(s.volumenTotalM3),
     itemsSinMedidas: s.itemsSinMedidas,
   };
   const tarifas = {
-    precioMinimo: perfil.precioMinimo.toNumber(),
-    precioPorKm: perfil.precioPorKm.toNumber(),
-    precioPorM3: perfil.precioPorM3.toNumber(),
-    precioPorAyudante: perfil.precioPorAyudante.toNumber(),
+    precioMinimo: numero(perfil.precioMinimo),
+    precioPorKm: numero(perfil.precioPorKm),
+    precioPorM3: numero(perfil.precioPorM3),
+    precioPorAyudante: numero(perfil.precioPorAyudante),
   };
-  const fecha = fechaIsoDeDia(s.fecha);
+  const fecha = fechaIsoDeDia(new Date(s.fecha));
+  const items = [...(s.items ?? [])].sort((a, b) => a.orden - b.orden);
   // Las fotos de la solicitud son privadas: se firman por un rato solo para quien puede verlas.
-  const fotos = [...s.fotos, ...s.items.flatMap((i) => i.fotos)];
+  const fotos = [...(s.fotos ?? []), ...items.flatMap((i) => i.fotos ?? [])];
   const urlsFotos = await urlsFirmadas(fotos.map((f) => f.ruta));
   const sugerido = vehiculoSugerido(carga, vehiculos);
-  const miPresupuesto = s.presupuestos[0];
+  const presupuestos = s.presupuestos ?? [];
+  const miPresupuesto = presupuestos.find((p) => p.fleteroId === fleteroId);
+  const distanciaKm = numero(s.distanciaKm);
 
   return {
     id: s.id,
     titulo: s.titulo,
     descripcion: s.descripcion,
-    tipoFlete: s.tipoFlete,
-    estado: s.estado,
+    tipoFlete: s.tipoFlete as TipoFlete,
+    estado: s.estado as EstadoSolicitud,
     fecha,
-    franja: s.franja,
-    publicadaEn: s.createdAt,
-    cliente: nombrePublico(s.cliente.user.nombre, s.cliente.user.apellido),
+    franja: s.franja as FranjaHoraria,
+    publicadaEn: new Date(s.createdAt),
+    cliente: nombrePublico(clienteUser.nombre, clienteUser.apellido),
     origen: {
       ...ubicar(s.origenDireccion, { lat: s.origenLat, lng: s.origenLng }),
       piso: s.origenPiso,
@@ -246,26 +323,43 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
       piso: s.destinoPiso,
       ascensor: s.destinoAscensor,
     },
-    distanciaLinealKm: s.distanciaKm.toNumber(),
-    recorridoKm: s.distanciaKm.toNumber() * FACTOR_RUTA_URBANA,
-    distanciaBaseKm: acceso.distanciaBaseKm,
+    distanciaLinealKm: distanciaKm,
+    recorridoKm: distanciaKm * FACTOR_RUTA_URBANA,
+    distanciaBaseKm: numero(acceso.distanciaBaseKm),
     carga,
     ayudantesRequeridos: s.ayudantesRequeridos,
     requiereEmbalaje: s.requiereEmbalaje,
     motivoCancelacion: s.motivoCancelacion,
-    tipoVehiculoSugerido: s.tipoVehiculoSugerido,
+    tipoVehiculoSugerido: (s.tipoVehiculoSugerido as TipoVehiculo | null) ?? null,
     fotos: fotos.flatMap(({ ruta, ...f }) => {
       const url = urlsFotos.get(ruta);
       return url ? [{ ...f, url }] : [];
     }),
-    items: s.items.map(({ fotos: _fotos, ...i }) => ({
-      ...i,
-      pesoKgAprox: i.pesoKgAprox?.toNumber() ?? null,
+    items: items.map(({ id, nombre, cantidad, largoCm, anchoCm, altoCm, pesoKgAprox, fragil, notas }) => ({
+      id,
+      nombre,
+      cantidad,
+      largoCm,
+      anchoCm,
+      altoCm,
+      pesoKgAprox: pesoKgAprox == null ? null : numero(pesoKgAprox),
+      fragil,
+      notas,
     })),
-    presupuestosRecibidos: s._count.presupuestos,
-    fleteId: esMiFlete ? (s.flete?.id ?? null) : null,
+    presupuestosRecibidos: presupuestos.filter((p) => p.estado === "PENDIENTE").length,
+    fleteId: esMiFlete ? (flete?.id ?? null) : null,
     conversacionId: conversacion?.id ?? null,
-    miPresupuesto: miPresupuesto ? { ...miPresupuesto, monto: miPresupuesto.monto.toNumber() } : null,
+    miPresupuesto: miPresupuesto
+      ? {
+          id: miPresupuesto.id,
+          monto: numero(miPresupuesto.monto),
+          estado: miPresupuesto.estado as EstadoPresupuesto,
+          validoHasta: new Date(miPresupuesto.validoHasta),
+          mensaje: miPresupuesto.mensaje,
+          incluyeAyudantes: miPresupuesto.incluyeAyudantes,
+          horaLlegada: miPresupuesto.horaLlegada,
+        }
+      : null,
     // Para el formulario de presupuesto:
     disponible: perfil.disponible,
     tarifas,
@@ -276,13 +370,15 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
     vehiculoSugeridoId: sugerido?.id ?? null,
     precioSugerido: precioSugerido(
       {
-        distanciaLinealKm: s.distanciaKm.toNumber(),
+        distanciaLinealKm: distanciaKm,
         volumenM3: carga.volumenTotalM3,
         ayudantes: s.ayudantesRequeridos,
       },
       tarifas,
     ),
-    conflictos: conflictosCon({ fecha, franja: s.franja }, turnos).filter((t) => t.solicitudId !== s.id),
+    conflictos: conflictosCon({ fecha, franja: s.franja as FranjaHoraria }, turnos).filter(
+      (t) => t.solicitudId !== s.id,
+    ),
   };
 }
 

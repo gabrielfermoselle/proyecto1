@@ -21,11 +21,11 @@ beforeAll(async () => {
     await db.exec(readFileSync(join(carpeta, m, "migration.sql"), "utf8"));
   }
   await db.exec(`
-    insert into users (id,email,"passwordHash",nombre,apellido,rol,"updatedAt") values
+    insert into usuarios (id,email,"passwordHash",nombre,apellido,rol,"updatedAt") values
       ('u-ana','a@x','h','Ana','Pereyra','CLIENTE',now()), ('u-luis','l@x','h','Luis','Gómez','CLIENTE',now()),
       ('u-carlos','c@x','h','Carlos','Rodríguez','FLETERO',now()), ('u-sole','s@x','h','Soledad','Castro','FLETERO',now());
-    insert into cliente_profiles (id,"userId") values ('c-ana','u-ana'), ('c-luis','u-luis');
-    insert into fletero_profiles (id,"userId") values ('f-carlos','u-carlos'), ('f-sole','u-sole');
+    insert into perfiles_cliente (id,"userId") values ('c-ana','u-ana'), ('c-luis','u-luis');
+    insert into perfiles_fletero (id,"userId") values ('f-carlos','u-carlos'), ('f-sole','u-sole');
     insert into vehiculos (id,"fleteroId",tipo,marca,modelo,patente,"capacidadKg","volumenM3") values
       ('v1','f-carlos','AUTO','a','b','AB123CD',500,3), ('v2','f-sole','AUTO','a','b','AB124CD',500,3);
     insert into solicitudes (id,"clienteId","tipoFlete",titulo,"origenDireccion","origenLat","origenLng","destinoDireccion","destinoLat","destinoLng","distanciaKm",fecha,franja,estado,"updatedAt") values

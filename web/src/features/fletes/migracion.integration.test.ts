@@ -23,10 +23,10 @@ beforeAll(async () => {
   // Base con el formato anterior a la migración nueva.
   for (const m of migraciones.filter((m) => m < NUEVA)) await aplicar(m);
   await db.exec(`
-    insert into users (id,email,"passwordHash",nombre,apellido,rol,"updatedAt") values
+    insert into usuarios (id,email,"passwordHash",nombre,apellido,rol,"updatedAt") values
       ('u-ana','a@x','h','Ana','Pereyra','CLIENTE',now()), ('u-carlos','c@x','h','Carlos','Rodríguez','FLETERO',now());
-    insert into cliente_profiles (id,"userId") values ('c-ana','u-ana');
-    insert into fletero_profiles (id,"userId") values ('f-carlos','u-carlos');
+    insert into perfiles_cliente (id,"userId") values ('c-ana','u-ana');
+    insert into perfiles_fletero (id,"userId") values ('f-carlos','u-carlos');
     insert into vehiculos (id,"fleteroId",tipo,marca,modelo,patente,"capacidadKg","volumenM3") values
       ('v1','f-carlos','AUTO','a','b','AB123CD',500,3);
     insert into solicitudes (id,"clienteId","tipoFlete",titulo,"origenDireccion","origenLat","origenLng","destinoDireccion","destinoLat","destinoLng","distanciaKm",fecha,franja,estado,"updatedAt") values

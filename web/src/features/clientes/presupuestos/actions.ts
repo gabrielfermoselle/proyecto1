@@ -1,16 +1,59 @@
 "use server";
 
-import type { FranjaHoraria } from "@prisma/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { FranjaHoraria } from "@/domain/catalogos";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { resumenInventario, validarTransicion } from "@/domain/ciclo-flete";
 import { fechaIsoDeDia } from "@/domain/fechas";
 import { conEventos } from "@/features/chat/eventos";
-import { ActionError, createClienteAction } from "@/lib/action";
+import { ActionError, createClienteAction, esViolacionUnica } from "@/lib/action";
+import { ahoraIso, fallar, nuevoId, numero, relacion } from "@/lib/db";
 
 const id = z.string().min(1).max(40);
-// Un evento por cada presupuesto rechazado: con muchos, el límite de 5 s de Prisma no alcanza.
-const OPCIONES_TRANSACCION = { timeout: 15_000 };
+
+interface PresupuestoAceptable {
+  solicitudId: string;
+  fleteroId: string;
+  vehiculoId: string;
+  monto: unknown;
+  solicitudes: { clienteId: string } | { clienteId: string }[] | null;
+}
+
+function comoFecha(valor: unknown): Date {
+  return valor instanceof Date ? valor : new Date(String(valor));
+}
+
+async function fechaAcordada(tx: SupabaseClient, solicitudId: string, fleteroId: string) {
+  const { data: conversacion, error } = await tx
+    .from("conversaciones")
+    .select("id")
+    .eq("solicitudId", solicitudId)
+    .eq("fleteroId", fleteroId)
+    .maybeSingle();
+  fallar(error);
+  if (!conversacion) return null;
+
+  const { data: mensajes, error: errorMensajes } = await tx
+    .from("mensajes")
+    .select("id")
+    .eq("conversacionId", conversacion.id);
+  fallar(errorMensajes);
+  const mensajeIds = (mensajes ?? []).map((m) => m.id as string);
+  if (mensajeIds.length === 0) return null;
+
+  const { data: acordada, error: errorAcordada } = await tx
+    .from("propuestas_horario")
+    .select("id, fecha, franja")
+    .eq("estado", "ACEPTADA")
+    .is("aplicadaEn", null)
+    .in("mensajeId", mensajeIds)
+    .order("respondidaEn", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  fallar(errorAcordada);
+  return acordada as { id: string; fecha: unknown; franja: string } | null;
+}
 
 /**
  * Acepta un presupuesto: crea el flete, adjudica la solicitud y rechaza los demás presupuestos.
@@ -20,90 +63,138 @@ const OPCIONES_TRANSACCION = { timeout: 15_000 };
 export const aceptarPresupuesto = createClienteAction({
   schema: z.object({ presupuestoId: id }),
   handler: async ({ presupuestoId }, { clienteId, usuario }) => {
-    const resultado = await conEventos(async (tx, { emitir }) => {
-      const presupuesto = await tx.presupuesto.findFirst({
-        where: { id: presupuestoId, solicitud: { clienteId } },
-        select: { solicitudId: true, fleteroId: true, vehiculoId: true, monto: true },
-      });
-      if (!presupuesto) throw new ActionError("No encontramos ese presupuesto.");
+    const resultado = await conEventos(async (tx: SupabaseClient, { emitir }) => {
+      const { data, error } = await tx
+        .from("presupuestos")
+        .select("solicitudId, fleteroId, vehiculoId, monto, solicitudes(clienteId)")
+        .eq("id", presupuestoId)
+        .maybeSingle();
+      fallar(error);
+      const presupuesto = data as PresupuestoAceptable | null;
+      const dueno = relacion(presupuesto?.solicitudes);
+      if (!presupuesto || dueno?.clienteId !== clienteId)
+        throw new ActionError("No encontramos ese presupuesto.");
       const { solicitudId, fleteroId } = presupuesto;
 
-      // Bloquea la solicitud: un fletero presupuestando en este momento (FOR SHARE) espera, y
-      // dos aceptaciones simultáneas no pueden crear dos fletes.
-      const [solicitud] = await tx.$queryRaw<{ fecha: Date; franja: FranjaHoraria }[]>`
-        SELECT fecha, franja FROM solicitudes
-        WHERE id = ${solicitudId} AND "clienteId" = ${clienteId} AND estado = 'ABIERTA'
-        FOR UPDATE`;
+      const marca = ahoraIso();
+      const volverAAbierta = async () => {
+        const { error: errorReverso } = await tx
+          .from("solicitudes")
+          .update({ estado: "ABIERTA", updatedAt: ahoraIso() })
+          .eq("id", solicitudId)
+          .eq("clienteId", clienteId)
+          .eq("estado", "ADJUDICADA");
+        fallar(errorReverso);
+      };
+      // El update condicionado reclama la fila: dos aceptaciones no adjudican la misma solicitud.
+      const { data: solicitud, error: errorReclamo } = await tx
+        .from("solicitudes")
+        .update({ estado: "ADJUDICADA", updatedAt: marca })
+        .eq("id", solicitudId)
+        .eq("clienteId", clienteId)
+        .eq("estado", "ABIERTA")
+        .select("fecha, franja")
+        .maybeSingle();
+      fallar(errorReclamo);
       if (!solicitud) throw new ActionError("Esta solicitud ya no está abierta.");
 
-      const ahora = new Date();
-      const { count } = await tx.presupuesto.updateMany({
-        where: { id: presupuestoId, estado: "PENDIENTE", validoHasta: { gte: ahora } },
-        data: { estado: "ACEPTADO" },
-      });
-      if (count === 0) throw new ActionError("Ese presupuesto venció o el fletero lo retiró.");
+      const { data: aceptados, error: errorAceptar } = await tx
+        .from("presupuestos")
+        .update({ estado: "ACEPTADO", updatedAt: marca })
+        .eq("id", presupuestoId)
+        .eq("estado", "PENDIENTE")
+        .gte("validoHasta", marca)
+        .select("id");
+      fallar(errorAceptar);
+      if (!aceptados?.length) {
+        await volverAAbierta();
+        throw new ActionError("Ese presupuesto venció o el fletero lo retiró.");
+      }
       // La solicitud está abierta y tiene este presupuesto pendiente: PRESUPUESTADO → CONFIRMADO.
       const validacion = validarTransicion("PRESUPUESTADO", "CONFIRMADO", "CLIENTE", {
         inventario: resumenInventario([]),
         conformidad: false,
         motivo: null,
       });
-      if (!validacion.ok) throw new ActionError(validacion.motivo);
-
-      // La última fecha que las partes aceptaron en el chat y todavía no se aplicó.
-      const acordada = await tx.propuestaHorario.findFirst({
-        where: {
-          estado: "ACEPTADA",
-          aplicadaEn: null,
-          mensaje: { conversacion: { solicitudId, fleteroId } },
-        },
-        orderBy: { respondidaEn: "desc" },
-        select: { id: true, fecha: true, franja: true },
-      });
-      const fecha = acordada?.fecha ?? solicitud.fecha;
-      const franja = acordada?.franja ?? solicitud.franja;
-      await tx.solicitud.update({
-        where: { id: solicitudId },
-        data: { estado: "ADJUDICADA", fecha, franja },
-      });
-      if (acordada) {
-        await tx.propuestaHorario.update({ where: { id: acordada.id }, data: { aplicadaEn: ahora } });
+      if (!validacion.ok) {
+        await volverAAbierta();
+        const { error: errorPresupuesto } = await tx
+          .from("presupuestos")
+          .update({ estado: "PENDIENTE", updatedAt: ahoraIso() })
+          .eq("id", presupuestoId)
+          .eq("estado", "ACEPTADO");
+        fallar(errorPresupuesto);
+        throw new ActionError(validacion.motivo);
       }
 
-      const flete = await tx.flete.create({
-        data: {
-          solicitudId,
-          presupuestoId,
-          clienteId,
-          fleteroId,
-          vehiculoId: presupuesto.vehiculoId,
-          precioAcordado: presupuesto.monto,
-        },
-        select: { id: true },
+      // La última fecha que las partes aceptaron en el chat y todavía no se aplicó.
+      const acordada = await fechaAcordada(tx, solicitudId, fleteroId);
+      const fecha = fechaIsoDeDia(comoFecha(acordada?.fecha ?? solicitud.fecha));
+      const franja = (acordada?.franja ?? solicitud.franja) as FranjaHoraria;
+      if (acordada) {
+        const { error: errorFecha } = await tx
+          .from("solicitudes")
+          .update({ fecha, franja, updatedAt: marca })
+          .eq("id", solicitudId);
+        fallar(errorFecha);
+        const { error: errorAplicada } = await tx
+          .from("propuestas_horario")
+          .update({ aplicadaEn: marca })
+          .eq("id", acordada.id);
+        fallar(errorAplicada);
+      }
+
+      const fleteId = nuevoId();
+      const { error: errorFlete } = await tx.from("fletes").insert({
+        id: fleteId,
+        solicitudId,
+        presupuestoId,
+        clienteId,
+        fleteroId,
+        vehiculoId: presupuesto.vehiculoId,
+        precioAcordado: presupuesto.monto,
+        updatedAt: marca,
       });
-      await tx.estadoFlete.create({ data: { fleteId: flete.id, etapa: "CONFIRMADO", autorId: usuario.id } });
+      if (esViolacionUnica(errorFlete)) throw new ActionError("Esta solicitud ya no está abierta.");
+      fallar(errorFlete);
+      const { error: errorEstado } = await tx.from("estados_flete").insert({
+        id: nuevoId(),
+        fleteId,
+        etapa: "CONFIRMADO",
+        autorId: usuario.id,
+      });
+      fallar(errorEstado);
 
       // Los demás presupuestos quedan rechazados y su chat, cerrado con aviso.
-      const otros = await tx.presupuesto.findMany({
-        where: { solicitudId, estado: "PENDIENTE" },
-        select: { fleteroId: true },
-      });
-      await tx.presupuesto.updateMany({
-        where: { solicitudId, estado: "PENDIENTE" },
-        data: { estado: "RECHAZADO" },
-      });
-      for (const otro of otros) {
-        await emitir({ solicitudId, fleteroId: otro.fleteroId, evento: "PRESUPUESTO_NO_ELEGIDO", datos: {} });
+      const { data: otros, error: errorOtros } = await tx
+        .from("presupuestos")
+        .select("fleteroId")
+        .eq("solicitudId", solicitudId)
+        .eq("estado", "PENDIENTE");
+      fallar(errorOtros);
+      const { error: errorRechazo } = await tx
+        .from("presupuestos")
+        .update({ estado: "RECHAZADO", updatedAt: marca })
+        .eq("solicitudId", solicitudId)
+        .eq("estado", "PENDIENTE");
+      fallar(errorRechazo);
+      for (const otro of otros ?? []) {
+        await emitir({
+          solicitudId,
+          fleteroId: otro.fleteroId as string,
+          evento: "PRESUPUESTO_NO_ELEGIDO",
+          datos: {},
+        });
       }
 
       const conversacionId = await emitir({
         solicitudId,
         fleteroId,
         evento: "FLETE_CONFIRMADO",
-        datos: { monto: presupuesto.monto.toNumber(), fecha: fechaIsoDeDia(fecha), franja },
+        datos: { monto: numero(presupuesto.monto), fecha, franja },
       });
-      return { fleteId: flete.id, conversacionId };
-    }, OPCIONES_TRANSACCION);
+      return { fleteId, conversacionId };
+    });
     revalidatePath("/cliente", "layout");
     return resultado;
   },
