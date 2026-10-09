@@ -107,6 +107,20 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
   await expect(carlos.locator("#contenido").getByRole("link", { name: "Cómo llegar" }).first()).toBeVisible();
 });
 
+/**
+ * Marca el inventario y recarga. El botón de la etapa lee el resumen del servidor: un refresco
+ * que ya estaba en curso puede traer el dato viejo y dejarlo deshabilitado.
+ */
+async function marcar(page: Page, nombre: string) {
+  const boton = page.locator("#contenido").getByRole("button", { name: nombre });
+  const guardado = page.waitForRequest(
+    (pedido) => pedido.method() === "POST" && pedido.headers()["next-action"] !== undefined,
+  );
+  await boton.click();
+  await (await guardado).response();
+  await page.reload();
+}
+
 /** Avanza de etapa con el botón principal y lo confirma en el diálogo (firmando, si lo pide). */
 async function avanzar(page: Page, boton: string, etapa: string, { firma = false } = {}) {
   const contenido = page.locator("#contenido");
@@ -141,9 +155,9 @@ test("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", 
   const salir = contenido.getByRole("button", { name: "Terminé de cargar, salgo" });
   await expect(salir).toBeDisabled();
 
-  await contenido.getByRole("button", { name: "Cargado: Bicicleta rodado 29" }).click();
+  await marcar(carlos, "Cargado: Bicicleta rodado 29");
   await expect(salir).toBeDisabled();
-  await contenido.getByRole("button", { name: "Cargado: Caja de herramientas" }).click();
+  await marcar(carlos, "Cargado: Caja de herramientas");
   await expect(salir).toBeEnabled();
   // Con ítems cargados ya no se puede cancelar.
   await expect(contenido.getByRole("button", { name: "No puedo hacer este flete" })).toBeHidden();
@@ -153,7 +167,7 @@ test("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", 
 
 test("el fletero descarga todo y firma la entrega", async () => {
   await avanzar(carlos, "Llegué al destino", "Etapa 5 de 7: Descargando");
-  await carlos.locator("#contenido").getByRole("button", { name: "Todo: entregado" }).click();
+  await marcar(carlos, "Todo: entregado");
   await avanzar(carlos, "Terminé de descargar", "Etapa 6 de 7: Entregado", { firma: true });
 });
 
@@ -164,7 +178,7 @@ test("la cliente revisa lo que recibió, cierra el flete y califica", async () =
   const cerrar = contenido.getByRole("button", { name: "Cerrar el flete" });
   await expect(cerrar).toBeDisabled();
 
-  await contenido.getByRole("button", { name: "Todo: recibido" }).click();
+  await marcar(florencia, "Todo: recibido");
   await avanzar(florencia, "Cerrar el flete", "Etapa 7 de 7: Cerrado", { firma: true });
 
   await contenido.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
