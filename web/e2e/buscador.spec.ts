@@ -9,7 +9,7 @@ test.use({ storageState: sesionDe("ana") });
 test("por defecto mide la distancia desde la dirección habitual", async ({ page }) => {
   await page.goto("/cliente/fleteros");
   await expect(page.getByRole("radio", { name: "Mi dirección habitual" })).toBeChecked();
-  await expect(page.getByText(/fleteros? cerca de/)).toBeVisible();
+  await expect(page.locator("#contenido").getByText(/fleteros? cerca de/)).toBeVisible();
   await expect(page.getByText(/^A [\d,]+ (km|m)$/).first()).toBeVisible();
 });
 
@@ -41,7 +41,9 @@ test("con una solicitud de referencia muestra el precio estimado y ordena por pr
 
 test("un tope de precio imposible deja la lista vacía", async ({ page }) => {
   await page.goto("/cliente/fleteros?precioMax=1&radio=todos");
-  await expect(page.getByRole("heading", { name: "No hay fleteros con esos filtros" })).toBeVisible();
+  await expect(
+    page.locator("#contenido").getByRole("heading", { name: "No hay fleteros con esos filtros" }),
+  ).toBeVisible();
 });
 
 test.describe("sin dirección habitual", () => {
