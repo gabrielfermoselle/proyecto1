@@ -13,6 +13,7 @@ const FUERA_S3 = [
   "src/features/clientes/fleteros/parametros.test.ts",
   "src/features/clientes/perfil/perfil-cliente.db.test.ts",
   "src/features/auth/recuperacion.db.test.ts",
+  "src/features/admin/admin.db.test.ts",
 ];
 
 export default defineConfig({

@@ -82,7 +82,8 @@ export default async function PerfilPage() {
           className="group flex items-center justify-between gap-4 rounded-xl bg-secondary p-5 text-secondary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <span className="grid gap-0.5">
-            <span className="font-heading text-lg font-extrabold">Vehículos, zona, tarifas y documentos</span>
+            {/* [FUERA-S3] [BE] Verificación de documentos: «Vehículos, zona, tarifas y documentos» */}
+            <span className="font-heading text-lg font-extrabold">Vehículos, zona y tarifas</span>
             <span className="text-sm text-secondary-foreground/80">
               Lo que define qué pedidos ves y cómo se calcula tu precio sugerido.
             </span>

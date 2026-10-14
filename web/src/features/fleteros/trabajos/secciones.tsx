@@ -1,9 +1,11 @@
 import { AlertTriangle, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Estrellas } from "@/components/shared/estrellas";
+// [FUERA-S3] Ganancias del fletero
+// import { Estrellas } from "@/components/shared/estrellas";
 import { SegmentedNav } from "@/components/shared/segmented-nav";
-import { StatTile } from "@/components/shared/stat-tile";
+// [FUERA-S3] Ganancias del fletero
+// import { StatTile } from "@/components/shared/stat-tile";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FRANJA, FRANJAS_HORARIAS } from "@/domain/catalogos";
@@ -11,8 +13,10 @@ import { agruparPorDia } from "@/domain/agenda";
 import { fechaIsoAr, inicioDeSemana, sumarDias } from "@/domain/fechas";
 import { TurnoCard } from "@/features/fleteros/fletes/components/turno-card";
 import { getAgenda } from "@/features/fleteros/fletes/queries";
-import { GananciasChart } from "@/features/fleteros/metricas/components/ganancias-chart";
-import { getPanelFletero } from "@/features/fleteros/metricas/queries";
+// [FUERA-S3] Ganancias del fletero
+// import { GananciasChart } from "@/features/fleteros/metricas/components/ganancias-chart";
+// [FUERA-S3] Ganancias del fletero
+// import { getPanelFletero } from "@/features/fleteros/metricas/queries";
 import { EstadoPresupuestoBadge } from "@/features/fleteros/presupuestos/components/estado-presupuesto";
 import {
   getMisPresupuestos,
@@ -25,8 +29,7 @@ import {
   formatearDiaAbsoluto,
   formatearFechaHora,
   formatearPesos,
-  formatearPorcentaje,
-  formatearRating,
+  // [FUERA-S3] Ganancias del fletero: formatearPorcentaje, formatearRating
 } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 
@@ -259,60 +262,61 @@ export async function Presupuestos({ fleteroId, estado }: { fleteroId: string; e
   );
 }
 
-export async function Ganancias({ fleteroId }: { fleteroId: string }) {
-  const panel = await getPanelFletero(fleteroId);
-  const { metricas: m } = panel;
-  return (
-    <div className="grid gap-6">
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          label="Ganancias del mes"
-          value={formatearPesos(m.gananciasMes)}
-          detail="Fletes confirmados por el cliente"
-        />
-        <StatTile
-          label="Fletes completados"
-          value={m.fletesCompletados}
-          detail={m.fletesEnCurso > 0 ? `${m.fletesEnCurso} en curso` : "Ninguno en curso"}
-        />
-        <StatTile
-          label="Calificación"
-          value={panel.cantidadCalificaciones > 0 ? formatearRating(panel.rating) : "—"}
-          detail={
-            panel.cantidadCalificaciones > 0 ? (
-              <span className="flex flex-wrap items-center gap-1.5">
-                <Estrellas puntaje={panel.rating} />
-                {panel.cantidadCalificaciones} reseña{panel.cantidadCalificaciones > 1 ? "s" : ""}
-              </span>
-            ) : (
-              "Todavía sin reseñas"
-            )
-          }
-        />
-        <StatTile
-          label="Tasa de aceptación"
-          value={m.tasaAceptacion === null ? "—" : formatearPorcentaje(m.tasaAceptacion)}
-          detail={
-            m.tasaAceptacion === null
-              ? "Cuando los clientes elijan, la vas a ver acá"
-              : `De ${m.presupuestosDecididos} presupuestos que los clientes decidieron`
-          }
-        />
-      </dl>
-      <section
-        aria-labelledby="titulo-ganancias"
-        className="grid gap-3 rounded-xl border bg-card p-5 shadow-sm sm:p-6"
-      >
-        <div className="grid gap-1">
-          <h3 id="titulo-ganancias" className="text-lg font-bold">
-            Ganancias de los últimos 6 meses
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Total histórico: {formatearPesos(m.gananciasTotales)}
-          </p>
-        </div>
-        <GananciasChart datos={m.gananciasPorMes} />
-      </section>
-    </div>
-  );
-}
+// [FUERA-S3] Ganancias del fletero. Fuera de los sprints 1-3: la pestaña queda comentada abajo.
+// export async function Ganancias({ fleteroId }: { fleteroId: string }) {
+//   const panel = await getPanelFletero(fleteroId);
+//   const { metricas: m } = panel;
+//   return (
+//     <div className="grid gap-6">
+//       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+//         <StatTile
+//           label="Ganancias del mes"
+//           value={formatearPesos(m.gananciasMes)}
+//           detail="Fletes confirmados por el cliente"
+//         />
+//         <StatTile
+//           label="Fletes completados"
+//           value={m.fletesCompletados}
+//           detail={m.fletesEnCurso > 0 ? `${m.fletesEnCurso} en curso` : "Ninguno en curso"}
+//         />
+//         <StatTile
+//           label="Calificación"
+//           value={panel.cantidadCalificaciones > 0 ? formatearRating(panel.rating) : "—"}
+//           detail={
+//             panel.cantidadCalificaciones > 0 ? (
+//               <span className="flex flex-wrap items-center gap-1.5">
+//                 <Estrellas puntaje={panel.rating} />
+//                 {panel.cantidadCalificaciones} reseña{panel.cantidadCalificaciones > 1 ? "s" : ""}
+//               </span>
+//             ) : (
+//               "Todavía sin reseñas"
+//             )
+//           }
+//         />
+//         <StatTile
+//           label="Tasa de aceptación"
+//           value={m.tasaAceptacion === null ? "—" : formatearPorcentaje(m.tasaAceptacion)}
+//           detail={
+//             m.tasaAceptacion === null
+//               ? "Cuando los clientes elijan, la vas a ver acá"
+//               : `De ${m.presupuestosDecididos} presupuestos que los clientes decidieron`
+//           }
+//         />
+//       </dl>
+//       <section
+//         aria-labelledby="titulo-ganancias"
+//         className="grid gap-3 rounded-xl border bg-card p-5 shadow-sm sm:p-6"
+//       >
+//         <div className="grid gap-1">
+//           <h3 id="titulo-ganancias" className="text-lg font-bold">
+//             Ganancias de los últimos 6 meses
+//           </h3>
+//           <p className="text-sm text-muted-foreground">
+//             Total histórico: {formatearPesos(m.gananciasTotales)}
+//           </p>
+//         </div>
+//         <GananciasChart datos={m.gananciasPorMes} />
+//       </section>
+//     </div>
+//   );
+// }

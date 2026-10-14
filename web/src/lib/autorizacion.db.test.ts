@@ -213,9 +213,10 @@ const MATRIZ: Record<string, Caso> = {
     ajeno: (m) => ({ como: m.otroFletero, input: { fotoId: m.fotoVehiculoId } }),
   },
   // Los documentos son siempre los del fletero de la sesión: no reciben IDs.
-  firmarSubidaDocumento: { roles: ["FLETERO"] },
-  guardarDocumento: { roles: ["FLETERO"] },
-  eliminarDocumento: { roles: ["FLETERO"] },
+  // [FUERA-S3] [BE] Verificación de documentos
+  // firmarSubidaDocumento: { roles: ["FLETERO"] },
+  // guardarDocumento: { roles: ["FLETERO"] },
+  // eliminarDocumento: { roles: ["FLETERO"] },
 
   // --- chat ---
   // [FUERA-S3] [BE] Chat en tiempo real
@@ -302,10 +303,11 @@ const MATRIZ: Record<string, Caso> = {
   // --- notificaciones: con IDs ajenos no falla, pero no marca nada ---
   marcarNotificacionesLeidas: { roles: TODOS_LOS_ROLES },
 
-  // --- admin (poder global sobre la plataforma: no hay recurso "ajeno") ---
-  cambiarEstadoUsuario: { roles: ["ADMIN"] },
-  verificarFletero: { roles: ["ADMIN"] },
-  resolverReclamo: { roles: ["ADMIN"] },
+  // [FUERA-S3] [FE] Panel de administración
+  // // --- admin (poder global sobre la plataforma: no hay recurso "ajeno") ---
+  // cambiarEstadoUsuario: { roles: ["ADMIN"] },
+  // verificarFletero: { roles: ["ADMIN"] },
+  // resolverReclamo: { roles: ["ADMIN"] },
 };
 
 /** Todas las Server Actions exportadas por los `actions.ts` del proyecto. */

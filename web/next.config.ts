@@ -43,9 +43,10 @@ const nextConfig: NextConfig = {
       { source: "/fletero/presupuestos", destination: "/fletero/trabajos?tab=presupuestos", permanent: true },
       // [FUERA-S3] [FE] Pantalla del chat
       // { source: "/fletero/mensajes", destination: "/chat", permanent: true },
-      { source: "/admin/usuarios", destination: "/admin/fleteros?tab=cuentas", permanent: true },
-      { source: "/admin/reclamos", destination: "/admin/reportes", permanent: true },
-      { source: "/admin/solicitudes", destination: "/admin/reportes?tab=pedidos", permanent: true },
+      // [FUERA-S3] [FE] Panel de administración
+      // { source: "/admin/usuarios", destination: "/admin/fleteros?tab=cuentas", permanent: true },
+      // { source: "/admin/reclamos", destination: "/admin/reportes", permanent: true },
+      // { source: "/admin/solicitudes", destination: "/admin/reportes?tab=pedidos", permanent: true },
     ];
   },
   async headers() {

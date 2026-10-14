@@ -12,7 +12,8 @@ export const CUENTAS = {
   // Tiene un flete confirmado para mañana: su agenda muestra la grilla de la semana.
   soledad: { email: "soledad@demo.test", area: "/fletero" },
   lucia: { email: "lucia@demo.test", area: "/fletero" },
-  admin: { email: "admin@demo.test", area: "/admin" },
+  // [FUERA-S3] [FE] Panel de administración
+  // admin: { email: "admin@demo.test", area: "/admin" },
 } as const;
 
 export type Cuenta = keyof typeof CUENTAS;

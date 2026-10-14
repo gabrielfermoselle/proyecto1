@@ -40,12 +40,13 @@ test.describe("cada rol entra a su área", () => {
   const casos = [
     { cuenta: "ana", inicio: "/cliente", titulo: "Mis pedidos", ajenas: ["/fletero", "/admin"] },
     { cuenta: "carlos", inicio: "/fletero", titulo: "Pedidos disponibles", ajenas: ["/cliente", "/admin"] },
-    {
-      cuenta: "admin",
-      inicio: "/admin/fleteros",
-      titulo: "Fleteros",
-      ajenas: ["/cliente", "/fletero", "/chat"],
-    },
+    // [FUERA-S3] [FE] Panel de administración
+    // {
+    //   cuenta: "admin",
+    //   inicio: "/admin/fleteros",
+    //   titulo: "Fleteros",
+    //   ajenas: ["/cliente", "/fletero", "/chat"],
+    // },
   ] as const;
 
   for (const { cuenta, inicio, titulo, ajenas } of casos) {

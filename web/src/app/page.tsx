@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeCheck, Star, Truck } from "lucide-react";
+import { ArrowRight, BadgeCheck, Calculator, CalendarDays, MapPin, Star, Truck } from "lucide-react";
 // [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
@@ -24,7 +24,8 @@ const PASOS = [
     // [FUERA-S3] [FE] Pantalla del chat: «Fleteros de tu zona te mandan su precio. Les preguntás por el chat.»
     detalle: "Fleteros de tu zona te mandan su precio y un mensaje.",
   },
-  { titulo: "Elegís", detalle: "Comparás precio, vehículo y reseñas. Seguís el flete hasta que llega." },
+  // [FUERA-S3] [BE] Reclamos, firmas y calificación: «Comparás precio, vehículo y reseñas. Seguís el flete hasta que llega.»
+  { titulo: "Elegís", detalle: "Comparás precio y vehículo. Seguís cada etapa del flete." },
 ];
 
 /** Presupuestos de muestra para la vista previa (datos inventados, marcados como ejemplo). */
@@ -262,19 +263,35 @@ export default async function InicioPage() {
                 Mirá los pedidos cerca de tu base, con fotos y medidas, y presupuestá los que te convienen.
               </p>
               <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-primary-foreground/85">
+                {/* [FUERA-S3] [BE] Verificación de documentos
                 <span className="inline-flex items-center gap-1.5">
                   <BadgeCheck className="size-4" aria-hidden="true" />
                   Insignia de verificado
                 </span>
+                */}
                 {/* [FUERA-S3] [FE] Pantalla del chat
                 <span className="inline-flex items-center gap-1.5">
                   <MessagesSquare className="size-4" aria-hidden="true" />
                   Chat por pedido
                 </span>
                 */}
+                {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
                 <span className="inline-flex items-center gap-1.5">
                   <Star className="size-4" aria-hidden="true" />
                   Reseñas de clientes reales
+                </span>
+                */}
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4" aria-hidden="true" />
+                  Pedidos dentro de tu radio
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Calculator className="size-4" aria-hidden="true" />
+                  Precio sugerido con tus tarifas
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="size-4" aria-hidden="true" />
+                  Agenda de tus fletes
                 </span>
               </p>
             </div>

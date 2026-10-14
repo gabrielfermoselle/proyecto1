@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { primerPasoPendiente, PASOS_ONBOARDING, pasosCompletos } from "@/domain/onboarding";
 import {
-  BUCKET_PRIVADO,
+  // [FUERA-S3] [BE] Verificación de documentos: BUCKET_PRIVADO,
   BUCKET_PUBLICO,
   eliminarArchivos,
   prepararSubida,
@@ -17,11 +17,11 @@ import { getPerfilFletero } from "./queries";
 import {
   datosSchema,
   disponibilidadSchema,
-  documentoSchema,
+  // [FUERA-S3] [BE] Verificación de documentos: documentoSchema,
   estadoVehiculoSchema,
   fotoVehiculoSchema,
   tarifasSchema,
-  tipoDocumentoSchema,
+  // [FUERA-S3] [BE] Verificación de documentos: tipoDocumentoSchema,
   vehiculoEdicionSchema,
   vehiculoSchema,
   zonaSchema,
@@ -252,68 +252,69 @@ export const eliminarFotoVehiculo = createFleteroAction({
   },
 });
 
-// --- Documentos para la verificación (bucket privado: los ven el fletero y la administración) ---
-
-const carpetaDocumentos = (fleteroId: string) => `documentos/${fleteroId}`;
-
-export const firmarSubidaDocumento = createFleteroAction({
-  schema: tipoDocumentoSchema,
-  requiereOnboarding: false,
-  handler: async (_datos, { fleteroId }) => {
-    const subida = await prepararSubida(BUCKET_PRIVADO, carpetaDocumentos(fleteroId));
-    if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
-    return subida;
-  },
-});
-
-/** Guarda la foto de un documento; si ya había una de ese tipo, la reemplaza. */
-export const guardarDocumento = createFleteroAction({
-  schema: documentoSchema,
-  requiereOnboarding: false,
-  handler: async ({ tipo, ruta }, { fleteroId }) => {
-    if (!(await rutaSubidaValida(BUCKET_PRIVADO, ruta, carpetaDocumentos(fleteroId))))
-      throw new ActionError("La foto no es válida.");
-    const { data: anterior, error: errorBusqueda } = await db()
-      .from("documentos_fletero")
-      .select("id, ruta")
-      .eq("fleteroId", fleteroId)
-      .eq("tipo", tipo)
-      .maybeSingle();
-    fallar(errorBusqueda);
-    if (anterior) {
-      const { error } = await db()
-        .from("documentos_fletero")
-        .update({ ruta, createdAt: ahoraIso() })
-        .eq("id", anterior.id);
-      fallar(error);
-    } else {
-      const { error } = await db().from("documentos_fletero").insert({ id: nuevoId(), fleteroId, tipo, ruta });
-      fallar(error);
-    }
-    if (anterior) await eliminarArchivos(BUCKET_PRIVADO, [anterior.ruta]);
-    refrescar();
-    revalidatePath("/admin/fleteros");
-    return null;
-  },
-});
-
-export const eliminarDocumento = createFleteroAction({
-  schema: tipoDocumentoSchema,
-  requiereOnboarding: false,
-  handler: async ({ tipo }, { fleteroId }) => {
-    const { data: documento, error } = await db()
-      .from("documentos_fletero")
-      .select("id, ruta")
-      .eq("fleteroId", fleteroId)
-      .eq("tipo", tipo)
-      .maybeSingle();
-    fallar(error);
-    if (!documento) throw new ActionError("No encontramos ese documento.");
-    const { error: errorBorrar } = await db().from("documentos_fletero").delete().eq("id", documento.id);
-    fallar(errorBorrar);
-    await eliminarArchivos(BUCKET_PRIVADO, [documento.ruta]);
-    refrescar();
-    revalidatePath("/admin/fleteros");
-    return null;
-  },
-});
+// [FUERA-S3] [BE] Verificación de documentos. Fuera de los sprints 1-3: las acciones de documentos quedan comentadas abajo.
+// // --- Documentos para la verificación (bucket privado: los ven el fletero y la administración) ---
+//
+// const carpetaDocumentos = (fleteroId: string) => `documentos/${fleteroId}`;
+//
+// export const firmarSubidaDocumento = createFleteroAction({
+//   schema: tipoDocumentoSchema,
+//   requiereOnboarding: false,
+//   handler: async (_datos, { fleteroId }) => {
+//     const subida = await prepararSubida(BUCKET_PRIVADO, carpetaDocumentos(fleteroId));
+//     if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
+//     return subida;
+//   },
+// });
+//
+// /** Guarda la foto de un documento; si ya había una de ese tipo, la reemplaza. */
+// export const guardarDocumento = createFleteroAction({
+//   schema: documentoSchema,
+//   requiereOnboarding: false,
+//   handler: async ({ tipo, ruta }, { fleteroId }) => {
+//     if (!(await rutaSubidaValida(BUCKET_PRIVADO, ruta, carpetaDocumentos(fleteroId))))
+//       throw new ActionError("La foto no es válida.");
+//     const { data: anterior, error: errorBusqueda } = await db()
+//       .from("documentos_fletero")
+//       .select("id, ruta")
+//       .eq("fleteroId", fleteroId)
+//       .eq("tipo", tipo)
+//       .maybeSingle();
+//     fallar(errorBusqueda);
+//     if (anterior) {
+//       const { error } = await db()
+//         .from("documentos_fletero")
+//         .update({ ruta, createdAt: ahoraIso() })
+//         .eq("id", anterior.id);
+//       fallar(error);
+//     } else {
+//       const { error } = await db().from("documentos_fletero").insert({ id: nuevoId(), fleteroId, tipo, ruta });
+//       fallar(error);
+//     }
+//     if (anterior) await eliminarArchivos(BUCKET_PRIVADO, [anterior.ruta]);
+//     refrescar();
+//     revalidatePath("/admin/fleteros");
+//     return null;
+//   },
+// });
+//
+// export const eliminarDocumento = createFleteroAction({
+//   schema: tipoDocumentoSchema,
+//   requiereOnboarding: false,
+//   handler: async ({ tipo }, { fleteroId }) => {
+//     const { data: documento, error } = await db()
+//       .from("documentos_fletero")
+//       .select("id, ruta")
+//       .eq("fleteroId", fleteroId)
+//       .eq("tipo", tipo)
+//       .maybeSingle();
+//     fallar(error);
+//     if (!documento) throw new ActionError("No encontramos ese documento.");
+//     const { error: errorBorrar } = await db().from("documentos_fletero").delete().eq("id", documento.id);
+//     fallar(errorBorrar);
+//     await eliminarArchivos(BUCKET_PRIVADO, [documento.ruta]);
+//     refrescar();
+//     revalidatePath("/admin/fleteros");
+//     return null;
+//   },
+// });

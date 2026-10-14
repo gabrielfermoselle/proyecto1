@@ -1,6 +1,7 @@
 import "server-only";
 import { AppShell } from "@/components/shared/app-shell";
-import { AdminNavInferior, AdminNavTabs } from "@/features/admin/components/admin-nav";
+// [FUERA-S3] [FE] Panel de administración
+// import { AdminNavInferior, AdminNavTabs } from "@/features/admin/components/admin-nav";
 import { AreaConChat } from "@/features/chat/area";
 import {
   BotonNuevoPedido,
@@ -36,7 +37,9 @@ function Fletero({ usuario, children }: { usuario: UsuarioActual; children: Reac
 
 function Admin({ usuario, children }: { usuario: UsuarioActual; children: React.ReactNode }) {
   return (
-    <AppShell usuario={usuario} nav={<AdminNavTabs />} mobileNav={<AdminNavInferior />}>
+    // [FUERA-S3] [FE] Panel de administración: sin el menú del panel de administración.
+    // <AppShell usuario={usuario} nav={<AdminNavTabs />} mobileNav={<AdminNavInferior />}>
+    <AppShell usuario={usuario}>
       {children}
     </AppShell>
   );

@@ -63,7 +63,8 @@ export default async function PedidosDisponiblesPage({
           <p>
             {/* [FUERA-S3] [FE] Buscador de fleteros: «Ya aparecés en el buscador y podés presupuestar pedidos» */}
             <strong>¡Tu perfil está listo!</strong> Ya podés presupuestar pedidos
-            cerca tuyo. Subí tus documentos para que te verifiquemos.
+            {/* [FUERA-S3] [BE] Verificación de documentos: «Subí tus documentos para que te verifiquemos.» */}
+            cerca tuyo.
           </p>
         </Alert>
       ) : null}

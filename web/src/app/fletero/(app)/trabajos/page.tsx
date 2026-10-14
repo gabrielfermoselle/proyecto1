@@ -6,12 +6,14 @@ import { SegmentedNav } from "@/components/shared/segmented-nav";
 import { Button } from "@/components/ui/button";
 import { getAgenda } from "@/features/fleteros/fletes/queries";
 import { getMisPresupuestos } from "@/features/fleteros/presupuestos/queries";
-import { Agenda, Ganancias, Presupuestos } from "@/features/fleteros/trabajos/secciones";
+import { Agenda, Presupuestos } from "@/features/fleteros/trabajos/secciones";
+// [FUERA-S3] Ganancias del fletero: import { Ganancias } from "@/features/fleteros/trabajos/secciones";
 import { requireFletero } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Mis trabajos" };
 
-const TABS = ["agenda", "presupuestos", "ganancias"] as const;
+// [FUERA-S3] Ganancias del fletero: const TABS = ["agenda", "presupuestos", "ganancias"] as const;
+const TABS = ["agenda", "presupuestos"] as const;
 type Tab = (typeof TABS)[number];
 
 type Props = { searchParams: Promise<{ tab?: string; estado?: string; semana?: string }> };
@@ -31,7 +33,8 @@ export default async function TrabajosPage({ searchParams }: Props) {
     <div className="grid gap-6">
       <PageHeader
         title="Mis trabajos"
-        description="Tus fletes aceptados, los presupuestos que enviaste y cuánto llevás ganado."
+        // [FUERA-S3] Ganancias del fletero: «Tus fletes aceptados, los presupuestos que enviaste y cuánto llevás ganado.»
+        description="Tus fletes aceptados y los presupuestos que enviaste."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={`/fleteros/${fleteroId}`}>
@@ -51,12 +54,13 @@ export default async function TrabajosPage({ searchParams }: Props) {
             activo: tab === "presupuestos",
             contador: conteos.pendientes,
           },
-          { href: "/fletero/trabajos?tab=ganancias", label: "Ganancias", activo: tab === "ganancias" },
+          // [FUERA-S3] Ganancias del fletero
+          // { href: "/fletero/trabajos?tab=ganancias", label: "Ganancias", activo: tab === "ganancias" },
         ]}
       />
       {tab === "agenda" ? <Agenda fleteroId={fleteroId} semana={q.semana} /> : null}
       {tab === "presupuestos" ? <Presupuestos fleteroId={fleteroId} estado={q.estado} /> : null}
-      {tab === "ganancias" ? <Ganancias fleteroId={fleteroId} /> : null}
+      {/* [FUERA-S3] Ganancias del fletero: {tab === "ganancias" ? <Ganancias fleteroId={fleteroId} /> : null} */}
     </div>
   );
 }

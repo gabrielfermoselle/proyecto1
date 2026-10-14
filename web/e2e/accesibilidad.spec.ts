@@ -56,20 +56,24 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "pedidos en el mapa", ruta: "/fletero?vista=mapa" },
     { nombre: "presupuestar", ruta: "/fletero", abrir: primeraSolicitud },
     { nombre: "mis presupuestos", ruta: "/fletero/trabajos?tab=presupuestos" },
-    { nombre: "ganancias", ruta: "/fletero/trabajos?tab=ganancias" },
-    { nombre: "vehículo, zona y documentos", ruta: "/fletero/perfil" },
+    // [FUERA-S3] Ganancias del fletero
+    // { nombre: "ganancias", ruta: "/fletero/trabajos?tab=ganancias" },
+    // [FUERA-S3] [BE] Verificación de documentos
+    // { nombre: "vehículo, zona y documentos", ruta: "/fletero/perfil" },
+    { nombre: "vehículo, zona y tarifas", ruta: "/fletero/perfil" },
   ],
   // [FUERA-S3] [BE] Reclamos, firmas y calificación: valeria tenía un flete entregado para revisar.
   valeria: [],
   // valeria: [
   //   { nombre: "revisar lo recibido", ruta: "/cliente", abrir: primerEnlace(/Escritorio y biblioteca/) },
   // ],
-  admin: [
-    { nombre: "verificar fleteros", ruta: "/admin/fleteros" },
-    { nombre: "cuentas", ruta: "/admin/fleteros?tab=cuentas" },
-    { nombre: "denuncias", ruta: "/admin/reportes" },
-    { nombre: "pedidos", ruta: "/admin/reportes?tab=pedidos" },
-  ],
+  // [FUERA-S3] [FE] Panel de administración
+  // admin: [
+  //   { nombre: "verificar fleteros", ruta: "/admin/fleteros" },
+  //   { nombre: "cuentas", ruta: "/admin/fleteros?tab=cuentas" },
+  //   { nombre: "denuncias", ruta: "/admin/reportes" },
+  //   { nombre: "pedidos", ruta: "/admin/reportes?tab=pedidos" },
+  // ],
   soledad: [{ nombre: "agenda con fletes", ruta: "/fletero/trabajos" }],
   florencia: [],
   lucia: [],
