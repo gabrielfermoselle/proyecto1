@@ -36,7 +36,8 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "mi cuenta", ruta: "/perfil" },
     { nombre: "notificaciones", ruta: "/notificaciones" },
     { nombre: "perfil público de un fletero", ruta: "/cliente/fleteros", abrir: primerEnlace(/Carlos R\./) },
-    { nombre: "chat", ruta: "/chat", abrir: primerEnlace(/Carlos R\./) },
+    // [FUERA-S3] [FE] Pantalla del chat
+    // { nombre: "chat", ruta: "/chat", abrir: primerEnlace(/Carlos R\./) },
     { nombre: "seguimiento del flete", ruta: "/cliente", abrir: primerEnlace(/Compra del mayorista/) },
   ],
   carlos: [

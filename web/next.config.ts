@@ -35,12 +35,14 @@ const nextConfig: NextConfig = {
       { source: "/cliente/solicitudes/:id", destination: "/cliente/pedido/:id", permanent: true },
       { source: "/cliente/solicitudes", destination: "/cliente", permanent: true },
       { source: "/cliente/perfil", destination: "/perfil", permanent: true },
-      { source: "/cliente/mensajes", destination: "/chat", permanent: true },
+      // [FUERA-S3] [FE] Pantalla del chat
+      // { source: "/cliente/mensajes", destination: "/chat", permanent: true },
       { source: "/fletero/solicitudes/:id", destination: "/fletero/pedido/:id", permanent: true },
       { source: "/fletero/solicitudes", destination: "/fletero", permanent: true },
       { source: "/fletero/agenda", destination: "/fletero/trabajos", permanent: true },
       { source: "/fletero/presupuestos", destination: "/fletero/trabajos?tab=presupuestos", permanent: true },
-      { source: "/fletero/mensajes", destination: "/chat", permanent: true },
+      // [FUERA-S3] [FE] Pantalla del chat
+      // { source: "/fletero/mensajes", destination: "/chat", permanent: true },
       { source: "/admin/usuarios", destination: "/admin/fleteros?tab=cuentas", permanent: true },
       { source: "/admin/reclamos", destination: "/admin/reportes", permanent: true },
       { source: "/admin/solicitudes", destination: "/admin/reportes?tab=pedidos", permanent: true },

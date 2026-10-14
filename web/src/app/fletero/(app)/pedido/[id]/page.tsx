@@ -1,4 +1,5 @@
-import { CheckCircle2, Clock, Lock, MessagesSquare, Package, PauseCircle, Users } from "lucide-react";
+import { CheckCircle2, Clock, Lock, Package, PauseCircle, Users } from "lucide-react";
+// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,10 +8,11 @@ import { Estrellas } from "@/components/shared/estrellas";
 import { GaleriaFotos } from "@/components/shared/galeria-fotos";
 import { TimelineEtapas } from "@/components/shared/timeline/timeline-etapas";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+// [FUERA-S3] [FE] Pantalla del chat: import { Button } from "@/components/ui/button";
 import { ACTOR_DE_FASE, esEtapaActiva, FASE_DE_ETAPA } from "@/domain/ciclo-flete";
 import type { EstadoSolicitudPedido } from "@/domain/pedido";
-import { hrefConversacion } from "@/features/chat/acceso-rutas";
+// [FUERA-S3] [FE] Pantalla del chat
+// import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { EstadoPresupuestoBadge } from "@/features/fleteros/presupuestos/components/estado-presupuesto";
 import { PresupuestoForm } from "@/features/fleteros/presupuestos/components/presupuesto-form";
 import { RetirarPresupuesto } from "@/features/fleteros/presupuestos/components/retirar-presupuesto";
@@ -39,7 +41,8 @@ export const metadata: Metadata = { title: "Pedido" };
 type Solicitud = NonNullable<Awaited<ReturnType<typeof getSolicitudParaFletero>>>;
 
 /** El presupuesto: el formulario para enviarlo, o el enviado con su estado. */
-function PanelPresupuesto({ s, fleteroId }: { s: Solicitud; fleteroId: string }) {
+// [FUERA-S3] [FE] Pantalla del chat: fleteroId solo se usaba para el enlace al chat.
+function PanelPresupuesto({ s, fleteroId: _fleteroId }: { s: Solicitud; fleteroId: string }) {
   const abierta = s.estado === "ABIERTA";
   const mio = s.miPresupuesto;
   return (
@@ -124,6 +127,7 @@ function PanelPresupuesto({ s, fleteroId }: { s: Solicitud; fleteroId: string })
           conflictos={s.conflictos}
         />
       )}
+      {/* [FUERA-S3] [FE] Pantalla del chat
       {s.conversacionId ? (
         <Button asChild variant="outline" className="justify-self-start">
           <Link href={hrefConversacion("FLETERO", s.id, fleteroId)}>
@@ -136,6 +140,7 @@ function PanelPresupuesto({ s, fleteroId }: { s: Solicitud; fleteroId: string })
           El chat con el cliente se abre cuando le presupuestás.
         </p>
       )}
+      */}
     </section>
   );
 }

@@ -1,10 +1,12 @@
-import { FileDown, MessagesSquare, Navigation, PenLine } from "lucide-react";
-import Link from "next/link";
+import { FileDown, Navigation, PenLine } from "lucide-react";
+// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
+// [FUERA-S3] [FE] Pantalla del chat: import Link from "next/link";
 import { BloquePedido } from "@/components/shared/cabecera-pedido";
 import { ContactoDirecto } from "@/components/shared/contacto-directo";
 import { UbicacionLinea } from "@/components/shared/ubicacion-linea";
 import { Button } from "@/components/ui/button";
-import { hrefConversacion } from "@/features/chat/acceso-rutas";
+// [FUERA-S3] [FE] Pantalla del chat
+// import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { formatearFechaHora, formatearPesos } from "@/lib/formato";
 import type { FleteDetalle } from "../queries";
 import { hrefComprobante } from "../rutas";
@@ -62,6 +64,7 @@ export function TarjetaContraparte({ f }: { f: FleteDetalle }) {
           mensaje={`Hola, te escribo por el flete «${f.titulo}» de Fletes Tucumán.`}
         />
       ) : null}
+      {/* [FUERA-S3] [FE] Pantalla del chat
       {f.conversacionId ? (
         <Button asChild variant="ghost" className="justify-self-start px-0 text-primary hover:bg-transparent">
           <Link href={hrefConversacion(f.miRol, f.solicitudId, f.fleteroId)}>
@@ -70,6 +73,7 @@ export function TarjetaContraparte({ f }: { f: FleteDetalle }) {
           </Link>
         </Button>
       ) : null}
+      */}
     </section>
   );
 }

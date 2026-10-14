@@ -5,7 +5,8 @@ import { hrefPedido } from "@/features/fletes/rutas";
 import { db, fallar, nuevoId, relacion } from "@/lib/db";
 import { formatearPesos, nombrePublico } from "@/lib/formato";
 import { publicar, type Publicacion } from "@/lib/supabase";
-import { hrefConversacion } from "./acceso";
+// [FUERA-S3] [FE] Pantalla del chat
+// import { hrefConversacion } from "./acceso";
 import { aMensajeDto, type RolChat } from "./dto";
 import type { DatosEvento, EventoChat } from "./eventos-catalogo";
 import { cargarMensaje } from "./mensaje-fila";
@@ -237,26 +238,28 @@ export async function registrarEvento<E extends EventoChat>(
     aFlete?: true;
   };
   const destinatario = opciones.notificarA ?? config.para(e.datos);
-  const flete = config.aFlete
-    ? await (async () => {
-        const { data, error } = await tx
-          .from("fletes")
-          .select("id")
-          .eq("solicitudId", e.solicitudId)
-          .eq("fleteroId", e.fleteroId)
-          .maybeSingle();
-        fallar(error);
-        return data;
-      })()
-    : null;
+  // [FUERA-S3] [FE] Pantalla del chat: sin chat, todos los avisos llevan a la página del pedido.
+  // const flete = config.aFlete
+  //   ? await (async () => {
+  //       const { data, error } = await tx
+  //         .from("fletes")
+  //         .select("id")
+  //         .eq("solicitudId", e.solicitudId)
+  //         .eq("fleteroId", e.fleteroId)
+  //         .maybeSingle();
+  //       fallar(error);
+  //       return data;
+  //     })()
+  //   : null;
   const avisos = await notificar(tx, {
     userId: destinatario === "CLIENTE" ? cliente.userId : (fletero.userId as string),
     tipo: config.tipo,
     titulo: config.titulo(partes, e.datos),
     cuerpo: solicitud.titulo as string,
-    href: flete
-      ? hrefPedido(destinatario, e.solicitudId)
-      : hrefConversacion(destinatario, e.solicitudId, e.fleteroId),
+    href: hrefPedido(destinatario, e.solicitudId),
+    // href: flete
+    //   ? hrefPedido(destinatario, e.solicitudId)
+    //   : hrefConversacion(destinatario, e.solicitudId, e.fleteroId),
   });
 
   // Los mensajes de sistema no tienen datos de contacto ni fotos: no hace falta ocultar ni firmar.

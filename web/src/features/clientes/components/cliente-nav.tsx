@@ -1,10 +1,12 @@
 "use client";
 
-import { ClipboardList, MessagesSquare, Plus, Search, UserRound } from "lucide-react";
+import { ClipboardList, Plus, Search, UserRound } from "lucide-react";
+// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
 import { Button } from "@/components/ui/button";
-import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
+// [FUERA-S3] [FE] Pantalla del chat
+// import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
 
 const secciones = (): SeccionNav[] => [
   {
@@ -32,14 +34,15 @@ const secciones = (): SeccionNav[] => [
     enSuperior: false,
     destacada: true,
   },
-  {
-    href: "/chat",
-    label: "Chat",
-    Icono: MessagesSquare,
-    prefijos: ["/chat"],
-    enInferior: true,
-    extra: <NoLeidosBadge />,
-  },
+  // [FUERA-S3] [FE] Pantalla del chat
+  // {
+  //   href: "/chat",
+  //   label: "Chat",
+  //   Icono: MessagesSquare,
+  //   prefijos: ["/chat"],
+  //   enInferior: true,
+  //   extra: <NoLeidosBadge />,
+  // },
   {
     href: "/perfil",
     label: "Perfil",

@@ -45,7 +45,8 @@ test("el fletero ve el pedido cerca suyo y presupuesta", async () => {
   await expect(carlos.getByRole("heading", { name: SOLICITUD })).toBeVisible();
 });
 
-test("la cliente recibe el presupuesto y lo consulta por chat", async () => {
+// [FUERA-S3] [FE] Pantalla del chat: el test se llamaba «la cliente recibe el presupuesto y lo consulta por chat».
+test("la cliente recibe el presupuesto", async () => {
   await florencia.goto("/cliente");
   await florencia.getByRole("link", { name: new RegExp(SOLICITUD) }).click();
   const presupuestos = florencia.getByRole("region", { name: "Presupuestos recibidos (1)" });
@@ -53,32 +54,34 @@ test("la cliente recibe el presupuesto y lo consulta por chat", async () => {
   await expect(presupuestos).toContainText("$ 23.500");
   await expect(presupuestos).toContainText("Llevo la bici parada y atada.");
 
-  await presupuestos.getByRole("link", { name: "Chat", exact: true }).click();
-  await florencia.getByRole("textbox", { name: "Mensaje" }).fill("¿Podés pasar después de las 17?");
-  await florencia.getByRole("button", { name: "Enviar", exact: true }).click();
-  await expect(florencia.getByRole("list", { name: "Mensajes" })).toContainText(
-    "¿Podés pasar después de las 17?",
-  );
+  // [FUERA-S3] [FE] Pantalla del chat
+  // await presupuestos.getByRole("link", { name: "Chat", exact: true }).click();
+  // await florencia.getByRole("textbox", { name: "Mensaje" }).fill("¿Podés pasar después de las 17?");
+  // await florencia.getByRole("button", { name: "Enviar", exact: true }).click();
+  // await expect(florencia.getByRole("list", { name: "Mensajes" })).toContainText(
+  //   "¿Podés pasar después de las 17?",
+  // );
 });
 
-test("el fletero lee el mensaje y responde; la cliente ve la respuesta", async () => {
-  await carlos.goto("/chat");
-  await carlos.getByRole("link", { name: new RegExp(`Florencia L\\..*${SOLICITUD}`) }).click();
-  const mensajes = carlos.getByRole("list", { name: "Mensajes" });
-  await expect(mensajes).toContainText("¿Podés pasar después de las 17?");
-
-  // No se pueden pasar datos de contacto antes de confirmar el flete.
-  await expect(carlos.getByText(/Los teléfonos y emails se ocultan/)).toBeVisible();
-
-  await carlos.getByRole("textbox", { name: "Mensaje" }).fill("Sí, paso 17:30.");
-  await carlos.getByRole("button", { name: "Enviar", exact: true }).click();
-  await expect(mensajes).toContainText("Sí, paso 17:30.");
-
-  // Sin Supabase el chat se actualiza por consultas periódicas: llega sin recargar.
-  await expect(florencia.getByRole("list", { name: "Mensajes" })).toContainText("Sí, paso 17:30.", {
-    timeout: 30_000,
-  });
-});
+// [FUERA-S3] [FE] Pantalla del chat
+// test("el fletero lee el mensaje y responde; la cliente ve la respuesta", async () => {
+//   await carlos.goto("/chat");
+//   await carlos.getByRole("link", { name: new RegExp(`Florencia L\\..*${SOLICITUD}`) }).click();
+//   const mensajes = carlos.getByRole("list", { name: "Mensajes" });
+//   await expect(mensajes).toContainText("¿Podés pasar después de las 17?");
+//
+//   // No se pueden pasar datos de contacto antes de confirmar el flete.
+//   await expect(carlos.getByText(/Los teléfonos y emails se ocultan/)).toBeVisible();
+//
+//   await carlos.getByRole("textbox", { name: "Mensaje" }).fill("Sí, paso 17:30.");
+//   await carlos.getByRole("button", { name: "Enviar", exact: true }).click();
+//   await expect(mensajes).toContainText("Sí, paso 17:30.");
+//
+//   // Sin Supabase el chat se actualiza por consultas periódicas: llega sin recargar.
+//   await expect(florencia.getByRole("list", { name: "Mensajes" })).toContainText("Sí, paso 17:30.", {
+//     timeout: 30_000,
+//   });
+// });
 
 test("la cliente acepta y se crea el flete para los dos", async () => {
   await florencia.goto("/cliente");

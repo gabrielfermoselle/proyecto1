@@ -3,6 +3,13 @@ import { defineConfig } from "vitest/config";
 
 const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
 
+// [FUERA-S3] Tests de lo que queda fuera de los sprints 1-3: los archivos siguen en el repo, comentados.
+const FUERA_S3 = [
+  "src/features/chat/hilo.test.ts",
+  "src/features/chat/bandeja.integration.test.ts",
+  "src/features/chat/chat.db.test.ts",
+];
+
 export default defineConfig({
   resolve: { alias },
   // tsconfig deja el JSX sin transformar (lo compila Next); en los tests lo transforma oxc.
@@ -12,7 +19,7 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: "unit", include: ["src/**/*.test.ts"], exclude: ["src/**/*.db.test.ts"] },
+        test: { name: "unit", include: ["src/**/*.test.ts"], exclude: ["src/**/*.db.test.ts", ...FUERA_S3] },
       },
       {
         // Integración con Prisma contra una base real (PGlite por TCP, ver test/db/global-setup).
@@ -26,6 +33,7 @@ export default defineConfig({
         test: {
           name: "db",
           include: ["src/**/*.db.test.ts"],
+          exclude: FUERA_S3,
           globalSetup: ["./test/db/global-setup.ts"],
           setupFiles: ["./test/db/setup.ts"],
           // Una sola base compartida: los archivos corren de a uno.

@@ -109,7 +109,8 @@ test.describe("las rutas anteriores siguen funcionando", () => {
   for (const [vieja, nueva] of [
     ["/cliente/solicitudes", "/cliente"],
     ["/cliente/solicitudes/nueva", "/cliente/nuevo"],
-    ["/cliente/mensajes", "/chat"],
+    // [FUERA-S3] [FE] Pantalla del chat
+    // ["/cliente/mensajes", "/chat"],
     ["/cliente/perfil", "/perfil"],
   ] as const) {
     test(`${vieja} lleva a ${nueva}`, async ({ page }) => {
@@ -119,18 +120,19 @@ test.describe("las rutas anteriores siguen funcionando", () => {
   }
 });
 
-test.describe("chat", () => {
-  test.use({ storageState: sesionDe("ana") });
-
-  test("la bandeja se pide al abrir el chat, no en bucle", async ({ page }) => {
-    let pedidos = 0;
-    page.on("request", (r) => {
-      if (r.url().includes("/api/chat/bandeja")) pedidos++;
-    });
-    await page.goto("/chat");
-    await expect(page.getByRole("list", { name: "Conversaciones" })).toBeVisible();
-    await page.waitForTimeout(6_000);
-    // Una al montar la lista y, como mucho, otra al conectarse el chat en vivo.
-    expect(pedidos).toBeLessThanOrEqual(2);
-  });
-});
+// [FUERA-S3] [FE] Pantalla del chat
+// test.describe("chat", () => {
+//   test.use({ storageState: sesionDe("ana") });
+//
+//   test("la bandeja se pide al abrir el chat, no en bucle", async ({ page }) => {
+//     let pedidos = 0;
+//     page.on("request", (r) => {
+//       if (r.url().includes("/api/chat/bandeja")) pedidos++;
+//     });
+//     await page.goto("/chat");
+//     await expect(page.getByRole("list", { name: "Conversaciones" })).toBeVisible();
+//     await page.waitForTimeout(6_000);
+//     // Una al montar la lista y, como mucho, otra al conectarse el chat en vivo.
+//     expect(pedidos).toBeLessThanOrEqual(2);
+//   });
+// });

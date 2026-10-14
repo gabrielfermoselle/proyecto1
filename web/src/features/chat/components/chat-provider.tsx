@@ -70,20 +70,22 @@ export function ChatProvider({
 }: ChatProviderProps) {
   const [modo, setModo] = useState<ModoConexion>("conectando");
   const [realtime, setRealtime] = useState<SupabaseClient | null>(null);
-  const [bandeja, setBandeja] = useState<ConversacionBandeja[] | null>(null);
-  const [noLeidos, setNoLeidos] = useState(noLeidosInicial);
+  // [FUERA-S3] [BE] Chat en tiempo real: la bandeja y los no leídos ya no se refrescan.
+  const [bandeja, _setBandeja] = useState<ConversacionBandeja[] | null>(null);
+  const [noLeidos, _setNoLeidos] = useState(noLeidosInicial);
   const [notificaciones, setNotificaciones] = useState(notificacionesIniciales);
   const topicsAutorizados = useRef(new Set<string>());
   const clienteRef = useRef<SupabaseClient | null>(null);
   const renovacion = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // [FUERA-S3] [BE] Chat en tiempo real: sin la bandeja del chat, no hay nada que refrescar.
   const refrescarBandeja = useCallback(async () => {
-    const datos = await obtenerJson<{ conversaciones: ConversacionBandeja[]; noLeidosTotal: number }>(
-      "/api/chat/bandeja",
-    );
-    if (!datos) return;
-    setBandeja(datos.conversaciones);
-    setNoLeidos(datos.noLeidosTotal);
+    // const datos = await obtenerJson<{ conversaciones: ConversacionBandeja[]; noLeidosTotal: number }>(
+    //   "/api/chat/bandeja",
+    // );
+    // if (!datos) return;
+    // setBandeja(datos.conversaciones);
+    // setNoLeidos(datos.noLeidosTotal);
   }, []);
 
   const refrescarNotificaciones = useCallback(async () => {
