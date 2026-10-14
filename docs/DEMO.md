@@ -1,3 +1,73 @@
+# Guion de la demo — Fletes Tucumán (sprints 1 a 3)
+
+Recorrido de unos 10 minutos con lo que entra en los sprints 1 a 3: entrar, pedir un flete,
+presupuestarlo, aceptarlo y seguirlo hasta la carga, con los dos roles (cliente y fletero).
+Lo que queda para el sprint actual está comentado en el código con la marca `[FUERA-S3]`
+(`grep -rn "\[FUERA-S3\]" web`).
+
+## Preparación
+
+```bash
+cd web
+npm run db:seed     # BORRA la base y carga los datos de demo (no corre con NODE_ENV=production)
+npm run dev         # http://localhost:3000
+```
+
+- Contraseña de todas las cuentas: **`Demo1234`**.
+- Usá **dos navegadores** (o uno normal y otro en incógnito): uno de cliente y otro de fletero.
+- Las fechas del seed son relativas al día en que se corre. Si la demo es otro día, volvé a
+  correr el seed.
+
+## Cuentas
+
+| Cuenta | Rol | Qué tiene |
+|---|---|---|
+| `florencia@demo.test` | Cliente (Barrio Norte) | "Bicicleta y caja de herramientas", publicada y sin presupuestos: es la del recorrido |
+| `ana@demo.test` | Cliente (Barrio Sur) | "Mudanza de monoambiente" con 3 presupuestos para comparar y un flete **confirmado** con Soledad |
+| `luis@demo.test` | Cliente (Centro) | "Heladera y lavarropas" con 2 presupuestos y un sobre sin presupuestos |
+| `carolina@demo.test` | Cliente | Un flete en la etapa **cargando** con Ramón |
+| `carlos@demo.test` | Fletero (camioneta, Barrio Norte) | Tiene el pedido de Florencia a 0 m de su base |
+| `soledad@demo.test` | Fletera (auto) | Flete confirmado con Ana: su agenda muestra la semana |
+| `diego@demo.test` | Fletero nuevo | Onboarding sin terminar |
+
+## Recorrido
+
+### Sprint 1: cuentas y acceso (2 min)
+1. En `/registro`, mostrar la elección de rol (cliente o fletero) y la validación de los campos.
+2. Ingresar como **florencia** → entra a *Mis pedidos*. Intentar abrir `/fletero` → vuelve a su
+   área (**control de acceso por rol**).
+
+### Sprint 2: fletero dado de alta y pedido publicado (3 min)
+1. Como **diego** → lo manda al **onboarding**: datos, zona en el mapa (radio de cobertura),
+   vehículo con capacidad y volumen, y tarifas.
+2. Como **florencia** → *Nuevo pedido*, en 5 pasos: tipo, origen y destino con autocompletado y
+   mapa (la **distancia** se calcula sola), qué se lleva con medidas, fecha y franja, y extras. Al
+   publicar, sumar fotos.
+3. Como **carlos** → *Pedidos disponibles*: solo lo que está **dentro de su radio** y entra en su
+   vehículo, con la dirección aproximada. Probar los filtros de zona, fecha y tipo.
+
+### Sprint 3: presupuestos y contratación (5 min)
+1. Carlos abre "Bicicleta y caja de herramientas", ve el **precio sugerido** según sus tarifas, lo
+   ajusta, pone la **hora de llegada** y un mensaje, y envía el presupuesto.
+2. Florencia recibe la **notificación** y en su pedido ve el presupuesto. Como **ana**, en
+   "Mudanza de monoambiente", se ven tres presupuestos **lado a lado** y el **perfil público** de
+   cada fletero.
+3. Florencia **acepta**: se crea el flete, los demás presupuestos quedan rechazados y cada parte
+   ve el teléfono de la otra.
+4. Carlos → *Mis trabajos*: el flete aparece en la **agenda**. Lo abre → *Salgo a buscar la carga*
+   → *Llegué al origen*.
+5. Florencia ve cada etapa en la **línea de tiempo** del pedido.
+6. (Opcional) Cancelar con motivo: un pedido abierto (Luis, "Sobre con documentación") o un flete
+   antes de cargar.
+
+### Calidad (1 min)
+- `npm test` (unitarios y con base de datos), `npm run test:e2e` (Playwright con chequeo de
+  accesibilidad) y el CI de GitHub en verde.
+
+<!--
+[FUERA-S3] Guion completo del proyecto (todas las funcionalidades). Queda comentado hasta que
+vuelvan a activarse las funcionalidades que están fuera de los sprints 1 a 3.
+
 # Guion de la demo — Fletes Tucumán
 
 Recorrido de unos 15 minutos que muestra cada punto del enunciado con los datos de demo.
@@ -106,3 +176,4 @@ npm run dev         # http://localhost:3000
   accesibilidad) y el CI de GitHub en verde.
 - Cada respuesta trae un `x-request-id`; en los logs JSON del servidor se busca todo lo que pasó
   en ese request.
+-->

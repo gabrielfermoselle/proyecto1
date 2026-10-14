@@ -165,7 +165,8 @@ async function crearFletero(f: FleteroSeed) {
     radioCoberturaKm: f.radioCoberturaKm,
     ...f.tarifas,
     disponible: f.disponible ?? true,
-    verificado: f.verificado ?? true,
+    // [FUERA-S3] [BE] Verificación de documentos: nadie está verificado. Antes: verificado: f.verificado ?? true,
+    verificado: f.verificado ?? false,
     onboardingCompletadoEn: hace(118),
   });
   const vehiculos = [];
@@ -510,21 +511,22 @@ async function adjudicar(
     });
   const incidencia = (i: number, cual: number) => Boolean(opciones.incidencias) && i === cual;
 
-  if (llego("CARGANDO")) {
-    const cuantos = llego("EN_TRASLADO") ? items.length : Math.ceil(items.length / 2);
-    items
-      .slice(0, cuantos)
-      .forEach((it, i) =>
-        control(
-          it.id,
-          "CARGA",
-          "CARGADO",
-          fletero.userId,
-          minutosDespues(en("CARGANDO"), 5 + i * 4),
-          incidencia(i, 0) ? "Rayón previo en un lateral." : null,
-        ),
-      );
-  }
+  // [FUERA-S3] [BE] Control de carga y descarga: sin controles de carga en los sprints 1-3.
+  // if (llego("CARGANDO")) {
+  //   const cuantos = llego("EN_TRASLADO") ? items.length : Math.ceil(items.length / 2);
+  //   items
+  //     .slice(0, cuantos)
+  //     .forEach((it, i) =>
+  //       control(
+  //         it.id,
+  //         "CARGA",
+  //         "CARGADO",
+  //         fletero.userId,
+  //         minutosDespues(en("CARGANDO"), 5 + i * 4),
+  //         incidencia(i, 0) ? "Rayón previo en un lateral." : null,
+  //       ),
+  //     );
+  // }
   if (llego("DESCARGANDO")) {
     const cuantos = llego("ENTREGADO") ? items.length : Math.floor(items.length / 2);
     items
@@ -665,36 +667,38 @@ async function adjudicar(
   return { fleteId: flete.id, cliente, fletero, conversacionId: ganador.conversacionId };
 }
 
-async function calificar(
-  adjudicado: Awaited<ReturnType<typeof adjudicar>>,
-  puntaje: number,
-  comentario: string,
-  haceDias: number,
-) {
-  await insertar(sb, "calificaciones", {
-    fleteId: adjudicado.fleteId,
-    clienteId: adjudicado.cliente.clienteId,
-    fleteroId: adjudicado.fletero.fleteroId,
-    puntaje,
-    comentario,
-    createdAt: hace(haceDias),
-  });
-}
+// [FUERA-S3] [BE] Reclamos, firmas y calificación
+// async function calificar(
+//   adjudicado: Awaited<ReturnType<typeof adjudicar>>,
+//   puntaje: number,
+//   comentario: string,
+//   haceDias: number,
+// ) {
+//   await insertar(sb, "calificaciones", {
+//     fleteId: adjudicado.fleteId,
+//     clienteId: adjudicado.cliente.clienteId,
+//     fleteroId: adjudicado.fletero.fleteroId,
+//     puntaje,
+//     comentario,
+//     createdAt: hace(haceDias),
+//   });
+// }
 
-/** Agrega mensajes de texto a la conversación del par (ya creada al presupuestar). */
-async function conversar(
-  solicitud: Solicitud,
-  fletero: Fletero,
-  mensajes: [autor: "cliente" | "fletero", texto: string][],
-) {
-  const inicio = hace(solicitud.seed.creadaHaceDias - 0.6);
-  const conversacionId = await conversacionDe(solicitud, fletero, inicio);
-  for (const [i, [autor, contenido]] of mensajes.entries()) {
-    const autorId = autor === "cliente" ? solicitud.seed.cliente.userId : fletero.userId;
-    await mensajeTexto(conversacionId, autorId, contenido, minutosDespues(inicio, i * 25));
-  }
-  return conversacionId;
-}
+// [FUERA-S3] [BE] Chat en tiempo real
+// /** Agrega mensajes de texto a la conversación del par (ya creada al presupuestar). */
+// async function conversar(
+//   solicitud: Solicitud,
+//   fletero: Fletero,
+//   mensajes: [autor: "cliente" | "fletero", texto: string][],
+// ) {
+//   const inicio = hace(solicitud.seed.creadaHaceDias - 0.6);
+//   const conversacionId = await conversacionDe(solicitud, fletero, inicio);
+//   for (const [i, [autor, contenido]] of mensajes.entries()) {
+//     const autorId = autor === "cliente" ? solicitud.seed.cliente.userId : fletero.userId;
+//     await mensajeTexto(conversacionId, autorId, contenido, minutosDespues(inicio, i * 25));
+//   }
+//   return conversacionId;
+// }
 
 /** Última actividad = último mensaje; todo leído salvo lo que se deja pendiente para la demo. */
 async function ajustarLecturas() {
@@ -773,16 +777,17 @@ async function main() {
   passwordHash = await bcrypt.hash(PASSWORD_DEMO, 10);
   await limpiar();
 
-  // --- Admin ---
-  await insertar(sb, "usuarios", {
-    ...datosUsuario({
-      nombre: "Equipo",
-      apellido: "Fletes Tucumán",
-      email: "admin@demo.test",
-      telefono: "3814000000",
-    }),
-    rol: "ADMIN",
-  });
+  // [FUERA-S3] [FE] Panel de administración
+  // // --- Admin ---
+  // await insertar(sb, "usuarios", {
+  //   ...datosUsuario({
+  //     nombre: "Equipo",
+  //     apellido: "Fletes Tucumán",
+  //     email: "admin@demo.test",
+  //     telefono: "3814000000",
+  //   }),
+  //   rol: "ADMIN",
+  // });
 
   // --- Clientes ---
   const ana = await crearCliente("Ana", "Pereyra", "ana@demo.test", "3814112222", LUGARES.barrioSur);
@@ -808,7 +813,8 @@ async function main() {
     "3814998123",
     LUGARES.tafiViejo,
   );
-  const jorge = await crearCliente("Jorge", "Robles", "jorge@demo.test", "3815773300", LUGARES.banda);
+  // [FUERA-S3] Solo lo usaban los datos comentados más abajo: ya no se guarda en una variable.
+  await crearCliente("Jorge", "Robles", "jorge@demo.test", "3815773300", LUGARES.banda);
   const florencia = await crearCliente(
     "Florencia",
     "Lazarte",
@@ -824,16 +830,17 @@ async function main() {
     LUGARES.villaCarmela,
   );
 
-  // Clienta recién registrada, sin dirección habitual: el buscador le pide que la cargue y
-  // muestra a los fleteros sin distancia.
-  const paula = await insertar<{ id: string }>(sb, "usuarios", {
-    ...datosUsuario({ nombre: "Paula", apellido: "Ibarra", email: "paula@demo.test", telefono: "" }),
-    rol: "CLIENTE",
-  });
-  await insertar(sb, "perfiles_cliente", { userId: paula.id });
-  // Cuenta para mostrar "cambiar contraseña" y "¿Olvidaste tu contraseña?" en la defensa sin
-  // cerrar las sesiones de las cuentas del recorrido principal.
-  await crearCliente("Rocío", "Medina", "rocio@demo.test", "3816009988", LUGARES.parque);
+  // [FUERA-S3] [FE] Perfil del cliente y [BE] Cambiar y recuperar contraseña: paula (sin dirección habitual) y rocio (contraseñas).
+  // // Clienta recién registrada, sin dirección habitual: el buscador le pide que la cargue y
+  // // muestra a los fleteros sin distancia.
+  // const paula = await insertar<{ id: string }>(sb, "usuarios", {
+  //   ...datosUsuario({ nombre: "Paula", apellido: "Ibarra", email: "paula@demo.test", telefono: "" }),
+  //   rol: "CLIENTE",
+  // });
+  // await insertar(sb, "perfiles_cliente", { userId: paula.id });
+  // // Cuenta para mostrar "cambiar contraseña" y "¿Olvidaste tu contraseña?" en la defensa sin
+  // // cerrar las sesiones de las cuentas del recorrido principal.
+  // await crearCliente("Rocío", "Medina", "rocio@demo.test", "3816009988", LUGARES.parque);
 
   // --- Fleteros: todos los tipos de vehículo, repartidos por el Gran Tucumán ---
   const T = (
@@ -870,7 +877,8 @@ async function main() {
       },
     ],
   });
-  const marta = await crearFletero({
+  // [FUERA-S3] Solo lo usaban los datos comentados más abajo: ya no se guarda en una variable.
+  await crearFletero({
     nombre: "Marta",
     apellido: "Silva",
     email: "marta@demo.test",
@@ -1183,19 +1191,21 @@ async function main() {
       item("Sillas", 4, [45, 45, 90], 6),
     ],
   });
-  const presupuestoCarlos = await presupuestar(mudanzaAna, carlos, {
+  // [FUERA-S3] Solo lo usaban los datos comentados más abajo: ya no se guarda en una variable.
+  await presupuestar(mudanzaAna, carlos, {
     mensaje: "Lo hago el sábado temprano. Voy con un ayudante y mantas.",
   });
-  const presupuestoFernanda = await presupuestar(mudanzaAna, fernanda, {
+  await presupuestar(mudanzaAna, fernanda, {
     ajuste: -2_000,
     mensaje: "Furgón cerrado, nada se moja. Llego 8:30.",
   });
   await presupuestar(mudanzaAna, jose, { mensaje: "Con el camión entra todo en un viaje." });
-  await conversar(mudanzaAna, carlos, [
-    ["cliente", "Hola Carlos, ¿la cama entra desarmada en la caja?"],
-    ["fletero", "Sí, sin problema. La atamos con la mesa para que no se mueva."],
-    ["cliente", "Genial, gracias. Mañana te confirmo."],
-  ]);
+  // [FUERA-S3] [BE] Chat en tiempo real
+  // await conversar(mudanzaAna, carlos, [
+  //   ["cliente", "Hola Carlos, ¿la cama entra desarmada en la caja?"],
+  //   ["fletero", "Sí, sin problema. La atamos con la mesa para que no se mueva."],
+  //   ["cliente", "Genial, gracias. Mañana te confirmo."],
+  // ]);
 
   const heladeraLuis = await crearSolicitud({
     cliente: luis,
@@ -1309,14 +1319,16 @@ async function main() {
     },
     "ADJUDICADA",
   );
-  const compraConfirmada = await adjudicar(compraAna, soledad, "CONFIRMADO", {
+  // [FUERA-S3] Solo lo usaban los datos comentados más abajo: ya no se guarda en una variable.
+  await adjudicar(compraAna, soledad, "CONFIRMADO", {
     mensaje: "Paso a las 17 por el Abasto.",
     competidores: [lucia],
   });
-  await conversar(compraAna, soledad, [
-    ["fletero", "Ana, ¿en qué puesto del Abasto te espero?"],
-    ["cliente", "En la entrada de calle Bernabé Aráoz. Gracias."],
-  ]);
+  // [FUERA-S3] [BE] Chat en tiempo real
+  // await conversar(compraAna, soledad, [
+  //   ["fletero", "Ana, ¿en qué puesto del Abasto te espero?"],
+  //   ["cliente", "En la entrada de calle Bernabé Aráoz. Gracias."],
+  // ]);
 
   await adjudicar(
     await crearSolicitud(
@@ -1342,193 +1354,197 @@ async function main() {
     "CARGANDO",
   );
 
-  await adjudicar(
-    await crearSolicitud(
-      {
-        cliente: jorge,
-        tipoFlete: "OTRO",
-        titulo: "Materiales para una ampliación",
-        origen: LUGARES.banda,
-        destino: LUGARES.alderetes,
-        fecha: dia(0),
-        franja: "MEDIODIA",
-        tipoVehiculoSugerido: "CAMION",
-        creadaHaceDias: 3,
-        items: [
-          item("Bolsas de cemento", 20, [60, 40, 12], 25),
-          item("Chapas", 10, [300, 110, 2], 12),
-          item("Ladrillos (pallet)", 1, [120, 100, 90], 900),
-        ],
-      },
-      "ADJUDICADA",
-    ),
-    hector,
-    "EN_TRASLADO",
-  );
+  // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre
+  // await adjudicar(
+  //   await crearSolicitud(
+  //     {
+  //       cliente: jorge,
+  //       tipoFlete: "OTRO",
+  //       titulo: "Materiales para una ampliación",
+  //       origen: LUGARES.banda,
+  //       destino: LUGARES.alderetes,
+  //       fecha: dia(0),
+  //       franja: "MEDIODIA",
+  //       tipoVehiculoSugerido: "CAMION",
+  //       creadaHaceDias: 3,
+  //       items: [
+  //         item("Bolsas de cemento", 20, [60, 40, 12], 25),
+  //         item("Chapas", 10, [300, 110, 2], 12),
+  //         item("Ladrillos (pallet)", 1, [120, 100, 90], 900),
+  //       ],
+  //     },
+  //     "ADJUDICADA",
+  //   ),
+  //   hector,
+  //   "EN_TRASLADO",
+  // );
 
-  // Entregado: a la espera de que el cliente confirme la recepción y califique.
-  await adjudicar(
-    await crearSolicitud(
-      {
-        cliente: valeria,
-        tipoFlete: "MUEBLES",
-        titulo: "Escritorio y biblioteca",
-        origen: LUGARES.yerbaBuena,
-        destino: LUGARES.villaCarmela,
-        fecha: dia(-1),
-        franja: "TARDE",
-        creadaHaceDias: 5,
-        items: [
-          item("Escritorio", 1, [120, 60, 75], 30),
-          item("Biblioteca", 1, [180, 80, 30], 40),
-          item("Cajas con libros", 4, [40, 30, 30], 15),
-        ],
-      },
-      "ADJUDICADA",
-    ),
-    lucia,
-    "ENTREGADO",
-  );
+  // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre
+  // // Entregado: a la espera de que el cliente confirme la recepción y califique.
+  // await adjudicar(
+  //   await crearSolicitud(
+  //     {
+  //       cliente: valeria,
+  //       tipoFlete: "MUEBLES",
+  //       titulo: "Escritorio y biblioteca",
+  //       origen: LUGARES.yerbaBuena,
+  //       destino: LUGARES.villaCarmela,
+  //       fecha: dia(-1),
+  //       franja: "TARDE",
+  //       creadaHaceDias: 5,
+  //       items: [
+  //         item("Escritorio", 1, [120, 60, 75], 30),
+  //         item("Biblioteca", 1, [180, 80, 30], 40),
+  //         item("Cajas con libros", 4, [40, 30, 30], 15),
+  //       ],
+  //     },
+  //     "ADJUDICADA",
+  //   ),
+  //   lucia,
+  //   "ENTREGADO",
+  // );
 
-  // --- Historial: completados (con y sin calificación) y cancelados ---
-  const completado = async (
-    s: SolicitudSeed,
-    fletero: Fletero,
-    competidores: Fletero[] = [],
-    incidencias = false,
-  ) => adjudicar(await crearSolicitud(s, "ADJUDICADA"), fletero, "CERRADO", { competidores, incidencias });
+  // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre y [BE] Reclamos, firmas y calificación: sin fletes cerrados ni calificaciones.
+  // // --- Historial: completados (con y sin calificación) y cancelados ---
+  // const completado = async (
+  //   s: SolicitudSeed,
+  //   fletero: Fletero,
+  //   competidores: Fletero[] = [],
+  //   incidencias = false,
+  // ) => adjudicar(await crearSolicitud(s, "ADJUDICADA"), fletero, "CERRADO", { competidores, incidencias });
+  //
+  // await calificar(
+  //   await completado(
+  //     {
+  //       cliente: florencia,
+  //       tipoFlete: "MUDANZA",
+  //       titulo: "Mudanza de departamento",
+  //       origen: LUGARES.barrioNorte,
+  //       destino: LUGARES.yerbaBuena,
+  //       origenPiso: 4,
+  //       origenAscensor: true,
+  //       fecha: dia(-10),
+  //       franja: "MANANA",
+  //       ayudantesRequeridos: 1,
+  //       creadaHaceDias: 14,
+  //       items: [
+  //         item("Cama de dos plazas", 1, [200, 160, 50], 60),
+  //         item("Cajas", 12, [50, 40, 40], 12),
+  //         item("Sillón", 1, [180, 85, 80], 45),
+  //       ],
+  //     },
+  //     carlos,
+  //     [jose],
+  //   ),
+  //   5,
+  //   "Puntual y muy cuidadoso. Subió todo con el ayudante y no se rayó nada.",
+  //   9,
+  // );
+  //
+  // await calificar(
+  //   await completado(
+  //     {
+  //       cliente: martin,
+  //       tipoFlete: "COMPRAS",
+  //       titulo: "Lavarropas nuevo",
+  //       origen: LUGARES.abasto,
+  //       destino: LUGARES.ciudadela,
+  //       fecha: dia(-20),
+  //       franja: "MEDIODIA",
+  //       creadaHaceDias: 22,
+  //       items: [item("Lavarropas en caja", 1, [90, 65, 65], 70)],
+  //     },
+  //     carlos,
+  //   ),
+  //   4,
+  //   "Buen servicio, llegó media hora tarde pero avisó por el chat.",
+  //   19,
+  // );
+  //
+  // await calificar(
+  //   await completado(
+  //     {
+  //       cliente: sebastian,
+  //       tipoFlete: "MUEBLES",
+  //       titulo: "Cuadros y espejo de pie",
+  //       origen: LUGARES.villaCarmela,
+  //       destino: LUGARES.centro,
+  //       fecha: dia(-15),
+  //       franja: "TARDE",
+  //       creadaHaceDias: 17,
+  //       items: [
+  //         item("Cuadros grandes", 3, [100, 10, 80], 6, true),
+  //         item("Espejo de pie", 1, [170, 60, 5], 15, true),
+  //       ],
+  //     },
+  //     soledad,
+  //     [lucia],
+  //   ),
+  //   5,
+  //   "Envolvió todo con plástico de burbujas. Impecable.",
+  //   14,
+  // );
+  //
+  // await calificar(
+  //   await completado(
+  //     {
+  //       cliente: jorge,
+  //       tipoFlete: "MUDANZA",
+  //       titulo: "Mudanza a Parque 9 de Julio",
+  //       origen: LUGARES.banda,
+  //       destino: LUGARES.parque,
+  //       fecha: dia(-30),
+  //       franja: "FLEXIBLE",
+  //       ayudantesRequeridos: 2,
+  //       creadaHaceDias: 33,
+  //       items: [item("Muebles varios", 8, [150, 60, 80], 40), item("Cajas", 20, [50, 40, 40], 12)],
+  //     },
+  //     jose,
+  //     [gustavo],
+  //     true,
+  //   ),
+  //   3,
+  //   "Llegó tarde y una caja se golpeó en el viaje. Lo demás, bien.",
+  //   29,
+  // );
+  //
+  // await calificar(
+  //   await completado(
+  //     {
+  //       cliente: carolina,
+  //       tipoFlete: "MUEBLES",
+  //       titulo: "Heladera usada",
+  //       origen: LUGARES.lasTalitas,
+  //       destino: LUGARES.tafiViejo,
+  //       fecha: dia(-25),
+  //       franja: "MANANA",
+  //       creadaHaceDias: 27,
+  //       items: [item("Heladera", 1, [170, 65, 65], 65, true)],
+  //     },
+  //     ramon,
+  //   ),
+  //   5,
+  //   "Excelente, rápido y amable.",
+  //   24,
+  // );
+  //
+  // // Completado sin calificar: Luis puede probar el flujo de calificación.
+  // await completado(
+  //   {
+  //     cliente: luis,
+  //     tipoFlete: "PAQUETERIA",
+  //     titulo: "Caja con repuestos",
+  //     origen: LUGARES.centro,
+  //     destino: LUGARES.parque,
+  //     fecha: dia(-5),
+  //     franja: "MANANA",
+  //     creadaHaceDias: 6,
+  //     items: [item("Caja de repuestos", 1, [40, 30, 25], 8)],
+  //   },
+  //   marta,
+  // );
 
-  await calificar(
-    await completado(
-      {
-        cliente: florencia,
-        tipoFlete: "MUDANZA",
-        titulo: "Mudanza de departamento",
-        origen: LUGARES.barrioNorte,
-        destino: LUGARES.yerbaBuena,
-        origenPiso: 4,
-        origenAscensor: true,
-        fecha: dia(-10),
-        franja: "MANANA",
-        ayudantesRequeridos: 1,
-        creadaHaceDias: 14,
-        items: [
-          item("Cama de dos plazas", 1, [200, 160, 50], 60),
-          item("Cajas", 12, [50, 40, 40], 12),
-          item("Sillón", 1, [180, 85, 80], 45),
-        ],
-      },
-      carlos,
-      [jose],
-    ),
-    5,
-    "Puntual y muy cuidadoso. Subió todo con el ayudante y no se rayó nada.",
-    9,
-  );
-
-  await calificar(
-    await completado(
-      {
-        cliente: martin,
-        tipoFlete: "COMPRAS",
-        titulo: "Lavarropas nuevo",
-        origen: LUGARES.abasto,
-        destino: LUGARES.ciudadela,
-        fecha: dia(-20),
-        franja: "MEDIODIA",
-        creadaHaceDias: 22,
-        items: [item("Lavarropas en caja", 1, [90, 65, 65], 70)],
-      },
-      carlos,
-    ),
-    4,
-    "Buen servicio, llegó media hora tarde pero avisó por el chat.",
-    19,
-  );
-
-  await calificar(
-    await completado(
-      {
-        cliente: sebastian,
-        tipoFlete: "MUEBLES",
-        titulo: "Cuadros y espejo de pie",
-        origen: LUGARES.villaCarmela,
-        destino: LUGARES.centro,
-        fecha: dia(-15),
-        franja: "TARDE",
-        creadaHaceDias: 17,
-        items: [
-          item("Cuadros grandes", 3, [100, 10, 80], 6, true),
-          item("Espejo de pie", 1, [170, 60, 5], 15, true),
-        ],
-      },
-      soledad,
-      [lucia],
-    ),
-    5,
-    "Envolvió todo con plástico de burbujas. Impecable.",
-    14,
-  );
-
-  await calificar(
-    await completado(
-      {
-        cliente: jorge,
-        tipoFlete: "MUDANZA",
-        titulo: "Mudanza a Parque 9 de Julio",
-        origen: LUGARES.banda,
-        destino: LUGARES.parque,
-        fecha: dia(-30),
-        franja: "FLEXIBLE",
-        ayudantesRequeridos: 2,
-        creadaHaceDias: 33,
-        items: [item("Muebles varios", 8, [150, 60, 80], 40), item("Cajas", 20, [50, 40, 40], 12)],
-      },
-      jose,
-      [gustavo],
-      true,
-    ),
-    3,
-    "Llegó tarde y una caja se golpeó en el viaje. Lo demás, bien.",
-    29,
-  );
-
-  await calificar(
-    await completado(
-      {
-        cliente: carolina,
-        tipoFlete: "MUEBLES",
-        titulo: "Heladera usada",
-        origen: LUGARES.lasTalitas,
-        destino: LUGARES.tafiViejo,
-        fecha: dia(-25),
-        franja: "MANANA",
-        creadaHaceDias: 27,
-        items: [item("Heladera", 1, [170, 65, 65], 65, true)],
-      },
-      ramon,
-    ),
-    5,
-    "Excelente, rápido y amable.",
-    24,
-  );
-
-  // Completado sin calificar: Luis puede probar el flujo de calificación.
-  await completado(
-    {
-      cliente: luis,
-      tipoFlete: "PAQUETERIA",
-      titulo: "Caja con repuestos",
-      origen: LUGARES.centro,
-      destino: LUGARES.parque,
-      fecha: dia(-5),
-      franja: "MANANA",
-      creadaHaceDias: 6,
-      items: [item("Caja de repuestos", 1, [40, 30, 25], 8)],
-    },
-    marta,
-  );
-
+  // --- Historial: cancelados ---
   await adjudicar(
     await crearSolicitud(
       {
@@ -1583,61 +1599,72 @@ async function main() {
   await recalcularRatings();
   await ajustarLecturas();
 
-  // --- Estado de demo del chat ---
-  // Ana todavía no leyó los presupuestos de su mudanza; Carlos no leyó la última respuesta de Ana.
-  await actualizar(sb, "conversaciones", { solicitudId: mudanzaAna.id }, { leidoHastaCliente: null });
-  await actualizar(sb, "conversaciones", { id: presupuestoCarlos.conversacionId }, { leidoHastaFletero: null });
+  // [FUERA-S3] [BE] Chat en tiempo real
+  // // --- Estado de demo del chat ---
+  // // Ana todavía no leyó los presupuestos de su mudanza; Carlos no leyó la última respuesta de Ana.
+  // await actualizar(sb, "conversaciones", { solicitudId: mudanzaAna.id }, { leidoHastaCliente: null });
+  // await actualizar(sb, "conversaciones", { id: presupuestoCarlos.conversacionId }, { leidoHastaFletero: null });
+  //
+  // // Soledad propone cambiar el horario del flete confirmado: Ana lo acepta con un toque.
+  // const propuestaEn = hace(0, 1);
+  // const propuestaMsg = await insertar<{ id: string }>(sb, "mensajes", {
+  //   conversacionId: compraConfirmada.conversacionId,
+  //   autorId: soledad.userId,
+  //   tipo: "PROPUESTA",
+  //   createdAt: propuestaEn,
+  // });
+  // await insertar(sb, "propuestas_horario", {
+  //   mensajeId: propuestaMsg.id,
+  //   fecha: dia(2),
+  //   franja: "MANANA",
+  //   propuestaPorId: soledad.userId,
+  // });
+  // await actualizar(sb, "conversaciones", { id: compraConfirmada.conversacionId }, {
+  //   ultimaActividadEn: propuestaEn,
+  //   leidoHastaFletero: propuestaEn,
+  // });
 
-  // Soledad propone cambiar el horario del flete confirmado: Ana lo acepta con un toque.
-  const propuestaEn = hace(0, 1);
-  const propuestaMsg = await insertar<{ id: string }>(sb, "mensajes", {
-    conversacionId: compraConfirmada.conversacionId,
-    autorId: soledad.userId,
-    tipo: "PROPUESTA",
-    createdAt: propuestaEn,
-  });
-  await insertar(sb, "propuestas_horario", {
-    mensajeId: propuestaMsg.id,
-    fecha: dia(2),
-    franja: "MANANA",
-    propuestaPorId: soledad.userId,
-  });
-  await actualizar(sb, "conversaciones", { id: compraConfirmada.conversacionId }, {
-    ultimaActividadEn: propuestaEn,
-    leidoHastaFletero: propuestaEn,
-  });
-
-  const chatAna = (conversacionId: string) => `/cliente/mensajes/${conversacionId}`;
-  await notificacion(
-    ana.userId,
-    "PRESUPUESTO",
-    "Carlos R. te envió un presupuesto",
-    chatAna(presupuestoCarlos.conversacionId),
-    "Mudanza de monoambiente",
-  );
+  // [FUERA-S3] [FE] Pantalla del chat: las notificaciones llevan al pedido, no al chat.
+  const pedidoAna = `/cliente/pedido/${mudanzaAna.id}`;
+  await notificacion(ana.userId, "PRESUPUESTO", "Carlos R. te envió un presupuesto", pedidoAna, "Mudanza de monoambiente");
   await notificacion(
     ana.userId,
     "PRESUPUESTO",
     "Fernanda R. te envió un presupuesto",
-    chatAna(presupuestoFernanda.conversacionId),
+    pedidoAna,
     "Mudanza de monoambiente",
   );
-  await notificacion(
-    ana.userId,
-    "MENSAJE",
-    "Mensajes de Soledad C.",
-    chatAna(compraConfirmada.conversacionId),
-    "Propuso una nueva fecha para el flete",
-    `chat:${compraConfirmada.conversacionId}`,
-  );
-  await notificacion(
-    carlos.userId,
-    "MENSAJE",
-    "Mensajes de Ana P.",
-    `/fletero/mensajes/${presupuestoCarlos.conversacionId}`,
-    "Genial, gracias. Mañana te confirmo.",
-    `chat:${presupuestoCarlos.conversacionId}`,
-  );
+  // const chatAna = (conversacionId: string) => `/cliente/mensajes/${conversacionId}`;
+  // await notificacion(
+  //   ana.userId,
+  //   "PRESUPUESTO",
+  //   "Carlos R. te envió un presupuesto",
+  //   chatAna(presupuestoCarlos.conversacionId),
+  //   "Mudanza de monoambiente",
+  // );
+  // await notificacion(
+  //   ana.userId,
+  //   "PRESUPUESTO",
+  //   "Fernanda R. te envió un presupuesto",
+  //   chatAna(presupuestoFernanda.conversacionId),
+  //   "Mudanza de monoambiente",
+  // );
+  // await notificacion(
+  //   ana.userId,
+  //   "MENSAJE",
+  //   "Mensajes de Soledad C.",
+  //   chatAna(compraConfirmada.conversacionId),
+  //   "Propuso una nueva fecha para el flete",
+  //   `chat:${compraConfirmada.conversacionId}`,
+  // );
+  // await notificacion(
+  //   carlos.userId,
+  //   "MENSAJE",
+  //   "Mensajes de Ana P.",
+  //   `/fletero/mensajes/${presupuestoCarlos.conversacionId}`,
+  //   "Genial, gracias. Mañana te confirmo.",
+  //   `chat:${presupuestoCarlos.conversacionId}`,
+  // );
 }
 
 main()
@@ -1649,11 +1676,11 @@ main()
     ]);
     console.log(`Seed listo: ${usuarios} usuarios, ${solicitudes} solicitudes, ${fletesN} fletes.`);
     console.log(`Contraseña de todos los usuarios de demo: ${PASSWORD_DEMO}`);
-    console.log("  Admin:    admin@demo.test");
+    // [FUERA-S3] [FE] Panel de administración: console.log("  Admin:    admin@demo.test");
     console.log(
       "  Clientes: ana, luis, valeria, martin, carolina, jorge, florencia, sebastian  (@demo.test)",
     );
-    console.log("            paula (sin dirección habitual), rocio (para la demo de contraseñas)");
+    // [FUERA-S3] [FE] Perfil del cliente y [BE] Cambiar y recuperar contraseña: paula y rocio
     console.log(
       "  Fleteros: carlos (camioneta), marta (moto), jose (camión), soledad (auto), ramon, gustavo,",
     );
