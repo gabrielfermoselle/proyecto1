@@ -67,8 +67,9 @@ export async function Agenda({ fleteroId, semana }: { fleteroId: string; semana:
           <AlertTriangle aria-hidden="true" />
           <p>
             <strong>Tenés fletes superpuestos</strong> el{" "}
+            {/* [FUERA-S3] [FE] Pantalla del chat: «Revisá los horarios con los clientes por el chat.» */}
             {diasConConflicto.map((d) => formatearDia(d, { hoy })).join(", ")}. Revisá los horarios con los
-            clientes por el chat.
+            clientes.
           </p>
         </Alert>
       ) : null}

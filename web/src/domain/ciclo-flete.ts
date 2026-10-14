@@ -256,15 +256,17 @@ const TRANSICIONES: Record<EtapaCiclo, Partial<Record<EtapaCiclo, Regla>>> = {
   CONFIRMADO: { EN_CAMINO_A_ORIGEN: { actores: ["FLETERO"] }, CANCELADO: CANCELAR },
   EN_CAMINO_A_ORIGEN: { CARGANDO: { actores: ["FLETERO"] }, CANCELADO: CANCELAR },
   CARGANDO: {
-    EN_TRASLADO: {
-      actores: ["FLETERO"],
-      condicion: ({ inventario: i }) =>
-        i.pendientesCarga > 0
-          ? "Resolvé todos los ítems: marcá cada uno como cargado o no cargado."
-          : i.total > 0 && i.cargados === 0
-            ? "No cargaste ningún ítem. Si el flete no se puede hacer, cancelalo."
-            : null,
-    },
+    // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre: en los sprints 1-3 el flete llega hasta la
+    // carga. Sin esta transición, las etapas siguientes quedan inalcanzables.
+    // EN_TRASLADO: {
+    //   actores: ["FLETERO"],
+    //   condicion: ({ inventario: i }) =>
+    //     i.pendientesCarga > 0
+    //       ? "Resolvé todos los ítems: marcá cada uno como cargado o no cargado."
+    //       : i.total > 0 && i.cargados === 0
+    //         ? "No cargaste ningún ítem. Si el flete no se puede hacer, cancelalo."
+    //         : null,
+    // },
     CANCELADO: {
       actores: ["CLIENTE", "FLETERO"],
       condicion: (c) =>

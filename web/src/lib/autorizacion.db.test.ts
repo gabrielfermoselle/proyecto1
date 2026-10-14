@@ -273,29 +273,30 @@ const MATRIZ: Record<string, Caso> = {
       input: { fleteId: m.fleteId, motivo: "Ya no lo necesito, gracias" },
     }),
   },
-  prepararFotoFlete: {
-    roles: ["CLIENTE", "FLETERO"],
-    ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId } }),
-  },
-  registrarControl: {
-    roles: ["CLIENTE", "FLETERO"],
-    ajeno: (m) => ({
-      como: m.otroFletero,
-      input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA", resultado: "CARGADO", observacion: "" },
-    }),
-  },
-  marcarTodos: {
-    roles: ["CLIENTE", "FLETERO"],
-    ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, fase: "CARGA" } }),
-  },
-  quitarControl: {
-    roles: ["CLIENTE", "FLETERO"],
-    ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA" } }),
-  },
-  calificarFlete: {
-    roles: ["CLIENTE"],
-    ajeno: (m) => ({ como: m.otroCliente, input: { fleteId: m.fleteId, puntaje: 1, comentario: "" } }),
-  },
+  // [FUERA-S3] [BE] Control de carga y descarga / [BE] Reclamos, firmas y calificación
+  // prepararFotoFlete: {
+  //   roles: ["CLIENTE", "FLETERO"],
+  //   ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId } }),
+  // },
+  // registrarControl: {
+  //   roles: ["CLIENTE", "FLETERO"],
+  //   ajeno: (m) => ({
+  //     como: m.otroFletero,
+  //     input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA", resultado: "CARGADO", observacion: "" },
+  //   }),
+  // },
+  // marcarTodos: {
+  //   roles: ["CLIENTE", "FLETERO"],
+  //   ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, fase: "CARGA" } }),
+  // },
+  // quitarControl: {
+  //   roles: ["CLIENTE", "FLETERO"],
+  //   ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA" } }),
+  // },
+  // calificarFlete: {
+  //   roles: ["CLIENTE"],
+  //   ajeno: (m) => ({ como: m.otroCliente, input: { fleteId: m.fleteId, puntaje: 1, comentario: "" } }),
+  // },
 
   // --- notificaciones: con IDs ajenos no falla, pero no marca nada ---
   marcarNotificacionesLeidas: { roles: TODOS_LOS_ROLES },

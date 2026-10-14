@@ -1,5 +1,6 @@
-import { MessageCircle, Phone } from "lucide-react";
-import { Button } from "@/components/ui/button";
+// [FUERA-S3] Contacto directo por WhatsApp
+// import { MessageCircle, Phone } from "lucide-react";
+// import { Button } from "@/components/ui/button";
 import { enlacesContacto } from "@/domain/contacto";
 
 /**
@@ -19,7 +20,8 @@ export function ContactoDirecto({
   if (!enlaces) {
     return (
       <p className="text-sm text-muted-foreground">
-        {nombre} no cargó un teléfono. Coordiná por el chat de la plataforma.
+        {/* [FUERA-S3] [FE] Pantalla del chat: «Coordiná por el chat de la plataforma.» */}
+        {nombre} no cargó un teléfono.
       </p>
     );
   }
@@ -28,6 +30,7 @@ export function ContactoDirecto({
       <p className="text-sm">
         Teléfono de {nombre}: <strong className="tabular-nums">{enlaces.visible}</strong>
       </p>
+      {/* [FUERA-S3] Contacto directo por WhatsApp: botones de WhatsApp y llamada.
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="secondary">
           <a href={enlaces.whatsapp} target="_blank" rel="noreferrer">
@@ -42,6 +45,7 @@ export function ContactoDirecto({
           </a>
         </Button>
       </div>
+      */}
     </div>
   );
 }

@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page, type Request } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
+// [FUERA-S3] [FE] Pantalla de control de inventario: import { type Request } from "@playwright/test";
 import { type Cuenta, sesionDe } from "./utils";
 
 // El recorrido central, con dos personas reales en dos navegadores: Florencia (cliente) publicó
@@ -96,11 +97,12 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
   await dialogo.getByRole("button", { name: "Aceptar y confirmar" }).click();
   await expect(dialogo).toBeHidden();
 
-  // El pedido sigue en la misma página, ahora con el flete y el contacto directo.
+  // El pedido sigue en la misma página, ahora con el flete.
   await expect(florencia).toHaveURL(/\/cliente\/pedido\//);
   await florencia.reload();
   await expect(florencia.locator("#contenido").getByText("Etapa 1 de 7: Confirmado")).toBeVisible();
-  await expect(florencia.locator("#contenido").getByRole("link", { name: "WhatsApp" })).toBeVisible();
+  // [FUERA-S3] Contacto directo por WhatsApp
+  // await expect(florencia.locator("#contenido").getByRole("link", { name: "WhatsApp" })).toBeVisible();
 
   await carlos.goto("/fletero/trabajos");
   await carlos.locator("#contenido").getByRole("link", { name: SOLICITUD }).click();
@@ -110,30 +112,31 @@ test("la cliente acepta y se crea el flete para los dos", async () => {
   await expect(carlos.locator("#contenido").getByRole("link", { name: "Cómo llegar" }).first()).toBeVisible();
 });
 
-/**
- * Marca el inventario y recarga. El botón de la etapa lee el resumen del servidor: un refresco
- * que ya estaba en curso puede traer el dato viejo y dejarlo deshabilitado.
- */
-async function marcar(page: Page, nombre: string) {
-  const boton = page.locator("#contenido").getByRole("button", { name: nombre });
-  // Un clic antes de que la página se hidrate no hace nada: se repite hasta que salga el guardado.
-  let pedido: Request | undefined;
-  await expect(async () => {
-    [pedido] = await Promise.all([
-      page.waitForRequest(
-        (r) =>
-          r.method() === "POST" &&
-          r.headers()["next-action"] !== undefined &&
-          (r.postData() ?? "").includes('"fase"'),
-        { timeout: 3_000 },
-      ),
-      boton.click({ timeout: 3_000 }),
-    ]);
-  }).toPass({ timeout: 30_000 });
-  const respuesta = await pedido!.response();
-  await respuesta?.finished();
-  await page.reload();
-}
+// [FUERA-S3] [FE] Pantalla de control de inventario
+// /**
+//  * Marca el inventario y recarga. El botón de la etapa lee el resumen del servidor: un refresco
+//  * que ya estaba en curso puede traer el dato viejo y dejarlo deshabilitado.
+//  */
+// async function marcar(page: Page, nombre: string) {
+//   const boton = page.locator("#contenido").getByRole("button", { name: nombre });
+//   // Un clic antes de que la página se hidrate no hace nada: se repite hasta que salga el guardado.
+//   let pedido: Request | undefined;
+//   await expect(async () => {
+//     [pedido] = await Promise.all([
+//       page.waitForRequest(
+//         (r) =>
+//           r.method() === "POST" &&
+//           r.headers()["next-action"] !== undefined &&
+//           (r.postData() ?? "").includes('"fase"'),
+//         { timeout: 3_000 },
+//       ),
+//       boton.click({ timeout: 3_000 }),
+//     ]);
+//   }).toPass({ timeout: 30_000 });
+//   const respuesta = await pedido!.response();
+//   await respuesta?.finished();
+//   await page.reload();
+// }
 
 /** Avanza de etapa con el botón principal y lo confirma en el diálogo (firmando, si lo pide). */
 async function avanzar(page: Page, boton: string, etapa: string, { firma = false } = {}) {
@@ -167,62 +170,72 @@ test("el fletero sale a buscar la carga y la cliente ve el avance", async () => 
   await expect(florencia.locator("#contenido").getByText("Etapa 2 de 7: En camino al origen")).toBeVisible();
 });
 
-// Salteados desde la etapa 3: el guardado del inventario no termina de responder en CI.
-// Volver a activarlos cuando se arregle esa acción.
-test.skip("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", async () => {
+test("el fletero llega al origen y el flete queda cargando", async () => {
   await avanzar(carlos, "Llegué al origen", "Etapa 3 de 7: Cargando");
-  const contenido = carlos.locator("#contenido");
-  const salir = contenido.getByRole("button", { name: "Terminé de cargar, salgo" });
-  await expect(salir).toBeDisabled();
+  // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre: el flete no sale del origen, así que no hay botón para seguir.
+  await expect(carlos.locator("#contenido").getByRole("button", { name: "Terminé de cargar, salgo" })).toHaveCount(0);
 
-  await marcar(carlos, "Cargado: Bicicleta rodado 29");
-  await expect(salir).toBeDisabled();
-  await marcar(carlos, "Cargado: Caja de herramientas");
-  await expect(salir).toBeEnabled();
-  // Con ítems cargados ya no se puede cancelar.
-  await expect(contenido.getByRole("button", { name: "No puedo hacer este flete" })).toBeHidden();
-
-  await avanzar(carlos, "Terminé de cargar, salgo", "Etapa 4 de 7: En traslado");
-});
-
-test.skip("el fletero descarga todo y firma la entrega", async () => {
-  await avanzar(carlos, "Llegué al destino", "Etapa 5 de 7: Descargando");
-  await marcar(carlos, "Todo: entregado");
-  await avanzar(carlos, "Terminé de descargar", "Etapa 6 de 7: Entregado", { firma: true });
-});
-
-test.skip("la cliente revisa lo que recibió, cierra el flete y califica", async () => {
   await florencia.reload();
-  const contenido = florencia.locator("#contenido");
-  await expect(contenido.getByText("Etapa 6 de 7: Entregado")).toBeVisible();
-  const cerrar = contenido.getByRole("button", { name: "Cerrar el flete" });
-  await expect(cerrar).toBeDisabled();
-
-  await marcar(florencia, "Todo: recibido");
-  await avanzar(florencia, "Cerrar el flete", "Etapa 7 de 7: Cerrado", { firma: true });
-
-  await contenido.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
-  await expect(florencia).toHaveURL(/\/calificar$/);
-  // El radio es solo para lectores de pantalla: se toca la estrella (el label que lo envuelve).
-  // Antes de hidratar, el navegador tilda el radio pero React no se entera: se toca otra estrella
-  // y después la de 5 hasta que el formulario la tome.
-  const cinco = contenido.getByRole("radio", { name: "5 estrellas: Excelente" });
-  const calificar = contenido.getByRole("button", { name: "Enviar calificación" });
-  await expect(async () => {
-    await contenido.locator("label", { hasText: "4 estrellas: Bueno" }).click({ timeout: 3_000 });
-    await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click({ timeout: 3_000 });
-    await expect(cinco).toBeChecked({ timeout: 1_000 });
-    await expect(calificar).toBeEnabled({ timeout: 1_000 });
-  }).toPass({ timeout: 30_000 });
-  await contenido.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
-  await calificar.click();
-  await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/, { timeout: 20_000 });
-  await florencia.reload();
-  await expect(contenido.getByRole("region", { name: "Tu calificación" })).toBeVisible();
-
-  // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
-  await florencia.goto("/cliente/fleteros");
-  await expect(
-    florencia.locator("#contenido").getByRole("link", { name: /Carlos R\./ }).first(),
-  ).toContainText("4,7 (3)");
+  await expect(florencia.locator("#contenido").getByText("Etapa 3 de 7: Cargando")).toBeVisible();
 });
+
+// [FUERA-S3] [FE] Pantalla de control de inventario, [BE] Etapas de traslado, entrega y cierre y [BE] Reclamos, firmas y calificación
+// // Salteados desde la etapa 3: el guardado del inventario no termina de responder en CI.
+// // Volver a activarlos cuando se arregle esa acción.
+// test.skip("el fletero no puede salir sin cargar todo; carga ítem por ítem y sale", async () => {
+//   await avanzar(carlos, "Llegué al origen", "Etapa 3 de 7: Cargando");
+//   const contenido = carlos.locator("#contenido");
+//   const salir = contenido.getByRole("button", { name: "Terminé de cargar, salgo" });
+//   await expect(salir).toBeDisabled();
+//
+//   await marcar(carlos, "Cargado: Bicicleta rodado 29");
+//   await expect(salir).toBeDisabled();
+//   await marcar(carlos, "Cargado: Caja de herramientas");
+//   await expect(salir).toBeEnabled();
+//   // Con ítems cargados ya no se puede cancelar.
+//   await expect(contenido.getByRole("button", { name: "No puedo hacer este flete" })).toBeHidden();
+//
+//   await avanzar(carlos, "Terminé de cargar, salgo", "Etapa 4 de 7: En traslado");
+// });
+//
+// test.skip("el fletero descarga todo y firma la entrega", async () => {
+//   await avanzar(carlos, "Llegué al destino", "Etapa 5 de 7: Descargando");
+//   await marcar(carlos, "Todo: entregado");
+//   await avanzar(carlos, "Terminé de descargar", "Etapa 6 de 7: Entregado", { firma: true });
+// });
+//
+// test.skip("la cliente revisa lo que recibió, cierra el flete y califica", async () => {
+//   await florencia.reload();
+//   const contenido = florencia.locator("#contenido");
+//   await expect(contenido.getByText("Etapa 6 de 7: Entregado")).toBeVisible();
+//   const cerrar = contenido.getByRole("button", { name: "Cerrar el flete" });
+//   await expect(cerrar).toBeDisabled();
+//
+//   await marcar(florencia, "Todo: recibido");
+//   await avanzar(florencia, "Cerrar el flete", "Etapa 7 de 7: Cerrado", { firma: true });
+//
+//   await contenido.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
+//   await expect(florencia).toHaveURL(/\/calificar$/);
+//   // El radio es solo para lectores de pantalla: se toca la estrella (el label que lo envuelve).
+//   // Antes de hidratar, el navegador tilda el radio pero React no se entera: se toca otra estrella
+//   // y después la de 5 hasta que el formulario la tome.
+//   const cinco = contenido.getByRole("radio", { name: "5 estrellas: Excelente" });
+//   const calificar = contenido.getByRole("button", { name: "Enviar calificación" });
+//   await expect(async () => {
+//     await contenido.locator("label", { hasText: "4 estrellas: Bueno" }).click({ timeout: 3_000 });
+//     await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click({ timeout: 3_000 });
+//     await expect(cinco).toBeChecked({ timeout: 1_000 });
+//     await expect(calificar).toBeEnabled({ timeout: 1_000 });
+//   }).toPass({ timeout: 30_000 });
+//   await contenido.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
+//   await calificar.click();
+//   await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/, { timeout: 20_000 });
+//   await florencia.reload();
+//   await expect(contenido.getByRole("region", { name: "Tu calificación" })).toBeVisible();
+//
+//   // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
+//   await florencia.goto("/cliente/fleteros");
+//   await expect(
+//     florencia.locator("#contenido").getByRole("link", { name: /Carlos R\./ }).first(),
+//   ).toContainText("4,7 (3)");
+// });

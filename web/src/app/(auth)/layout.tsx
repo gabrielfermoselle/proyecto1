@@ -5,7 +5,8 @@ import { Logo } from "@/components/shared/logo";
 const PUNTOS = [
   { Icono: ClipboardList, texto: "Publicás qué necesitás mover y recibís presupuestos." },
   { Icono: BadgeCheck, texto: "Fleteros con reseñas de clientes reales y documentación verificada." },
-  { Icono: MessagesSquare, texto: "Hablás por el chat; el teléfono se comparte al aceptar." },
+  // [FUERA-S3] [FE] Pantalla del chat: «Hablás por el chat; el teléfono se comparte al aceptar.»
+  { Icono: MessagesSquare, texto: "El teléfono se comparte recién cuando aceptás un presupuesto." },
 ];
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {

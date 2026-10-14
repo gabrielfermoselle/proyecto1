@@ -215,7 +215,8 @@ export function PresupuestosRecibidos({
                     <>
                       Confirmás el flete con <strong>{p.fletero.nombre}</strong> por{" "}
                       <strong>{formatearPesos(p.monto)}</strong> para el <strong>{textoCuando}</strong>. Los
-                      demás presupuestos se rechazan y se habilita el contacto por WhatsApp o teléfono.
+                      {/* [FUERA-S3] Contacto directo por WhatsApp: «se habilita el contacto por WhatsApp o teléfono.» */}
+                      demás presupuestos se rechazan y se comparten los teléfonos.
                     </>
                   }
                   confirmLabel="Aceptar y confirmar"

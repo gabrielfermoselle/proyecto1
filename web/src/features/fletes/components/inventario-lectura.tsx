@@ -15,7 +15,8 @@ export function InventarioLectura({ items, titulo = "Inventario" }: { items: Ite
       </h2>
       <ul className="grid gap-2">
         {items.map((item) => {
-          const algo = item.carga || item.descarga || item.recepcion;
+          // [FUERA-S3] [FE] Pantalla de control de inventario
+          // const algo = item.carga || item.descarga || item.recepcion;
           return (
             <li key={item.id} className="grid gap-3 rounded-lg border bg-card p-3">
               <EncabezadoItem item={item} />
@@ -48,7 +49,9 @@ export function InventarioLectura({ items, titulo = "Inventario" }: { items: Ite
                   ) : null}
                 </div>
               ) : null}
+              {/* [FUERA-S3] [FE] Pantalla de control de inventario
               {!algo ? <p className="text-sm text-muted-foreground">Todavía no se cargó.</p> : null}
+              */}
               {item.fotos.length > 0 ? (
                 <details className="text-sm">
                   <summary className="cursor-pointer font-semibold text-muted-foreground">

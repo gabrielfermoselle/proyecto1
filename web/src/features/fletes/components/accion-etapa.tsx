@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin } from "lucide-react";
+// [FUERA-S3] Mapa con la ubicación del fletero: import { MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -15,7 +15,7 @@ import {
   type Actor,
   type ResumenInventario,
 } from "@/domain/ciclo-flete";
-import { obtenerPosicion } from "@/lib/geolocalizacion";
+// [FUERA-S3] Mapa con la ubicación del fletero: import { obtenerPosicion } from "@/lib/geolocalizacion";
 import { avanzarEtapa } from "../actions";
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
@@ -25,7 +25,8 @@ function descripcion(hacia: EtapaFlete, r: ResumenInventario): string {
     case "EN_CAMINO_A_ORIGEN":
       return "Le avisamos al cliente que saliste a buscar la carga.";
     case "CARGANDO":
-      return "Le avisamos al cliente que llegaste. Después marcá cada ítem a medida que lo cargás.";
+      // [FUERA-S3] [FE] Pantalla de control de inventario: «Le avisamos al cliente que llegaste. Después marcá cada ítem a medida que lo cargás.»
+      return "Le avisamos al cliente que llegaste y empezás a cargar.";
     case "EN_TRASLADO":
       return (
         `Cargaste ${plural(r.cargados, "ítem", "ítems")}` +
@@ -73,11 +74,13 @@ export function AccionEtapa({ fleteId, etapa, rol, resumen }: AccionEtapaProps) 
 
   async function confirmar(): Promise<boolean> {
     setError(null);
-    let ubicacion = null;
-    if (rol === "FLETERO") {
-      setEstado("Obteniendo tu ubicación…");
-      ubicacion = await obtenerPosicion();
-    }
+    // [FUERA-S3] Mapa con la ubicación del fletero: la etapa avanza sin compartir la ubicación.
+    const ubicacion = null;
+    // let ubicacion = null;
+    // if (rol === "FLETERO") {
+    //   setEstado("Obteniendo tu ubicación…");
+    //   ubicacion = await obtenerPosicion();
+    // }
     setEstado(null);
     const r = await avanzarEtapa({
       fleteId,
@@ -137,6 +140,7 @@ export function AccionEtapa({ fleteId, etapa, rol, resumen }: AccionEtapaProps) 
               </p>
             </div>
           ) : null}
+          {/* [FUERA-S3] Mapa con la ubicación del fletero
           {rol === "FLETERO" ? (
             <p className="flex items-start gap-2 text-sm text-muted-foreground">
               <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -144,6 +148,7 @@ export function AccionEtapa({ fleteId, etapa, rol, resumen }: AccionEtapaProps) 
               avanza igual.
             </p>
           ) : null}
+          */}
           {estado ? (
             <p className="text-sm font-medium" aria-live="polite">
               {estado}

@@ -122,7 +122,8 @@ export function RegistroForm({ rolInicial }: { rolInicial?: RolRegistrable | und
         type="tel"
         autoComplete="tel-national"
         inputMode="tel"
-        hint="No se muestra a nadie: la coordinación es por el chat de la plataforma."
+        // [FUERA-S3] [FE] Pantalla del chat: «No se muestra a nadie: la coordinación es por el chat de la plataforma.»
+        hint="Solo lo ve la otra parte cuando se confirma un flete."
         error={errors.telefono?.message}
         {...register("telefono")}
       />

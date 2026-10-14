@@ -51,7 +51,8 @@ describe("validarTransicion: quién mueve cada etapa", () => {
     ["CONFIRMADO", "CANCELADO", ["CLIENTE", "FLETERO"]],
     ["EN_CAMINO_A_ORIGEN", "CARGANDO", ["FLETERO"]],
     ["EN_CAMINO_A_ORIGEN", "CANCELADO", ["CLIENTE", "FLETERO"]],
-    ["CARGANDO", "EN_TRASLADO", ["FLETERO"]],
+    // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre
+    // ["CARGANDO", "EN_TRASLADO", ["FLETERO"]],
     ["EN_TRASLADO", "DESCARGANDO", ["FLETERO"]],
     ["DESCARGANDO", "ENTREGADO", ["FLETERO"]],
     ["ENTREGADO", "CERRADO", ["CLIENTE"]],
@@ -101,28 +102,29 @@ describe("validarTransicion: condiciones", () => {
     ...extra,
   });
 
-  it("no sale del origen con ítems sin resolver", () => {
-    const r = validarTransicion(
-      "CARGANDO",
-      "EN_TRASLADO",
-      "FLETERO",
-      ctx([item("a", { carga: cargado }), item("b")]),
-    );
-    expect(r).toEqual({
-      ok: false,
-      motivo: "Resolvé todos los ítems: marcá cada uno como cargado o no cargado.",
-    });
-  });
-
-  it("sale del origen con todo resuelto aunque algún ítem no se haya cargado", () => {
-    const items = [item("a", { carga: cargado }), item("b", { carga: noCargado })];
-    expect(validarTransicion("CARGANDO", "EN_TRASLADO", "FLETERO", ctx(items)).ok).toBe(true);
-  });
-
-  it("no sale del origen si no cargó nada", () => {
-    const r = validarTransicion("CARGANDO", "EN_TRASLADO", "FLETERO", ctx([item("a", { carga: noCargado })]));
-    expect(r.ok).toBe(false);
-  });
+  // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre: el flete no sale del origen en los sprints 1-3.
+  // it("no sale del origen con ítems sin resolver", () => {
+  //   const r = validarTransicion(
+  //     "CARGANDO",
+  //     "EN_TRASLADO",
+  //     "FLETERO",
+  //     ctx([item("a", { carga: cargado }), item("b")]),
+  //   );
+  //   expect(r).toEqual({
+  //     ok: false,
+  //     motivo: "Resolvé todos los ítems: marcá cada uno como cargado o no cargado.",
+  //   });
+  // });
+  //
+  // it("sale del origen con todo resuelto aunque algún ítem no se haya cargado", () => {
+  //   const items = [item("a", { carga: cargado }), item("b", { carga: noCargado })];
+  //   expect(validarTransicion("CARGANDO", "EN_TRASLADO", "FLETERO", ctx(items)).ok).toBe(true);
+  // });
+  //
+  // it("no sale del origen si no cargó nada", () => {
+  //   const r = validarTransicion("CARGANDO", "EN_TRASLADO", "FLETERO", ctx([item("a", { carga: noCargado })]));
+  //   expect(r.ok).toBe(false);
+  // });
 
   it("entregar exige resolver los ítems cargados y la conformidad del fletero", () => {
     const sinDescargar = [item("a", { carga: cargado }), item("b", { carga: noCargado })];
@@ -189,14 +191,16 @@ describe("siguienteEtapa y puedeCancelar", () => {
       pasos.push(etapa);
       etapa = siguienteEtapa(etapa, "FLETERO");
     }
-    expect(pasos).toEqual([
-      "CONFIRMADO",
-      "EN_CAMINO_A_ORIGEN",
-      "CARGANDO",
-      "EN_TRASLADO",
-      "DESCARGANDO",
-      "ENTREGADO",
-    ]);
+    // [FUERA-S3] [BE] Etapas de traslado, entrega y cierre: el camino feliz termina en CARGANDO.
+    // expect(pasos).toEqual([
+    //   "CONFIRMADO",
+    //   "EN_CAMINO_A_ORIGEN",
+    //   "CARGANDO",
+    //   "EN_TRASLADO",
+    //   "DESCARGANDO",
+    //   "ENTREGADO",
+    // ]);
+    expect(pasos).toEqual(["CONFIRMADO", "EN_CAMINO_A_ORIGEN", "CARGANDO"]);
   });
 
   it("al cliente le toca aceptar y cerrar", () => {

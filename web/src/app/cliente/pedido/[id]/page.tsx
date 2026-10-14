@@ -1,9 +1,11 @@
-import { CheckCircle2, MapPin, Package, Star, Truck, Users } from "lucide-react";
+import { CheckCircle2, Package, Truck, Users } from "lucide-react";
+// [FUERA-S3] Mapa con la ubicación del fletero y [BE] Reclamos, firmas y calificación: import { MapPin, Star } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BloquePedido, CabeceraPedido } from "@/components/shared/cabecera-pedido";
-import { Estrellas } from "@/components/shared/estrellas";
+// [FUERA-S3] [BE] Reclamos, firmas y calificación
+// import { Estrellas } from "@/components/shared/estrellas";
 import { TimelineEtapas } from "@/components/shared/timeline/timeline-etapas";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -18,19 +20,21 @@ import { getSolicitudDelCliente, type SolicitudDelCliente } from "@/features/cli
 import { AccionEtapa } from "@/features/fletes/components/accion-etapa";
 import { CancelarFlete } from "@/features/fletes/components/cancelar-flete";
 import { FleteEnVivo } from "@/features/fletes/components/flete-en-vivo";
-import { InventarioControl } from "@/features/fletes/components/inventario-control";
-import { InventarioLectura, ResumenInventarioTiles } from "@/features/fletes/components/inventario-lectura";
+// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario
+// import { InventarioControl } from "@/features/fletes/components/inventario-control";
+import { InventarioLectura } from "@/features/fletes/components/inventario-lectura";
+// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: import { ResumenInventarioTiles } from "@/features/fletes/components/inventario-lectura";
 import { MapaSeguimiento } from "@/features/fletes/components/mapa-seguimiento";
-import {
-  FirmasYComprobante,
-  RecorridoFlete,
-  TarjetaContraparte,
-} from "@/features/fletes/components/secciones";
+import { RecorridoFlete, TarjetaContraparte } from "@/features/fletes/components/secciones";
+// [FUERA-S3] [BE] Reclamos, firmas y calificación y [BE] Comprobante en PDF: import { FirmasYComprobante } from "@/features/fletes/components/secciones";
 import { etapaEnCurso, pasosTimeline } from "@/features/fletes/presentacion";
 import { getFleteDetalle, type FleteDetalle } from "@/features/fletes/queries";
-import { hrefCalificar } from "@/features/fletes/rutas";
+// [FUERA-S3] [BE] Reclamos, firmas y calificación
+// import { hrefCalificar } from "@/features/fletes/rutas";
 import { fotosHabilitadas } from "@/features/uploads/storage";
-import { formatearDia, formatearHora, formatearKg, formatearM3, formatearPesos } from "@/lib/formato";
+// [FUERA-S3] Mapa con la ubicación del fletero: formatearHora
+// import { formatearDia, formatearHora, formatearKg, formatearM3, formatearPesos } from "@/lib/formato";
+import { formatearDia, formatearKg, formatearM3, formatearPesos } from "@/lib/formato";
 import { requireCliente } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Pedido" };
@@ -187,12 +191,14 @@ function PedidoSinFlete({ s, nueva }: { s: SolicitudDelCliente; nueva: boolean }
 
 /** Con flete: seguimiento, recepción, calificación y contacto con el fletero. */
 function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
-  const recibiendo = f.etapa === "ENTREGADO";
-  const conInventarioMovido = f.resumen.cargados + f.resumen.noCargados > 0;
+  // [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: sin recepción ni inventario movido en los sprints 1-3.
+  // const recibiendo = f.etapa === "ENTREGADO";
+  // const conInventarioMovido = f.resumen.cargados + f.resumen.noCargados > 0;
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <FleteEnVivo fleteId={f.id} activo={esEtapaActiva(f.etapa)} />
       <div className="grid gap-6">
+        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
         {recibiendo ? (
           <Alert>
             <p>
@@ -201,6 +207,7 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
             </p>
           </Alert>
         ) : null}
+        */}
         {f.cancelacion ? (
           <Alert variant="destructive">
             <p>
@@ -210,6 +217,7 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           </Alert>
         ) : null}
 
+        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación / [BE] Control de carga y descarga / [FE] Pantalla de control de inventario
         {f.etapa === "CERRADO" ? (
           f.calificacion ? (
             <BloquePedido titulo="Tu calificación">
@@ -244,10 +252,12 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           />
         ) : null}
 
+        */}
         <BloquePedido titulo="Seguimiento" descripcion="Cada etapa con la hora en que pasó.">
           <TimelineEtapas pasos={pasosTimeline(f.pasos, f.cancelacion)} etiqueta="Etapas del flete" />
         </BloquePedido>
 
+        {/* [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario, [BE] Reclamos, firmas y calificación y [BE] Comprobante en PDF
         {conInventarioMovido ? <ResumenInventarioTiles resumen={f.resumen} /> : null}
         {!recibiendo ? (
           <InventarioLectura
@@ -256,6 +266,8 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           />
         ) : null}
         <FirmasYComprobante f={f} />
+        */}
+        <InventarioLectura items={f.items} />
         <CancelarFlete fleteId={f.id} etapa={f.etapa} rol="CLIENTE" resumen={f.resumen} />
         <AccionEtapa fleteId={f.id} etapa={f.etapa} rol="CLIENTE" resumen={f.resumen} />
       </div>
@@ -263,7 +275,9 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
       <aside className="grid gap-4 lg:sticky lg:top-24">
         <TarjetaContraparte f={f} />
         <div className="grid gap-2">
-          <MapaSeguimiento origen={f.origen} destino={f.destino} ultimaUbicacion={f.ultimaUbicacion} />
+          {/* [FUERA-S3] Mapa con la ubicación del fletero: ultimaUbicacion={f.ultimaUbicacion} */}
+          <MapaSeguimiento origen={f.origen} destino={f.destino} ultimaUbicacion={null} />
+          {/* [FUERA-S3] Mapa con la ubicación del fletero
           {esEtapaActiva(f.etapa) ? (
             <p className="flex items-start gap-2 text-sm text-muted-foreground">
               <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -272,6 +286,7 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
                 : "Vas a ver dónde está el fletero cuando salga, si comparte su ubicación al cambiar de etapa."}
             </p>
           ) : null}
+          */}
         </div>
         <RecorridoFlete origen={f.origen} destino={f.destino}>
           <DatosCarga s={s} />

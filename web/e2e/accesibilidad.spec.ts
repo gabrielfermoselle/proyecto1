@@ -58,9 +58,11 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "ganancias", ruta: "/fletero/trabajos?tab=ganancias" },
     { nombre: "vehículo, zona y documentos", ruta: "/fletero/perfil" },
   ],
-  valeria: [
-    { nombre: "revisar lo recibido", ruta: "/cliente", abrir: primerEnlace(/Escritorio y biblioteca/) },
-  ],
+  // [FUERA-S3] [BE] Reclamos, firmas y calificación: valeria tenía un flete entregado para revisar.
+  valeria: [],
+  // valeria: [
+  //   { nombre: "revisar lo recibido", ruta: "/cliente", abrir: primerEnlace(/Escritorio y biblioteca/) },
+  // ],
   admin: [
     { nombre: "verificar fleteros", ruta: "/admin/fleteros" },
     { nombre: "cuentas", ruta: "/admin/fleteros?tab=cuentas" },
