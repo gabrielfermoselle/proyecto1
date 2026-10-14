@@ -65,10 +65,18 @@ test.describe("cada rol entra a su área", () => {
         });
       }
 
-      test("Mi cuenta es común a todos los roles", async ({ page }) => {
-        await page.goto("/perfil");
-        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mi cuenta");
-      });
+      // [FUERA-S3] [FE] Perfil del cliente: el cliente no tiene "Mi cuenta"; /perfil lo devuelve a sus pedidos.
+      if (cuenta === "ana") {
+        test("/perfil lo devuelve a sus pedidos", async ({ page }) => {
+          await page.goto("/perfil");
+          await expect(page).toHaveURL(inicio);
+        });
+      } else {
+        test("Mi cuenta es común a todos los roles", async ({ page }) => {
+          await page.goto("/perfil");
+          await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mi cuenta");
+        });
+      }
     });
   }
 });
@@ -111,7 +119,9 @@ test.describe("las rutas anteriores siguen funcionando", () => {
     ["/cliente/solicitudes/nueva", "/cliente/nuevo"],
     // [FUERA-S3] [FE] Pantalla del chat
     // ["/cliente/mensajes", "/chat"],
-    ["/cliente/perfil", "/perfil"],
+    // [FUERA-S3] [FE] Perfil del cliente: /perfil devuelve al cliente a sus pedidos.
+    // ["/cliente/perfil", "/perfil"],
+    ["/cliente/perfil", "/cliente"],
   ] as const) {
     test(`${vieja} lleva a ${nueva}`, async ({ page }) => {
       await page.goto(vieja);

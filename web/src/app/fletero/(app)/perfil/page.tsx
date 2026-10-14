@@ -33,7 +33,8 @@ export default async function PerfilFleteroPage() {
     <div className="mx-auto grid max-w-3xl gap-6">
       <PageHeader
         title="Vehículo, zona y documentos"
-        description="Lo que cambies acá se aplica al instante en el buscador y en tus próximos presupuestos."
+        // [FUERA-S3] [FE] Buscador de fleteros: «…se aplica al instante en el buscador y en tus próximos presupuestos.»
+        description="Lo que cambies acá se aplica al instante en los pedidos que ves y en tus próximos presupuestos."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={`/fleteros/${fleteroId}`}>

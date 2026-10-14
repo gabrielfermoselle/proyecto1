@@ -1,13 +1,17 @@
 import { ArrowRight, ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { SeccionCard } from "@/components/shared/seccion-card";
 import { Button } from "@/components/ui/button";
 import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
-import { DatosClienteForm } from "@/features/clientes/perfil/components/datos-cliente-form";
-import { DireccionHabitualForm } from "@/features/clientes/perfil/components/direccion-habitual-form";
-import { getPerfilCliente } from "@/features/clientes/perfil/queries";
+// [FUERA-S3] [FE] Perfil del cliente
+// import { DatosClienteForm } from "@/features/clientes/perfil/components/datos-cliente-form";
+// [FUERA-S3] [FE] Perfil del cliente
+// import { DireccionHabitualForm } from "@/features/clientes/perfil/components/direccion-habitual-form";
+// [FUERA-S3] [FE] Perfil del cliente
+// import { getPerfilCliente } from "@/features/clientes/perfil/queries";
 import { DatosForm } from "@/features/fleteros/perfil/components/datos-form";
 import { getPerfilFletero } from "@/features/fleteros/perfil/queries";
 import { requireUsuario } from "@/lib/session";
@@ -28,29 +32,31 @@ const SeccionContrasena = () => (
 export default async function PerfilPage() {
   const usuario = await requireUsuario();
 
-  if (usuario.clienteProfile) {
-    const perfil = await getPerfilCliente(usuario.clienteProfile.id);
-    return (
-      <div className="mx-auto grid max-w-3xl gap-6">
-        <PageHeader title="Mi cuenta" description={`Entrás con ${perfil.email}.`} />
-        <SeccionCard
-          id="datos"
-          titulo="Tus datos"
-          descripcion="Los fleteros ven tu nombre y la inicial del apellido. Tu teléfono, solo el fletero que elijas."
-        >
-          <DatosClienteForm inicial={perfil.datos} />
-        </SeccionCard>
-        <SeccionCard
-          id="direccion"
-          titulo="Dirección habitual"
-          descripcion="Desde acá medimos la distancia a cada fletero en el buscador."
-        >
-          <DireccionHabitualForm inicial={perfil.direccion} />
-        </SeccionCard>
-        <SeccionContrasena />
-      </div>
-    );
-  }
+  // [FUERA-S3] [FE] Perfil del cliente: el cliente no tiene "Mi cuenta" en los sprints 1-3; vuelve a sus pedidos.
+  if (usuario.clienteProfile) redirect("/cliente");
+  // if (usuario.clienteProfile) {
+  //   const perfil = await getPerfilCliente(usuario.clienteProfile.id);
+  //   return (
+  //     <div className="mx-auto grid max-w-3xl gap-6">
+  //       <PageHeader title="Mi cuenta" description={`Entrás con ${perfil.email}.`} />
+  //       <SeccionCard
+  //         id="datos"
+  //         titulo="Tus datos"
+  //         descripcion="Los fleteros ven tu nombre y la inicial del apellido. Tu teléfono, solo el fletero que elijas."
+  //       >
+  //         <DatosClienteForm inicial={perfil.datos} />
+  //       </SeccionCard>
+  //       <SeccionCard
+  //         id="direccion"
+  //         titulo="Dirección habitual"
+  //         descripcion="Desde acá medimos la distancia a cada fletero en el buscador."
+  //       >
+  //         <DireccionHabitualForm inicial={perfil.direccion} />
+  //       </SeccionCard>
+  //       <SeccionContrasena />
+  //     </div>
+  //   );
+  // }
 
   if (usuario.fleteroProfile) {
     const fleteroId = usuario.fleteroProfile.id;

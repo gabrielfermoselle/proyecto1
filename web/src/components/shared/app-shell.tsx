@@ -42,22 +42,38 @@ export function AppShell({
           <div className="flex items-center gap-1 sm:gap-2">
             {accionPrincipal ? <div className="hidden lg:block">{accionPrincipal}</div> : null}
             {headerExtra}
-            <Link
-              href="/perfil"
-              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:pr-3"
-            >
-              <span
-                aria-hidden="true"
-                className="grid size-9 place-items-center rounded-full bg-accent font-heading text-base font-extrabold text-accent-foreground"
+            {/* [FUERA-S3] [FE] Perfil del cliente: el cliente no tiene "Mi cuenta"; su nombre no es un enlace. */}
+            {usuario.rol === "CLIENTE" ? (
+              <div className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 sm:pr-3">
+                <span
+                  aria-hidden="true"
+                  className="grid size-9 place-items-center rounded-full bg-accent font-heading text-base font-extrabold text-accent-foreground"
+                >
+                  {usuario.nombre.charAt(0).toUpperCase()}
+                </span>
+                <span className="hidden text-left text-sm leading-tight sm:block">
+                  <span className="block font-semibold">{usuario.nombre}</span>
+                  <span className="text-secondary-foreground/75">{ETIQUETA_ROL[usuario.rol]}</span>
+                </span>
+              </div>
+            ) : (
+              <Link
+                href="/perfil"
+                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:pr-3"
               >
-                {usuario.nombre.charAt(0).toUpperCase()}
-              </span>
-              <span className="hidden text-left text-sm leading-tight sm:block">
-                <span className="block font-semibold">{usuario.nombre}</span>
-                <span className="text-secondary-foreground/75">{ETIQUETA_ROL[usuario.rol]}</span>
-              </span>
-              <span className="sr-only sm:hidden">Mi cuenta</span>
-            </Link>
+                <span
+                  aria-hidden="true"
+                  className="grid size-9 place-items-center rounded-full bg-accent font-heading text-base font-extrabold text-accent-foreground"
+                >
+                  {usuario.nombre.charAt(0).toUpperCase()}
+                </span>
+                <span className="hidden text-left text-sm leading-tight sm:block">
+                  <span className="block font-semibold">{usuario.nombre}</span>
+                  <span className="text-secondary-foreground/75">{ETIQUETA_ROL[usuario.rol]}</span>
+                </span>
+                <span className="sr-only sm:hidden">Mi cuenta</span>
+              </Link>
+            )}
             <SignOutButton sobreToldo />
           </div>
         </div>

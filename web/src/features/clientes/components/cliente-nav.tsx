@@ -1,6 +1,7 @@
 "use client";
 
-import { ClipboardList, Plus, Search, UserRound } from "lucide-react";
+import { ClipboardList, Plus } from "lucide-react";
+// [FUERA-S3] [FE] Buscador de fleteros y [FE] Perfil del cliente: import { Search, UserRound } from "lucide-react";
 // [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
@@ -17,13 +18,14 @@ const secciones = (): SeccionNav[] => [
     prefijos: ["/cliente/pedido"],
     enInferior: true,
   },
-  {
-    href: "/cliente/fleteros",
-    label: "Fleteros",
-    Icono: Search,
-    prefijos: ["/cliente/fleteros"],
-    enInferior: true,
-  },
+  // [FUERA-S3] [FE] Buscador de fleteros
+  // {
+  //   href: "/cliente/fleteros",
+  //   label: "Fleteros",
+  //   Icono: Search,
+  //   prefijos: ["/cliente/fleteros"],
+  //   enInferior: true,
+  // },
   {
     href: "/cliente/nuevo",
     label: "Nuevo pedido",
@@ -43,14 +45,15 @@ const secciones = (): SeccionNav[] => [
   //   enInferior: true,
   //   extra: <NoLeidosBadge />,
   // },
-  {
-    href: "/perfil",
-    label: "Perfil",
-    Icono: UserRound,
-    prefijos: [],
-    enInferior: true,
-    enSuperior: false,
-  },
+  // [FUERA-S3] [FE] Perfil del cliente
+  // {
+  //   href: "/perfil",
+  //   label: "Perfil",
+  //   Icono: UserRound,
+  //   prefijos: [],
+  //   enInferior: true,
+  //   enSuperior: false,
+  // },
 ];
 
 export function ClienteNavTabs() {

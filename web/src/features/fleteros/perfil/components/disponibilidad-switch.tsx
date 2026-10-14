@@ -34,9 +34,10 @@ export function DisponibilidadSwitch({ disponible }: { disponible: boolean }) {
             {optimista ? "Estoy recibiendo solicitudes" : "Estoy en pausa"}
           </span>
           <span className="text-sm text-muted-foreground">
+            {/* [FUERA-S3] [FE] Buscador de fleteros: «Aparecés en el buscador y…» / «No aparecés en el buscador ni…» */}
             {optimista
-              ? "Aparecés en el buscador y podés enviar presupuestos."
-              : "No aparecés en el buscador ni podés presupuestar. Tus fletes aceptados siguen activos."}
+              ? "Podés enviar presupuestos."
+              : "No podés presupuestar. Tus fletes aceptados siguen activos."}
           </span>
         </span>
         <span

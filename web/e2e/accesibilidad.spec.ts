@@ -21,6 +21,12 @@ const primeraSolicitud = async (page: Page) => {
   await page.waitForURL((url) => url.href !== antes);
 };
 
+/** Perfil público del primer fletero que presupuestó la mudanza de Ana. */
+const abrirPerfilDesdePresupuesto = async (page: Page) => {
+  await primerEnlace(/Mudanza de monoambiente/)(page);
+  await primerEnlace(/Carlos R\./)(page);
+};
+
 const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
   anonimo: [
     { nombre: "portada", ruta: "/" },
@@ -32,10 +38,14 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "mis pedidos", ruta: "/cliente" },
     { nombre: "comparar presupuestos", ruta: "/cliente", abrir: primerEnlace(/Mudanza de monoambiente/) },
     { nombre: "nuevo pedido", ruta: "/cliente/nuevo" },
-    { nombre: "buscar fleteros", ruta: "/cliente/fleteros" },
-    { nombre: "mi cuenta", ruta: "/perfil" },
+    // [FUERA-S3] [FE] Buscador de fleteros
+    // { nombre: "buscar fleteros", ruta: "/cliente/fleteros" },
+    // [FUERA-S3] [FE] Perfil del cliente
+    // { nombre: "mi cuenta", ruta: "/perfil" },
     { nombre: "notificaciones", ruta: "/notificaciones" },
-    { nombre: "perfil público de un fletero", ruta: "/cliente/fleteros", abrir: primerEnlace(/Carlos R\./) },
+    // [FUERA-S3] [FE] Buscador de fleteros: el perfil público se abre desde un presupuesto recibido.
+    // { nombre: "perfil público de un fletero", ruta: "/cliente/fleteros", abrir: primerEnlace(/Carlos R\./) },
+    { nombre: "perfil público de un fletero", ruta: "/cliente", abrir: abrirPerfilDesdePresupuesto },
     // [FUERA-S3] [FE] Pantalla del chat
     // { nombre: "chat", ruta: "/chat", abrir: primerEnlace(/Carlos R\./) },
     { nombre: "seguimiento del flete", ruta: "/cliente", abrir: primerEnlace(/Compra del mayorista/) },

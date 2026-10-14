@@ -160,8 +160,9 @@ const MATRIZ: Record<string, Caso> = {
   },
 
   // --- perfil del cliente (operan sobre el perfil de la sesión) ---
-  guardarDatosCliente: { roles: ["CLIENTE"] },
-  guardarDireccionHabitual: { roles: ["CLIENTE"] },
+  // [FUERA-S3] [FE] Perfil del cliente
+  // guardarDatosCliente: { roles: ["CLIENTE"] },
+  // guardarDireccionHabitual: { roles: ["CLIENTE"] },
 
   // --- presupuestos (fletero) ---
   enviarPresupuesto: {

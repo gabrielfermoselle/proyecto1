@@ -8,6 +8,10 @@ const FUERA_S3 = [
   "src/features/chat/hilo.test.ts",
   "src/features/chat/bandeja.integration.test.ts",
   "src/features/chat/chat.db.test.ts",
+  "src/features/clientes/fleteros/buscador.db.test.ts",
+  "src/features/clientes/fleteros/buscador.integration.test.ts",
+  "src/features/clientes/fleteros/parametros.test.ts",
+  "src/features/clientes/perfil/perfil-cliente.db.test.ts",
 ];
 
 export default defineConfig({
