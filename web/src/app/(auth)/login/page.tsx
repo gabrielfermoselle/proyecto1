@@ -29,7 +29,8 @@ export default async function LoginPage({
     <Card className="w-full max-w-md">
       <CardHeader>
         <h1 className="text-2xl font-extrabold">Ingresá a tu cuenta</h1>
-        <CardDescription>Seguí tus fletes, presupuestos y mensajes.</CardDescription>
+        {/* [FUERA-S3] [FE] Pantalla del chat: «Seguí tus fletes, presupuestos y mensajes.» */}
+        <CardDescription>Seguí tus fletes y presupuestos.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         {textoAviso ? (
@@ -39,12 +40,14 @@ export default async function LoginPage({
           </Alert>
         ) : null}
         <LoginForm callbackUrl={callbackUrl} />
+        {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña
         <Link
           href="/recuperar"
           className="justify-self-center text-sm font-semibold text-primary underline-offset-4 hover:underline"
         >
           ¿Olvidaste tu contraseña?
         </Link>
+        */}
       </CardContent>
       <CardFooter className="justify-center text-sm">
         <p>

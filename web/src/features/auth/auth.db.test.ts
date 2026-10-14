@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authOptions } from "@/lib/auth";
-import { cargarUsuario, error, ok } from "../../../test/db/fabrica";
+import { error, ok } from "../../../test/db/fabrica";
+// [FUERA-S3] [BE] Cambiar y recuperar contraseña: import { cargarUsuario } from "../../../test/db/fabrica";
 import { contar, insertar, uno, unoONull } from "../../../test/db/tabla";
-import { comoUsuario } from "../../../test/db/sesion";
-import { cambiarContrasena, registrarUsuario } from "./actions";
+// [FUERA-S3] [BE] Cambiar y recuperar contraseña: import { comoUsuario } from "../../../test/db/sesion";
+import { registrarUsuario } from "./actions";
+// [FUERA-S3] [BE] Cambiar y recuperar contraseña: import { cambiarContrasena } from "./actions";
 import { ERROR_DEMASIADOS_INTENTOS } from "./schemas";
 
 // Cada test usa una IP distinta: el límite de registros es por IP y la base es compartida.
@@ -155,62 +157,63 @@ describe("login (authorize de NextAuth)", () => {
   });
 });
 
-describe("cambiarContrasena", () => {
-  async function conClave(clave = "clave1234") {
-    const u = await insertar<{ id: string }>("usuarios", {
-      email: emailUnico(),
-      passwordHash: await bcrypt.hash(clave, 4),
-      nombre: "Rosa",
-      apellido: "Paz",
-      rol: "CLIENTE",
-    });
-    await insertar("perfiles_cliente", { userId: u.id });
-    return cargarUsuario(u.id);
-  }
-  const cambio = (actual: string, nueva = "nueva12345") => ({ actual, nueva, confirmar: nueva });
-
-  it("con la contraseña actual correcta la cambia y marca el cambio (cierra las sesiones)", async () => {
-    const u = await conClave();
-    comoUsuario(u);
-    const antes = Date.now();
-
-    ok(await cambiarContrasena(cambio("clave1234")));
-
-    const guardado = await uno<{ passwordHash: string; credencialesCambiadasEn: string }>("usuarios", { id: u.id });
-    expect(await bcrypt.compare("nueva12345", guardado.passwordHash)).toBe(true);
-    expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(false);
-    expect(new Date(guardado.credencialesCambiadasEn).getTime()).toBeGreaterThanOrEqual(antes - 1000);
-  });
-
-  it("con la actual incorrecta no cambia nada y marca el campo", async () => {
-    const u = await conClave();
-    comoUsuario(u);
-
-    const r = await cambiarContrasena(cambio("otra98765"));
-    expect(campo(r, "actual")).toEqual(["La contraseña actual no es correcta."]);
-    const guardado = await uno<{ passwordHash: string; credencialesCambiadasEn: string | null }>("usuarios", { id: u.id });
-    expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(true);
-    expect(guardado.credencialesCambiadasEn).toBeNull();
-  });
-
-  it("aplica la política de contraseñas y no acepta repetir la actual", async () => {
-    comoUsuario(await conClave());
-
-    expect(campo(await cambiarContrasena(cambio("clave1234", "corta")), "nueva")).toBeDefined();
-    expect(campo(await cambiarContrasena(cambio("clave1234", "clave1234")), "nueva")).toEqual([
-      "La nueva tiene que ser distinta de la actual",
-    ]);
-    const r = await cambiarContrasena({ actual: "clave1234", nueva: "nueva12345", confirmar: "nueva54321" });
-    expect(campo(r, "confirmar")).toEqual(["Las contraseñas no coinciden"]);
-  });
-
-  it("frena el adivinado de la actual: más de 5 intentos en 15 minutos", async () => {
-    comoUsuario(await conClave());
-    for (let i = 0; i < 5; i++) await cambiarContrasena(cambio(`mala${i}1234`));
-
-    expect(error(await cambiarContrasena(cambio("clave1234")))).toMatch(/demasiados intentos/);
-  });
-});
+// [FUERA-S3] [BE] Cambiar y recuperar contraseña
+// describe("cambiarContrasena", () => {
+//   async function conClave(clave = "clave1234") {
+//     const u = await insertar<{ id: string }>("usuarios", {
+//       email: emailUnico(),
+//       passwordHash: await bcrypt.hash(clave, 4),
+//       nombre: "Rosa",
+//       apellido: "Paz",
+//       rol: "CLIENTE",
+//     });
+//     await insertar("perfiles_cliente", { userId: u.id });
+//     return cargarUsuario(u.id);
+//   }
+//   const cambio = (actual: string, nueva = "nueva12345") => ({ actual, nueva, confirmar: nueva });
+//
+//   it("con la contraseña actual correcta la cambia y marca el cambio (cierra las sesiones)", async () => {
+//     const u = await conClave();
+//     comoUsuario(u);
+//     const antes = Date.now();
+//
+//     ok(await cambiarContrasena(cambio("clave1234")));
+//
+//     const guardado = await uno<{ passwordHash: string; credencialesCambiadasEn: string }>("usuarios", { id: u.id });
+//     expect(await bcrypt.compare("nueva12345", guardado.passwordHash)).toBe(true);
+//     expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(false);
+//     expect(new Date(guardado.credencialesCambiadasEn).getTime()).toBeGreaterThanOrEqual(antes - 1000);
+//   });
+//
+//   it("con la actual incorrecta no cambia nada y marca el campo", async () => {
+//     const u = await conClave();
+//     comoUsuario(u);
+//
+//     const r = await cambiarContrasena(cambio("otra98765"));
+//     expect(campo(r, "actual")).toEqual(["La contraseña actual no es correcta."]);
+//     const guardado = await uno<{ passwordHash: string; credencialesCambiadasEn: string | null }>("usuarios", { id: u.id });
+//     expect(await bcrypt.compare("clave1234", guardado.passwordHash)).toBe(true);
+//     expect(guardado.credencialesCambiadasEn).toBeNull();
+//   });
+//
+//   it("aplica la política de contraseñas y no acepta repetir la actual", async () => {
+//     comoUsuario(await conClave());
+//
+//     expect(campo(await cambiarContrasena(cambio("clave1234", "corta")), "nueva")).toBeDefined();
+//     expect(campo(await cambiarContrasena(cambio("clave1234", "clave1234")), "nueva")).toEqual([
+//       "La nueva tiene que ser distinta de la actual",
+//     ]);
+//     const r = await cambiarContrasena({ actual: "clave1234", nueva: "nueva12345", confirmar: "nueva54321" });
+//     expect(campo(r, "confirmar")).toEqual(["Las contraseñas no coinciden"]);
+//   });
+//
+//   it("frena el adivinado de la actual: más de 5 intentos en 15 minutos", async () => {
+//     comoUsuario(await conClave());
+//     for (let i = 0; i < 5; i++) await cambiarContrasena(cambio(`mala${i}1234`));
+//
+//     expect(error(await cambiarContrasena(cambio("clave1234")))).toMatch(/demasiados intentos/);
+//   });
+// });
 
 describe("sesión (JWT)", () => {
   it("al iniciar sesión, el token guarda cuándo se autenticó y la sesión lo expone", async () => {

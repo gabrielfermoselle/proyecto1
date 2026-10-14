@@ -96,7 +96,8 @@ export default async function PerfilFleteroPage() {
         className="group flex items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm transition-colors hover:border-primary/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span>
-          <strong>Tus datos, teléfono y contraseña</strong> están en Mi cuenta.
+          {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: «Tus datos, teléfono y contraseña» */}
+          <strong>Tus datos y teléfono</strong> están en Mi cuenta.
         </span>
         <ArrowRight
           className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { SeccionCard } from "@/components/shared/seccion-card";
 import { Button } from "@/components/ui/button";
-import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
+// [FUERA-S3] [BE] Cambiar y recuperar contraseña
+// import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
 // [FUERA-S3] [FE] Perfil del cliente
 // import { DatosClienteForm } from "@/features/clientes/perfil/components/datos-cliente-form";
 // [FUERA-S3] [FE] Perfil del cliente
@@ -18,15 +19,16 @@ import { requireUsuario } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
 
-const SeccionContrasena = () => (
-  <SeccionCard
-    id="contrasena"
-    titulo="Contraseña"
-    descripcion="Al cambiarla cerramos tu sesión en todos los dispositivos."
-  >
-    <CambiarContrasenaForm />
-  </SeccionCard>
-);
+// [FUERA-S3] [BE] Cambiar y recuperar contraseña
+// const SeccionContrasena = () => (
+//   <SeccionCard
+//     id="contrasena"
+//     titulo="Contraseña"
+//     descripcion="Al cambiarla cerramos tu sesión en todos los dispositivos."
+//   >
+//     <CambiarContrasenaForm />
+//   </SeccionCard>
+// );
 
 /** La cuenta de cada rol en una sola página: datos personales, lo propio del rol y la contraseña. */
 export default async function PerfilPage() {
@@ -97,7 +99,7 @@ export default async function PerfilPage() {
         >
           <DatosForm inicial={perfil.datos} />
         </SeccionCard>
-        <SeccionContrasena />
+        {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: <SeccionContrasena /> */}
       </div>
     );
   }
@@ -105,7 +107,7 @@ export default async function PerfilPage() {
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
       <PageHeader title="Mi cuenta" description={`Entrás con ${usuario.email}.`} />
-      <SeccionContrasena />
+      {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: <SeccionContrasena /> */}
     </div>
   );
 }

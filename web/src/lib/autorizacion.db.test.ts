@@ -130,11 +130,12 @@ const fotoInput = { ruta: `x/${randomUUID()}.jpg`, ancho: 10, alto: 10 };
 const MATRIZ: Record<string, Caso> = {
   // --- auth ---
   registrarUsuario: { roles: TODOS_LOS_ROLES, publica: true },
-  // Opera sobre la cuenta de la sesión: no recibe IDs.
-  cambiarContrasena: { roles: TODOS_LOS_ROLES },
-  // Públicas: la autorización es tener el email o el token de un solo uso.
-  solicitarRecuperacion: { roles: TODOS_LOS_ROLES, publica: true },
-  restablecerContrasena: { roles: TODOS_LOS_ROLES, publica: true },
+  // [FUERA-S3] [BE] Cambiar y recuperar contraseña
+  // // Opera sobre la cuenta de la sesión: no recibe IDs.
+  // cambiarContrasena: { roles: TODOS_LOS_ROLES },
+  // // Públicas: la autorización es tener el email o el token de un solo uso.
+  // solicitarRecuperacion: { roles: TODOS_LOS_ROLES, publica: true },
+  // restablecerContrasena: { roles: TODOS_LOS_ROLES, publica: true },
 
   // --- solicitudes (cliente) ---
   crearSolicitud: { roles: ["CLIENTE"] },

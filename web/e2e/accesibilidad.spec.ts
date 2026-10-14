@@ -32,7 +32,8 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "portada", ruta: "/" },
     { nombre: "login", ruta: "/login" },
     { nombre: "registro", ruta: "/registro" },
-    { nombre: "recuperar contraseña", ruta: "/recuperar" },
+    // [FUERA-S3] [BE] Cambiar y recuperar contraseña
+    // { nombre: "recuperar contraseña", ruta: "/recuperar" },
   ],
   ana: [
     { nombre: "mis pedidos", ruta: "/cliente" },
