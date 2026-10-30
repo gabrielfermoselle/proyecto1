@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
 import { FormSolicitud } from "@/features/clientes/solicitudes/components/form-solicitud";
+import { urlBaseFotosCosas } from "@/features/uploads/storage";
 import { requireRol } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Nuevo pedido" };
@@ -13,7 +14,7 @@ export default async function NuevoPedidoPage() {
         title="¿Qué necesitás mover?"
         description="Cinco pasos y listo: los fleteros de la zona te mandan presupuestos y vos elegís."
       />
-      <FormSolicitud />
+      <FormSolicitud urlFotosMuebles={urlBaseFotosCosas()} />
     </div>
   );
 }
