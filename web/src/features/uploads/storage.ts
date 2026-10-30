@@ -9,6 +9,7 @@ import { supabaseAdmin, supabaseHabilitado } from "@/lib/supabase";
 // el binario nunca pasa por nuestra app.
 //  - fotos-publicas: vehículos (se ven en el perfil público).
 //  - fotos-privadas: chat, solicitudes e ítems. Se sirven con URLs firmadas de corta duración.
+//  - FotosCosas: miniaturas fijas de los muebles típicos (`domain/muebles.ts`). Se suben a mano.
 
 export const BUCKET_PUBLICO = "fotos-publicas";
 export const BUCKET_PRIVADO = "fotos-privadas";
@@ -56,6 +57,11 @@ export async function rutaSubidaValida(bucket: Bucket, ruta: string, carpeta: st
 
 export function urlPublica(ruta: string): string | null {
   return env.SUPABASE_URL ? `${env.SUPABASE_URL}/storage/v1/object/public/${BUCKET_PUBLICO}/${ruta}` : null;
+}
+
+/** Base pública de las miniaturas de muebles; null si Supabase no está configurado. */
+export function urlBaseFotosCosas(): string | null {
+  return env.SUPABASE_URL ? `${env.SUPABASE_URL}/storage/v1/object/public/FotosCosas` : null;
 }
 
 /** URLs firmadas para fotos privadas, en una sola llamada. Las que fallan quedan afuera. */

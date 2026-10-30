@@ -25,6 +25,7 @@ import {
 import { resumirCarga, type ItemCarga } from "@/domain/carga";
 import { fechaIsoAr, sumarDias } from "@/domain/fechas";
 import { haversineKm, type Coordenadas } from "@/domain/geo";
+import { buscarMueble } from "@/domain/muebles";
 import { DIAS_MAXIMOS_ANTICIPACION, MAXIMO_ITEMS } from "@/domain/solicitud";
 import { hrefPedido } from "@/features/fletes/rutas";
 import { AddressAutocomplete } from "@/features/mapas/components/address-autocomplete";
@@ -35,6 +36,7 @@ import { useEnvio } from "@/lib/use-envio";
 import { cn } from "@/lib/utils";
 import { crearSolicitud } from "../actions";
 import { solicitudSchema, type SolicitudDatos, type SolicitudInput } from "../schemas";
+import { MuebleCombobox } from "./mueble-combobox";
 
 type Formulario = UseFormReturn<SolicitudInput, unknown, SolicitudDatos>;
 type Campo = FieldPath<SolicitudInput>;
@@ -308,7 +310,7 @@ function FilaResumen({ etiqueta, children }: { etiqueta: string; children: React
   );
 }
 
-export function FormSolicitud() {
+export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | null }) {
   const router = useRouter();
   const hoy = fechaIsoAr();
   const [paso, setPaso] = useState(0);
@@ -337,6 +339,9 @@ export function FormSolicitud() {
   const { errors, isSubmitting } = formState;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const { mensaje, enviar } = useEnvio(setError);
+  // Por ítem (id del campo): el mueble cuyas medidas se completaron y si el detalle está abierto.
+  const [muebleDe, setMuebleDe] = useState<Record<string, string>>({});
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
   const tipoFlete = watch("tipoFlete");
   const franja = watch("franja");
   const items = watch("items");
@@ -351,6 +356,27 @@ export function FormSolicitud() {
       encabezado.current?.focus({ preventScroll: true });
       encabezado.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  }
+
+  /** Si el nombre es un mueble de la lista, completa medidas y peso y abre el detalle para editarlos. */
+  function elegirMueble(i: number, idCampo: string, nombre: string) {
+    const mueble = buscarMueble(nombre);
+    if (!mueble) {
+      setMuebleDe((m) => {
+        if (!(idCampo in m)) return m;
+        const resto = { ...m };
+        delete resto[idCampo];
+        return resto;
+      });
+      return;
+    }
+    const opciones = { shouldValidate: true, shouldDirty: true };
+    setValue(`items.${i}.largoCm`, mueble.largoCm, opciones);
+    setValue(`items.${i}.anchoCm`, mueble.anchoCm, opciones);
+    setValue(`items.${i}.altoCm`, mueble.altoCm, opciones);
+    setValue(`items.${i}.pesoKgAprox`, mueble.pesoKgAprox, opciones);
+    setMuebleDe((m) => ({ ...m, [idCampo]: mueble.nombre }));
+    setAbiertos((a) => ({ ...a, [idCampo]: true }));
   }
 
   async function avanzar() {
@@ -470,6 +496,10 @@ export function FormSolicitud() {
                     (es el inventario que se controla al cargar y al entregar)
                   </span>
                 </legend>
+                <p className="text-sm text-muted-foreground">
+                  Escribí qué es y elegilo de la lista (heladera, mesa, sillón…): completamos las medidas
+                  típicas y las podés cambiar.
+                </p>
                 <ol className="grid gap-3">
                   {fields.map((campo, i) => {
                     const e = errors.items?.[i];
@@ -480,11 +510,27 @@ export function FormSolicitud() {
                             {i + 1}.
                           </span>
                           <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_7rem]">
-                            <FormField
+                            <MuebleCombobox
                               label="Qué es"
-                              placeholder="Ej.: Heladera"
+                              placeholder="Ej.: Heladera simple"
                               error={e?.nombre?.message}
-                              {...register(`items.${i}.nombre`)}
+                              texto={items[i]?.nombre ?? ""}
+                              urlFotos={urlFotosMuebles}
+                              onElegir={(mueble) => {
+                                if (!mueble) {
+                                  setAbiertos((a) => ({ ...a, [campo.id]: true }));
+                                  return;
+                                }
+                                setValue(`items.${i}.nombre`, mueble.nombre, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                elegirMueble(i, campo.id, mueble.nombre);
+                              }}
+                              {...register(`items.${i}.nombre`, {
+                                onChange: (ev: React.ChangeEvent<HTMLInputElement>) =>
+                                  elegirMueble(i, campo.id, ev.target.value),
+                              })}
                             />
                             <FormField
                               label="Cantidad"
@@ -508,10 +554,25 @@ export function FormSolicitud() {
                             </Button>
                           ) : null}
                         </div>
-                        <details className="group grid gap-3 sm:pl-8">
+                        <p
+                          className={cn("text-sm text-success sm:pl-8", !muebleDe[campo.id] && "sr-only")}
+                          aria-live="polite"
+                        >
+                          {muebleDe[campo.id]
+                            ? `Pusimos las medidas típicas de «${muebleDe[campo.id]}». Si el tuyo es distinto, cambialas abajo.`
+                            : null}
+                        </p>
+                        <details
+                          className="group grid gap-3 sm:pl-8"
+                          open={abiertos[campo.id] ?? false}
+                          onToggle={(ev) => {
+                            const abierto = ev.currentTarget.open;
+                            setAbiertos((a) => (a[campo.id] === abierto ? a : { ...a, [campo.id]: abierto }));
+                          }}
+                        >
                           <summary className="cursor-pointer list-none text-sm font-semibold text-primary underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
-                            <span className="group-open:hidden">+ Tamaño aproximado, peso y estado</span>
-                            <span className="hidden group-open:inline">− Ocultar tamaño, peso y estado</span>
+                            <span className="group-open:hidden">+ Cambiar medidas típicas</span>
+                            <span className="hidden group-open:inline">− Ocultar medidas</span>
                           </summary>
                           <div className="mt-3 grid gap-3">
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
