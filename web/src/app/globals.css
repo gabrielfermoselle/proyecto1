@@ -2,35 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Vidriera pintada: papel, tinta, bordó, verde de toldo y pan de oro (misma identidad que la app anterior).
-   Todos los pares texto/fondo cumplen WCAG AA, también los badges tintados (texto del color sobre el
-   mismo color al 10%) encima de background, card y muted: de ahí el tono de success, warning y destructive. */
+/* Hoja de ruta: el azul es el sistema (marca, estructura, links, progreso) y el naranja es la única
+   señal de "andá": solo la acción principal de cada pantalla. El rojo queda para peligro y errores.
+   Todos los pares texto/fondo cumplen WCAG AA (≥4.5:1), también los badges tintados (texto del color
+   sobre el mismo color al 10%) encima de background, card y muted: de ahí los tonos profundos de
+   success y warning. El borde de los campos llega a 3:1 contra el fondo (contraste de componentes). */
 @layer base {
   :root {
-    --background: 42 45% 87%; /* papel #ede4cf */
-    --foreground: 20 19% 9%; /* tinta #1c1613 */
-    --card: 42 55% 94%;
-    --card-foreground: 20 19% 9%;
-    --popover: 42 55% 94%;
-    --popover-foreground: 20 19% 9%;
-    --primary: 0 59% 30%; /* bordó #7a1f1f */
-    --primary-foreground: 42 55% 94%;
-    --secondary: 160 37% 17%; /* verde toldo #1c3d32 */
-    --secondary-foreground: 42 55% 94%;
-    --muted: 43 40% 82%;
-    --muted-foreground: 32 19% 35%;
-    --accent: 42 69% 51%; /* oro #d9a52c */
-    --accent-foreground: 20 19% 9%;
-    --destructive: 4 76% 36%;
-    --destructive-foreground: 42 55% 94%;
-    --success: 143 40% 26%;
-    --success-foreground: 42 55% 94%;
-    --warning: 34 66% 27%;
-    --warning-foreground: 42 55% 94%;
-    --border: 41 32% 76%;
-    --input: 41 32% 70%;
-    --ring: 158 37% 24%;
-    --radius: 0.5rem;
+    --background: 210 40% 98%; /* blanco frío #f8fafc */
+    --foreground: 222 47% 11%; /* tinta #0f172a */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 224 76% 48%; /* azul ruta #1d4ed8 */
+    --primary-foreground: 0 0% 100%;
+    /* Azul suave para fondos de la marca (pestaña activa, paso actual, filas destacadas). */
+    --primary-soft: 214 95% 93%; /* #dbeafe */
+    --secondary: 224 64% 33%; /* azul marino del encabezado #1e3a8a */
+    --secondary-foreground: 0 0% 100%;
+    /* Texto secundario sobre el azul marino (6.9:1). */
+    --secondary-muted: 228 96% 89%; /* #c7d2fe */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 19% 35%;
+    --accent: 17 88% 40%; /* naranja de acción #c2410c */
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 15 79% 34%; /* #9a3412 */
+    /* Naranja claro solo para texto sobre el azul marino (4.6:1), nunca sobre blanco. */
+    --accent-on-dark: 27 96% 61%; /* #fb923c */
+    --destructive: 0 74% 42%; /* #b91c1c */
+    --destructive-foreground: 0 0% 100%;
+    --success: 143 64% 24%; /* #166534 */
+    --success-foreground: 0 0% 100%;
+    --warning: 32 81% 29%; /* #854d0e */
+    --warning-foreground: 0 0% 100%;
+    --rating: 38 92% 50%; /* estrellas #f59e0b */
+    --border: 214 32% 91%;
+    --input: 216 16% 56%;
+    --ring: 221 83% 53%;
+    --radius: 0.625rem;
   }
 
   * {
@@ -43,13 +53,23 @@
   }
 
   ::selection {
-    background: hsl(var(--accent) / 0.45);
+    background: hsl(var(--primary-soft));
     color: hsl(var(--foreground));
   }
 
-  /* Barras de desplazamiento con los colores del papel (Firefox y Chromium). */
+  /* Barras de desplazamiento con los grises fríos de la app (Firefox y Chromium). */
   html {
-    scrollbar-color: hsl(var(--input)) hsl(var(--muted));
+    scrollbar-color: hsl(var(--input) / 0.7) hsl(var(--muted));
+  }
+
+  :focus-visible {
+    outline-color: hsl(var(--ring));
+  }
+
+  input,
+  textarea,
+  select {
+    accent-color: hsl(var(--primary));
   }
 
   a {
@@ -78,12 +98,21 @@
   }
 }
 
-/* Toldo: el encabezado verde termina en un filete dorado, como el borde pintado de una caja de
-   flete. La pestaña activa lo engrosa. */
+/* Encabezado azul marino: una línea de luz abajo y una sombra fría que lo separa del contenido.
+   La pestaña activa se marca con una barra naranja (ver area-nav). */
 .toldo {
   box-shadow:
-    inset 0 -1px 0 hsl(var(--accent) / 0.7),
-    0 6px 16px -10px rgb(28 22 19 / 0.45);
+    inset 0 -1px 0 hsl(var(--secondary-muted) / 0.18),
+    0 8px 20px -14px rgb(15 23 42 / 0.55);
+}
+
+/* Ruta: trazo punteado entre origen y destino, el gesto que se repite en la portada, las tarjetas
+   y las pantallas de error. */
+.ruta-punteada {
+  background-image: linear-gradient(to right, currentColor 55%, transparent 0);
+  background-size: 10px 2px;
+  background-repeat: repeat-x;
+  background-position: center;
 }
 
 /* Pines de Leaflet (divIcon): sin imágenes, con los colores del tema. */
@@ -94,7 +123,7 @@
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   border: 3px solid hsl(var(--card));
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.35);
   background: hsl(var(--primary));
 }
 .pin--base {

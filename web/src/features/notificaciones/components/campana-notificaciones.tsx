@@ -63,7 +63,7 @@ export function CampanaNotificaciones() {
         aria-expanded={abierta}
         aria-controls={panelId}
         onClick={() => setAbierta((a) => !a)}
-        className="relative hover:bg-white/10 focus-visible:ring-accent focus-visible:ring-offset-0"
+        className="relative hover:bg-white/10 focus-visible:ring-accent-on-dark focus-visible:ring-offset-0"
       >
         <Bell aria-hidden="true" />
         <span className="sr-only">Notificaciones{noLeidas > 0 ? `, ${noLeidas} sin leer` : ""}</span>

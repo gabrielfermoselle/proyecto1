@@ -70,7 +70,7 @@ export function BandejaLista({ textoVacio }: { textoVacio: string }) {
               >
                 {c.contraparte.charAt(0)}
               </span>
-              <span className="grid min-w-0 flex-1 gap-0.5">
+              <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-0.5">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={cn("truncate", c.noLeidos > 0 ? "font-bold" : "font-semibold")}>
                     {c.contraparte}

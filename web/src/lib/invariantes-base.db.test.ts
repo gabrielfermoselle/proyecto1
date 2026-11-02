@@ -21,20 +21,9 @@ describe("invariantes del esquema", () => {
 
   it("toda clave foránea tiene un índice que empieza por sus columnas", async () => {
     // Sin índice, cada borrado en cascada o join por esa FK recorre la tabla hija entera.
-    // Trinquete: estas son las que ya existían sin índice (deuda conocida). Una FK nueva sin
-    // índice hace fallar el test; al indexar una de estas, hay que sacarla de la lista.
-    const DEUDA_CONOCIDA = [
-      "fletes_vehiculoId_fkey",
-      "presupuestos_vehiculoId_fkey",
-      "calificaciones_clienteId_fkey",
-      "conformidades_userId_fkey",
-      "controles_item_autorId_fkey",
-      "estados_flete_autorId_fkey",
-      "propuestas_horario_propuestaPorId_fkey",
-      "propuestas_horario_respondidaPorId_fkey",
-      "reclamos_autorId_fkey",
-      "reclamos_resueltoPorId_fkey",
-    ];
+    // La deuda que había se saldó en la migración indices_faltantes: una FK nueva sin índice
+    // hace fallar el test.
+    const DEUDA_CONOCIDA: string[] = [];
     const sinIndice = await consulta<{ restriccion: string }>(
       `SELECT c.conname AS restriccion
       FROM pg_constraint c

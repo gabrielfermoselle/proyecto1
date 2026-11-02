@@ -191,8 +191,7 @@ test.skip("el fletero descarga todo y firma la entrega", async () => {
   await avanzar(carlos, "Terminé de descargar", "Etapa 6 de 7: Entregado", { firma: true });
 });
 
-// [FUERA-S3] [BE] Reclamos, firmas y calificación: el test se llamaba «… cierra el flete y califica».
-test.skip("la cliente revisa lo que recibió y cierra el flete", async () => {
+test.skip("la cliente revisa lo que recibió, cierra el flete y califica", async () => {
   await florencia.reload();
   const contenido = florencia.locator("#contenido");
   await expect(contenido.getByText("Etapa 6 de 7: Entregado")).toBeVisible();
@@ -202,29 +201,28 @@ test.skip("la cliente revisa lo que recibió y cierra el flete", async () => {
   await marcar(florencia, "Todo: recibido");
   await avanzar(florencia, "Cerrar el flete", "Etapa 7 de 7: Cerrado", { firma: true });
 
-  // [FUERA-S3] [BE] Reclamos, firmas y calificación
-  // await contenido.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
-  // await expect(florencia).toHaveURL(/\/calificar$/);
-  // // El radio es solo para lectores de pantalla: se toca la estrella (el label que lo envuelve).
-  // // Antes de hidratar, el navegador tilda el radio pero React no se entera: se toca otra estrella
-  // // y después la de 5 hasta que el formulario la tome.
-  // const cinco = contenido.getByRole("radio", { name: "5 estrellas: Excelente" });
-  // const calificar = contenido.getByRole("button", { name: "Enviar calificación" });
-  // await expect(async () => {
-  //   await contenido.locator("label", { hasText: "4 estrellas: Bueno" }).click({ timeout: 3_000 });
-  //   await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click({ timeout: 3_000 });
-  //   await expect(cinco).toBeChecked({ timeout: 1_000 });
-  //   await expect(calificar).toBeEnabled({ timeout: 1_000 });
-  // }).toPass({ timeout: 30_000 });
-  // await contenido.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
-  // await calificar.click();
-  // await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/, { timeout: 20_000 });
-  // await florencia.reload();
-  // await expect(contenido.getByRole("region", { name: "Tu calificación" })).toBeVisible();
-  //
-  // // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
-  // await florencia.goto("/cliente/fleteros");
-  // await expect(
-  //   florencia.locator("#contenido").getByRole("link", { name: /Carlos R\./ }).first(),
-  // ).toContainText("4,7 (3)");
+  await contenido.getByRole("link", { name: /¿Cómo te fue con Carlos R\.\?/ }).click();
+  await expect(florencia).toHaveURL(/\/calificar$/);
+  // El radio es solo para lectores de pantalla: se toca la estrella (el label que lo envuelve).
+  // Antes de hidratar, el navegador tilda el radio pero React no se entera: se toca otra estrella
+  // y después la de 5 hasta que el formulario la tome.
+  const cinco = contenido.getByRole("radio", { name: "5 estrellas: Excelente" });
+  const calificar = contenido.getByRole("button", { name: "Enviar calificación" });
+  await expect(async () => {
+    await contenido.locator("label", { hasText: "4 estrellas: Bueno" }).click({ timeout: 3_000 });
+    await contenido.locator("label", { hasText: "5 estrellas: Excelente" }).click({ timeout: 3_000 });
+    await expect(cinco).toBeChecked({ timeout: 1_000 });
+    await expect(calificar).toBeEnabled({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await contenido.getByLabel(/Comentario/).fill("Puntual y cuidadoso con la bici.");
+  await calificar.click();
+  await expect(florencia).toHaveURL(/\/cliente\/pedido\/[^/]+$/, { timeout: 20_000 });
+  await florencia.reload();
+  await expect(contenido.getByRole("region", { name: "Tu calificación" })).toBeVisible();
+
+  // El promedio público del fletero pasa de 4,5 (2) a 4,7 (3).
+  await florencia.goto("/cliente/fleteros");
+  await expect(
+    florencia.locator("#contenido").getByRole("link", { name: /Carlos R\./ }).first(),
+  ).toContainText("4,7 (3)");
 });

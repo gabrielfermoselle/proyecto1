@@ -47,10 +47,10 @@ export function NavTabs({ secciones }: { secciones: SeccionNav[] }) {
                   aria-current={activa ? "page" : undefined}
                   className={cn(
                     "relative flex h-full items-center gap-2 px-3 text-sm font-semibold transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-on-dark",
                     "after:absolute after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-full after:transition-colors",
                     activa
-                      ? "text-secondary-foreground after:bg-accent"
+                      ? "text-secondary-foreground after:bg-accent-on-dark"
                       : "text-secondary-foreground/75 after:bg-transparent hover:text-secondary-foreground",
                   )}
                 >
@@ -75,7 +75,7 @@ export function NavInferior({ secciones, ocultarEn }: { secciones: SeccionNav[];
   return (
     <nav
       aria-label="Secciones"
-      className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(28_22_19/0.06)] backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgb(15_23_42/0.08)] backdrop-blur supports-[backdrop-filter]:bg-card/85 lg:hidden"
     >
       <ul className="grid" style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}>
         {visibles.map((s) => {
@@ -88,9 +88,9 @@ export function NavInferior({ secciones, ocultarEn }: { secciones: SeccionNav[];
                   // Las secciones principales se precargan enteras: el click es instantáneo.
                   prefetch
                   aria-current={activa ? "page" : undefined}
-                  className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <span className="-mt-6 grid size-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-md ring-4 ring-card">
+                  <span className="-mt-6 grid size-12 place-items-center rounded-full bg-accent text-accent-foreground shadow-md ring-4 ring-card">
                     <s.Icono className="size-6" aria-hidden="true" />
                   </span>
                   {s.labelCorto ?? s.label}

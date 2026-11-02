@@ -4,8 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { SeccionCard } from "@/components/shared/seccion-card";
 import { Button } from "@/components/ui/button";
-// [FUERA-S3] [BE] Cambiar y recuperar contraseña
-// import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
+import { CambiarContrasenaForm } from "@/features/auth/components/cambiar-contrasena-form";
 import { DatosClienteForm } from "@/features/clientes/perfil/components/datos-cliente-form";
 import { DireccionHabitualForm } from "@/features/clientes/perfil/components/direccion-habitual-form";
 import { getPerfilCliente } from "@/features/clientes/perfil/queries";
@@ -15,16 +14,15 @@ import { requireUsuario } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
 
-// [FUERA-S3] [BE] Cambiar y recuperar contraseña
-// const SeccionContrasena = () => (
-//   <SeccionCard
-//     id="contrasena"
-//     titulo="Contraseña"
-//     descripcion="Al cambiarla cerramos tu sesión en todos los dispositivos."
-//   >
-//     <CambiarContrasenaForm />
-//   </SeccionCard>
-// );
+const SeccionContrasena = () => (
+  <SeccionCard
+    id="contrasena"
+    titulo="Contraseña"
+    descripcion="Al cambiarla cerramos tu sesión en todos los dispositivos."
+  >
+    <CambiarContrasenaForm />
+  </SeccionCard>
+);
 
 /** La cuenta de cada rol en una sola página: datos personales, lo propio del rol y la contraseña. */
 export default async function PerfilPage() {
@@ -49,7 +47,7 @@ export default async function PerfilPage() {
         >
           <DireccionHabitualForm inicial={perfil.direccion} />
         </SeccionCard>
-        {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: <SeccionContrasena /> */}
+        <SeccionContrasena />
       </div>
     );
   }
@@ -76,8 +74,7 @@ export default async function PerfilPage() {
           className="group flex items-center justify-between gap-4 rounded-xl bg-secondary p-5 text-secondary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <span className="grid gap-0.5">
-            {/* [FUERA-S3] [BE] Verificación de documentos: «Vehículos, zona, tarifas y documentos» */}
-            <span className="font-heading text-lg font-extrabold">Vehículos, zona y tarifas</span>
+            <span className="font-heading text-lg font-extrabold">Vehículos, zona, tarifas y documentos</span>
             <span className="text-sm text-secondary-foreground/80">
               Lo que define qué pedidos ves y cómo se calcula tu precio sugerido.
             </span>
@@ -94,7 +91,7 @@ export default async function PerfilPage() {
         >
           <DatosForm inicial={perfil.datos} />
         </SeccionCard>
-        {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: <SeccionContrasena /> */}
+        <SeccionContrasena />
       </div>
     );
   }
@@ -102,7 +99,7 @@ export default async function PerfilPage() {
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
       <PageHeader title="Mi cuenta" description={`Entrás con ${usuario.email}.`} />
-      {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: <SeccionContrasena /> */}
+      <SeccionContrasena />
     </div>
   );
 }

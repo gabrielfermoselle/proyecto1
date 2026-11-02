@@ -155,6 +155,8 @@ model User {
   conformidades           Conformidad[]
   tokensRecuperacion      TokenRecuperacion[]
 
+  /// Listado de cuentas del admin: filtra por rol y ordena por alta.
+  @@index([rol, createdAt])
   @@map("usuarios")
 }
 
@@ -222,6 +224,8 @@ model FleteroProfile {
 
   @@index([disponible, ratingPromedio])
   @@index([baseGeo], map: "perfiles_fletero_baseGeo_gix", type: Gist)
+  /// Cola de verificación del admin: no verificados con el onboarding completo.
+  @@index([verificado, onboardingCompletadoEn])
   @@map("perfiles_fletero")
 }
 
@@ -313,6 +317,8 @@ model Solicitud {
   @@index([estado, fecha])
   @@index([clienteId, estado])
   @@index([origenGeo], map: "solicitudes_origenGeo_gix", type: Gist)
+  /// Últimos pedidos del admin.
+  @@index([createdAt])
   @@map("solicitudes")
 }
 
@@ -396,6 +402,8 @@ model Presupuesto {
   @@unique([solicitudId, fleteroId])
   @@index([solicitudId, estado])
   @@index([fleteroId, estado])
+  /// Baja de vehículos: presupuestos pendientes con ese vehículo.
+  @@index([vehiculoId, estado])
   @@map("presupuestos")
 }
 
@@ -426,6 +434,10 @@ model Flete {
 
   @@index([clienteId, etapa])
   @@index([fleteroId, etapa])
+  /// Baja de vehículos: fletes en curso con ese vehículo.
+  @@index([vehiculoId, etapa])
+  /// Métricas del admin: fletes por etapa sin filtrar por cliente ni fletero.
+  @@index([etapa])
   @@map("fletes")
 }
 
@@ -445,6 +457,7 @@ model EstadoFlete {
   createdAt  DateTime   @default(now())
 
   @@index([fleteId, createdAt])
+  @@index([autorId])
   @@map("estados_flete")
 }
 
@@ -466,6 +479,7 @@ model ControlItem {
 
   @@unique([itemId, fase])
   @@index([fleteId])
+  @@index([autorId])
   @@map("controles_item")
 }
 
@@ -489,6 +503,10 @@ model Reclamo {
   fotos         Foto[]
 
   @@index([fleteId])
+  /// Bandeja de reclamos del admin: por estado, los más nuevos primero.
+  @@index([estado, createdAt])
+  @@index([autorId])
+  @@index([resueltoPorId])
   @@map("reclamos")
 }
 
@@ -505,6 +523,7 @@ model Conformidad {
   aceptadaEn DateTime @default(now())
 
   @@unique([fleteId, rol])
+  @@index([userId])
   @@map("conformidades")
 }
 
@@ -573,6 +592,8 @@ model PropuestaHorario {
   respondidaEn    DateTime?
   aplicadaEn      DateTime?
 
+  @@index([propuestaPorId])
+  @@index([respondidaPorId])
   @@map("propuestas_horario")
 }
 
@@ -631,5 +652,6 @@ model Calificacion {
   createdAt  DateTime       @default(now())
 
   @@index([fleteroId, createdAt])
+  @@index([clienteId])
   @@map("calificaciones")
 }

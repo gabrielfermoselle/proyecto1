@@ -21,12 +21,12 @@ export function textoPdf(texto: string): string {
 }
 
 const c = {
-  tinta: "#1f2a24",
-  suave: "#5b665f",
-  linea: "#c9c2b0",
-  fondo: "#f4efe3",
-  alerta: "#9b1c1c",
-  ok: "#1f6f4a",
+  tinta: "#0f172a",
+  suave: "#475569",
+  linea: "#cbd5e1",
+  fondo: "#eff6ff",
+  alerta: "#b91c1c",
+  ok: "#166534",
 };
 
 const s = StyleSheet.create({

@@ -1,11 +1,10 @@
-import { CheckCircle2, Package, Truck, Users } from "lucide-react";
-// [FUERA-S3] Mapa con la ubicación del fletero y [BE] Reclamos, firmas y calificación: import { MapPin, Star } from "lucide-react";
+import { CheckCircle2, Package, Star, Truck, Users } from "lucide-react";
+// [FUERA-S3] Mapa con la ubicación del fletero: import { MapPin } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BloquePedido, CabeceraPedido } from "@/components/shared/cabecera-pedido";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación
-// import { Estrellas } from "@/components/shared/estrellas";
+import { Estrellas } from "@/components/shared/estrellas";
 import { TimelineEtapas } from "@/components/shared/timeline/timeline-etapas";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,8 +29,7 @@ import {
 } from "@/features/fletes/components/secciones";
 import { etapaEnCurso, pasosTimeline } from "@/features/fletes/presentacion";
 import { getFleteDetalle, type FleteDetalle } from "@/features/fletes/queries";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación
-// import { hrefCalificar } from "@/features/fletes/rutas";
+import { hrefCalificar } from "@/features/fletes/rutas";
 import { fotosHabilitadas } from "@/features/uploads/storage";
 // [FUERA-S3] Mapa con la ubicación del fletero: formatearHora
 // import { formatearDia, formatearHora, formatearKg, formatearM3, formatearPesos } from "@/lib/formato";
@@ -215,7 +213,6 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           </Alert>
         ) : null}
 
-        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación: la calificación del flete cerrado.
         {f.etapa === "CERRADO" ? (
           f.calificacion ? (
             <BloquePedido titulo="Tu calificación">
@@ -227,7 +224,7 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
               href={hrefCalificar(s.id)}
               className="group flex items-center gap-4 rounded-xl bg-secondary p-5 text-secondary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <Star className="size-8 shrink-0 fill-accent text-accent" aria-hidden="true" />
+              <Star className="size-8 shrink-0 fill-rating text-rating" aria-hidden="true" />
               <span className="grid flex-1 gap-0.5">
                 <span className="font-heading text-xl font-extrabold">¿Cómo te fue con {f.contraparte}?</span>
                 <span className="text-sm text-secondary-foreground/80">
@@ -240,7 +237,6 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
             </Link>
           )
         ) : null}
-        */}
 
         {recibiendo ? (
           <InventarioControl

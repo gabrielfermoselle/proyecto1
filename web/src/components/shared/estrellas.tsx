@@ -18,7 +18,7 @@ export function Estrellas({ puntaje, className }: { puntaje: number; className?:
             <Star className="absolute inset-0 size-full text-muted-foreground/40" />
             {llena || media ? (
               <span className={cn("absolute inset-0 overflow-hidden", media && "w-1/2")}>
-                <Star className="size-[1em] fill-accent text-accent" />
+                <Star className="size-[1em] fill-rating text-rating" />
               </span>
             ) : null}
           </span>

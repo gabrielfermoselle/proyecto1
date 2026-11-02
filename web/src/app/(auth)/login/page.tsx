@@ -39,14 +39,12 @@ export default async function LoginPage({
           </Alert>
         ) : null}
         <LoginForm callbackUrl={callbackUrl} />
-        {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña
         <Link
           href="/recuperar"
           className="justify-self-center text-sm font-semibold text-primary underline-offset-4 hover:underline"
         >
           ¿Olvidaste tu contraseña?
         </Link>
-        */}
       </CardContent>
       <CardFooter className="justify-center text-sm">
         <p>

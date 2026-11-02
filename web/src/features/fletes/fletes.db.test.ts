@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación
-// import { numero } from "@/lib/db";
+import { numero } from "@/lib/db";
 import {
   crearCliente,
   crearFletero,
@@ -15,7 +14,7 @@ import { comoUsuario } from "../../../test/db/sesion";
 import { filas, uno } from "../../../test/db/tabla";
 import {
   avanzarEtapa,
-  // [FUERA-S3] [BE] Reclamos, firmas y calificación: calificarFlete,
+  calificarFlete,
   cancelarFlete,
   marcarTodos,
   quitarControl,
@@ -36,8 +35,7 @@ async function fleteConfirmado(items = 2) {
 const ubicacion = { lat: -26.83, lng: -65.2, precisionM: 20 };
 
 describe("flete de punta a punta por las acciones", () => {
-  // [FUERA-S3] [BE] Reclamos, firmas y calificación: el test se llamaba «… reclamo, cierre y calificación».
-  it("recorre todas las etapas con controles, reclamo y cierre", async () => {
+  it("recorre todas las etapas con controles, reclamo, cierre y calificación", async () => {
     const { cliente, fletero, solicitud, fleteId } = await fleteConfirmado();
     const [a, b] = solicitud.items;
 
@@ -61,8 +59,7 @@ describe("flete de punta a punta por las acciones", () => {
     ok(await avanzarEtapa({ fleteId, hacia: "ENTREGADO", conformidad: true, ubicacion }));
 
     comoUsuario(cliente);
-    // [FUERA-S3] [BE] Reclamos, firmas y calificación
-    // expect(error(await calificarFlete({ fleteId, puntaje: 5 }))).toMatch(/cuando cierres/);
+    expect(error(await calificarFlete({ fleteId, puntaje: 5 }))).toMatch(/cuando cierres/);
     ok(
       await registrarControl({
         fleteId,
@@ -74,9 +71,8 @@ describe("flete de punta a punta por las acciones", () => {
     );
     ok(await marcarTodos({ fleteId, fase: "RECEPCION" }));
     ok(await avanzarEtapa({ fleteId, hacia: "CERRADO", conformidad: true }));
-    // [FUERA-S3] [BE] Reclamos, firmas y calificación
-    // ok(await calificarFlete({ fleteId, puntaje: 4, comentario: "Bien, pero hubo un rayón" }));
-    // expect(error(await calificarFlete({ fleteId, puntaje: 5 }))).toMatch(/Ya calificaste/);
+    ok(await calificarFlete({ fleteId, puntaje: 4, comentario: "Bien, pero hubo un rayón" }));
+    expect(error(await calificarFlete({ fleteId, puntaje: 5 }))).toMatch(/Ya calificaste/);
 
     const fila = await uno<{ etapa: string; recepcionConfirmadaEn: string | null }>("fletes", { id: fleteId });
     const conformidades = await filas<{ rol: string }>("conformidades", { fleteId });
@@ -118,13 +114,12 @@ describe("flete de punta a punta por las acciones", () => {
       "RECLAMO_ABIERTO",
       "FLETE_CERRADO",
     ]);
-    // [FUERA-S3] [BE] Reclamos, firmas y calificación
-    // // La calificación actualiza el promedio desnormalizado del perfil.
-    // const perfil = await uno<{ ratingPromedio: unknown; cantidadCalificaciones: number }>("perfiles_fletero", {
-    //   id: fletero.fleteroProfile!.id,
-    // });
-    // expect(perfil.cantidadCalificaciones).toBe(1);
-    // expect(numero(perfil.ratingPromedio)).toBe(4);
+    // La calificación actualiza el promedio desnormalizado del perfil.
+    const perfil = await uno<{ ratingPromedio: unknown; cantidadCalificaciones: number }>("perfiles_fletero", {
+      id: fletero.fleteroProfile!.id,
+    });
+    expect(perfil.cantidadCalificaciones).toBe(1);
+    expect(numero(perfil.ratingPromedio)).toBe(4);
   });
 });
 

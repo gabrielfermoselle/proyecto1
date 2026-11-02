@@ -76,6 +76,17 @@ export const aceptarPresupuesto = createClienteAction({
         throw new ActionError("No encontramos ese presupuesto.");
       const { solicitudId, fleteroId } = presupuesto;
 
+      // El fletero no puede dar de baja un vehículo con presupuestos pendientes, pero un
+      // presupuesto anterior a esa regla puede apuntar a uno inactivo: no se confirma.
+      const { data: vehiculo, error: errorVehiculo } = await tx
+        .from("vehiculos")
+        .select("activo")
+        .eq("id", presupuesto.vehiculoId)
+        .maybeSingle();
+      fallar(errorVehiculo);
+      if (!vehiculo?.activo)
+        throw new ActionError("El vehículo de este presupuesto ya no está disponible. Elegí otro presupuesto.");
+
       const marca = ahoraIso();
       const volverAAbierta = async () => {
         const { error: errorReverso } = await tx

@@ -230,7 +230,7 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
       </div>
 
       {props.pideEmbalaje ? (
-        <p className="flex items-start gap-2 rounded-lg bg-accent/15 px-3 py-2 text-sm">
+        <p className="flex items-start gap-2 rounded-lg bg-primary-soft px-3 py-2 text-sm">
           <Package className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           El cliente pidió embalaje: si lo incluís, contalo en el mensaje.
         </p>

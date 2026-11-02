@@ -51,7 +51,7 @@ function TarjetaPedido({ p }: { p: SolicitudDeLista }) {
               <span className="shrink-0 text-muted-foreground">· {formatearKm(p.distanciaKm)}</span>
             </p>
             {pendiente ? (
-              <p className="mt-1 justify-self-start rounded-md bg-accent/20 px-2.5 py-1 text-sm font-semibold text-foreground">
+              <p className="mt-1 justify-self-start rounded-md bg-primary-soft px-2.5 py-1 text-sm font-semibold text-foreground">
                 {pendiente}
               </p>
             ) : null}

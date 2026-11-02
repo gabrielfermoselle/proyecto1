@@ -4,17 +4,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
+        /** Naranja: la acción principal de la pantalla. Una por pantalla, idealmente. */
+        default: "bg-accent text-accent-foreground shadow-sm hover:bg-accent-hover hover:shadow-md",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline: "border border-input bg-card shadow-sm hover:bg-muted",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/90",
-        /** Dorado: la acción principal sobre el toldo verde. */
+        outline: "border border-input/60 bg-card text-foreground shadow-sm hover:border-primary/50 hover:bg-primary-soft/40",
+        /** Azul de la marca: acciones de navegación o secundarias con peso. */
+        secondary: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
+        /** La acción principal sobre el encabezado azul marino. */
         accent:
-          "bg-accent text-accent-foreground shadow-sm hover:bg-accent/90 focus-visible:ring-offset-secondary",
+          "bg-accent text-accent-foreground shadow-sm hover:bg-accent-hover focus-visible:ring-accent-on-dark focus-visible:ring-offset-secondary",
         ghost: "hover:bg-muted",
         link: "text-primary underline-offset-4 hover:underline",
       },

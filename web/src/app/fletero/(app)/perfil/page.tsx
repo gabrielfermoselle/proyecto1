@@ -5,41 +5,34 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SeccionCard } from "@/components/shared/seccion-card";
 import { Button } from "@/components/ui/button";
 import { DisponibilidadSwitch } from "@/features/fleteros/perfil/components/disponibilidad-switch";
-// [FUERA-S3] [BE] Verificación de documentos
-// import { DocumentosEditor } from "@/features/fleteros/perfil/components/documentos-editor";
+import { DocumentosEditor } from "@/features/fleteros/perfil/components/documentos-editor";
 import { TarifasForm } from "@/features/fleteros/perfil/components/tarifas-form";
 import { VehiculosEditor } from "@/features/fleteros/perfil/components/vehiculos-editor";
 import { ZonaForm } from "@/features/fleteros/perfil/components/zona-form";
-import { getPerfilFletero } from "@/features/fleteros/perfil/queries";
-// [FUERA-S3] [BE] Verificación de documentos: import { getDocumentosFletero } from "@/features/fleteros/perfil/queries";
+import { getDocumentosFletero, getPerfilFletero } from "@/features/fleteros/perfil/queries";
 import { requireFletero } from "@/lib/session";
 
-// [FUERA-S3] [BE] Verificación de documentos: «Vehículo, zona y documentos»
-export const metadata: Metadata = { title: "Vehículo, zona y tarifas" };
+export const metadata: Metadata = { title: "Vehículo, zona y documentos" };
 
 const SECCIONES = [
   ["vehiculos", "Vehículos"],
   ["zona", "Zona"],
-  // [FUERA-S3] [BE] Verificación de documentos
-  // ["documentos", "Documentos"],
+  ["documentos", "Documentos"],
   ["tarifas", "Tarifas"],
 ] as const;
 
 /** Lo de trabajo del fletero en una sola página. Los datos personales y la contraseña están en /perfil. */
 export default async function PerfilFleteroPage() {
   const { fleteroId } = await requireFletero();
-  // [FUERA-S3] [BE] Verificación de documentos
-  // const [perfil, documentos] = await Promise.all([
-  //   getPerfilFletero(fleteroId),
-  //   getDocumentosFletero(fleteroId),
-  // ]);
-  const perfil = await getPerfilFletero(fleteroId);
+  const [perfil, documentos] = await Promise.all([
+    getPerfilFletero(fleteroId),
+    getDocumentosFletero(fleteroId),
+  ]);
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
       <PageHeader
-        // [FUERA-S3] [BE] Verificación de documentos: «Vehículo, zona y documentos»
-        title="Vehículo, zona y tarifas"
+        title="Vehículo, zona y documentos"
         description="Lo que cambies acá se aplica al instante en el buscador y en tus próximos presupuestos."
         actions={
           <Button asChild variant="outline" size="sm">
@@ -79,7 +72,6 @@ export default async function PerfilFleteroPage() {
       >
         <ZonaForm inicial={perfil.zona} />
       </SeccionCard>
-      {/* [FUERA-S3] [BE] Verificación de documentos
       <SeccionCard
         id="documentos"
         titulo="Documentos"
@@ -91,7 +83,6 @@ export default async function PerfilFleteroPage() {
           storage={perfil.storage}
         />
       </SeccionCard>
-      */}
       <SeccionCard
         id="tarifas"
         titulo="Tarifas"
@@ -104,8 +95,7 @@ export default async function PerfilFleteroPage() {
         className="group flex items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm transition-colors hover:border-primary/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span>
-          {/* [FUERA-S3] [BE] Cambiar y recuperar contraseña: «Tus datos, teléfono y contraseña» */}
-          <strong>Tus datos y teléfono</strong> están en Mi cuenta.
+          <strong>Tus datos, teléfono y contraseña</strong> están en Mi cuenta.
         </span>
         <ArrowRight
           className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"

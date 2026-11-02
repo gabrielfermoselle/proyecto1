@@ -126,12 +126,11 @@ const fotoInput = { ruta: `x/${randomUUID()}.jpg`, ancho: 10, alto: 10 };
 const MATRIZ: Record<string, Caso> = {
   // --- auth ---
   registrarUsuario: { roles: TODOS_LOS_ROLES, publica: true },
-  // [FUERA-S3] [BE] Cambiar y recuperar contraseña
-  // // Opera sobre la cuenta de la sesión: no recibe IDs.
-  // cambiarContrasena: { roles: TODOS_LOS_ROLES },
-  // // Públicas: la autorización es tener el email o el token de un solo uso.
-  // solicitarRecuperacion: { roles: TODOS_LOS_ROLES, publica: true },
-  // restablecerContrasena: { roles: TODOS_LOS_ROLES, publica: true },
+  // Opera sobre la cuenta de la sesión: no recibe IDs.
+  cambiarContrasena: { roles: TODOS_LOS_ROLES },
+  // Públicas: la autorización es tener el email o el token de un solo uso.
+  solicitarRecuperacion: { roles: TODOS_LOS_ROLES, publica: true },
+  restablecerContrasena: { roles: TODOS_LOS_ROLES, publica: true },
 
   // --- solicitudes (cliente) ---
   crearSolicitud: { roles: ["CLIENTE"] },
@@ -208,10 +207,9 @@ const MATRIZ: Record<string, Caso> = {
     ajeno: (m) => ({ como: m.otroFletero, input: { fotoId: m.fotoVehiculoId } }),
   },
   // Los documentos son siempre los del fletero de la sesión: no reciben IDs.
-  // [FUERA-S3] [BE] Verificación de documentos
-  // firmarSubidaDocumento: { roles: ["FLETERO"] },
-  // guardarDocumento: { roles: ["FLETERO"] },
-  // eliminarDocumento: { roles: ["FLETERO"] },
+  firmarSubidaDocumento: { roles: ["FLETERO"] },
+  guardarDocumento: { roles: ["FLETERO"] },
+  eliminarDocumento: { roles: ["FLETERO"] },
 
   // --- chat ---
   enviarMensaje: {
@@ -288,11 +286,10 @@ const MATRIZ: Record<string, Caso> = {
     roles: ["CLIENTE", "FLETERO"],
     ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA" } }),
   },
-  // [FUERA-S3] [BE] Reclamos, firmas y calificación
-  // calificarFlete: {
-  //   roles: ["CLIENTE"],
-  //   ajeno: (m) => ({ como: m.otroCliente, input: { fleteId: m.fleteId, puntaje: 1, comentario: "" } }),
-  // },
+  calificarFlete: {
+    roles: ["CLIENTE"],
+    ajeno: (m) => ({ como: m.otroCliente, input: { fleteId: m.fleteId, puntaje: 1, comentario: "" } }),
+  },
 
   // --- notificaciones: con IDs ajenos no falla, pero no marca nada ---
   marcarNotificacionesLeidas: { roles: TODOS_LOS_ROLES },

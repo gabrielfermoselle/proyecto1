@@ -140,7 +140,7 @@ export async function Agenda({ fleteroId, semana }: { fleteroId: string; semana:
                     scope="col"
                     className={cn(
                       "border-b border-l p-2 text-left font-semibold",
-                      d === hoy && "bg-accent/15 text-foreground",
+                      d === hoy && "bg-primary-soft text-foreground",
                     )}
                   >
                     {formatearDia(d, { hoy })}
@@ -162,7 +162,7 @@ export async function Agenda({ fleteroId, semana }: { fleteroId: string; semana:
                     return (
                       <td
                         key={d}
-                        className={cn("border-b border-l p-1.5 align-top", d === hoy && "bg-accent/10")}
+                        className={cn("border-b border-l p-1.5 align-top", d === hoy && "bg-primary-soft")}
                       >
                         <div className="grid gap-1.5">
                           {enCelda.map((t) => (
