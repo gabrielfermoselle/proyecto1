@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
 import { consulta } from "@/lib/db";
 import {
   cargarUsuario,
@@ -11,7 +12,7 @@ import {
   presupuestar,
 } from "../../../../test/db/fabrica";
 import { comoUsuario, conPostgresReal } from "../../../../test/db/sesion";
-import { insertar, uno } from "../../../../test/db/tabla";
+import { actualizar, insertar, uno } from "../../../../test/db/tabla";
 import {
   actualizarVehiculo,
   cambiarEstadoVehiculo,
@@ -209,19 +210,46 @@ describe("vehículos", () => {
     );
   });
 
-  // BUG CONOCIDO (roadmap 1.7): hoy se puede dar de baja un vehículo comprometido en un
-  // presupuesto pendiente, y el cliente acepta un flete con un vehículo que ya no está.
-  // `it.fails` documenta el comportamiento esperado: cuando se corrija, este test empieza a
-  // fallar y hay que pasarlo a `it`.
-  it.fails("no permite dar de baja un vehículo con un presupuesto pendiente", async () => {
+  it("no permite dar de baja un vehículo con un presupuesto pendiente", async () => {
     const cliente = await crearCliente();
     const f = await crearFletero();
     const s = await crearSolicitud(cliente);
-    await presupuestar(s.id, f);
+    const { presupuestoId } = await presupuestar(s.id, f);
     comoUsuario(f);
     ok(await crearVehiculo(vehiculo())); // otro activo, para no chocar con la regla del último
 
     expect(error(await cambiarEstadoVehiculo({ id: f.vehiculoId, activo: false }))).toMatch(/presupuesto/);
+    expect((await uno<{ activo: boolean }>("vehiculos", { id: f.vehiculoId })).activo).toBe(true);
+
+    // Con el presupuesto retirado, la baja pasa.
+    await actualizar("presupuestos", { id: presupuestoId }, { estado: "RETIRADO" });
+    ok(await cambiarEstadoVehiculo({ id: f.vehiculoId, activo: false }));
+  });
+
+  it("no permite dar de baja un vehículo con un flete en curso", async () => {
+    const cliente = await crearCliente();
+    const f = await crearFletero();
+    const s = await crearSolicitud(cliente);
+    const { presupuestoId } = await presupuestar(s.id, f);
+    comoUsuario(cliente);
+    ok(await aceptarPresupuesto({ presupuestoId }));
+    comoUsuario(f);
+    ok(await crearVehiculo(vehiculo()));
+
+    expect(error(await cambiarEstadoVehiculo({ id: f.vehiculoId, activo: false }))).toMatch(/flete en curso/);
+  });
+
+  it("el cliente no puede aceptar un presupuesto cuyo vehículo ya no está activo", async () => {
+    const cliente = await crearCliente();
+    const f = await crearFletero();
+    const s = await crearSolicitud(cliente);
+    const { presupuestoId } = await presupuestar(s.id, f);
+    // Un presupuesto anterior a la regla de la baja: el vehículo quedó inactivo igual.
+    await actualizar("vehiculos", { id: f.vehiculoId }, { activo: false });
+    comoUsuario(cliente);
+
+    expect(error(await aceptarPresupuesto({ presupuestoId }))).toMatch(/ya no está disponible/);
+    expect((await uno<{ estado: string }>("solicitudes", { id: s.id })).estado).toBe("ABIERTA");
   });
 });
 

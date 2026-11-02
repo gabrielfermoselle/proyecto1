@@ -17,7 +17,7 @@ export function TipoFleteIcono({ tipo, className }: { tipo: TipoFlete; className
     <span
       aria-hidden="true"
       className={cn(
-        "grid size-11 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground ring-1 ring-inset ring-accent/40 [&_svg]:size-5",
+        "grid size-11 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary [&_svg]:size-5",
         className,
       )}
     >

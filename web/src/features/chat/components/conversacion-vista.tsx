@@ -40,7 +40,7 @@ function BannerEstado({ meta }: { meta: MetaConversacion }) {
       className={cn(
         "border-b px-4 py-1.5 text-center text-xs font-semibold",
         meta.estado === "ACTIVA" && "bg-success/10 text-success",
-        meta.estado === "NEGOCIACION" && "bg-accent/15",
+        meta.estado === "NEGOCIACION" && "bg-primary-soft",
         (meta.estado === "CERRADA" || meta.estado === "BLOQUEADA") && "bg-muted text-muted-foreground",
       )}
     >

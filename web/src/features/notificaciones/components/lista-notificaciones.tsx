@@ -57,7 +57,7 @@ export function ListaNotificaciones({ items, noLeidas }: { items: NotificacionDt
                 disabled={pendiente}
                 className={cn(
                   "flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5",
-                  !n.leida && "bg-accent/10",
+                  !n.leida && "bg-primary-soft",
                 )}
               >
                 <span

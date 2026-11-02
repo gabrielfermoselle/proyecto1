@@ -183,7 +183,7 @@ export default async function PerfilPublicoPage({ params, searchParams }: Props)
                       <span>{d.puntaje} estrellas</span>
                       <span className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
                         <span
-                          className="block h-full rounded-full bg-accent"
+                          className="block h-full rounded-full bg-rating"
                           style={{ width: `${(d.cantidad / maxDistribucion) * 100}%` }}
                         />
                       </span>

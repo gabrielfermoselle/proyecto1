@@ -3,19 +3,18 @@
 import { revalidatePath } from "next/cache";
 import type { EtapaFlete } from "@/domain/catalogos";
 import { ACTOR_DE_FASE, FASE_DE_ETAPA } from "@/domain/ciclo-flete";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación: import { redondear } from "@/domain/geo";
+import { redondear } from "@/domain/geo";
 import { perfilChat } from "@/features/chat/acceso";
 import { BUCKET_PRIVADO, prepararSubida, rutaSubidaValida } from "@/features/uploads/storage";
 import { ActionError, createAction, esViolacionUnica } from "@/lib/action";
-import { db, fallar } from "@/lib/db";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación: import { nuevoId, numero } from "@/lib/db";
+import { db, fallar, nuevoId, numero } from "@/lib/db";
 import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
 import type { UsuarioActual } from "@/lib/session";
 import { configPublicaSupabase } from "@/lib/supabase";
 import { patronPedido } from "./rutas";
 import {
   avanzarEtapaSchema,
-  // [FUERA-S3] [BE] Reclamos, firmas y calificación: calificarSchema,
+  calificarSchema,
   cancelarFleteSchema,
   marcarTodosSchema,
   prepararFotoSchema,
@@ -162,51 +161,50 @@ export const quitarControl = createAction({
   },
 });
 
-// [FUERA-S3] [BE] Reclamos, firmas y calificación. Fuera de los sprints 1-3: la calificación del flete.
-// /** Una calificación por flete, solo del cliente y con el flete cerrado. */
-// export const calificarFlete = createAction({
-//   schema: calificarSchema,
-//   roles: ["CLIENTE"],
-//   handler: async ({ fleteId, puntaje, comentario }, { usuario }) => {
-//     const actor = actorDe(usuario);
-//     const { data: flete, error: errorFlete } = await db()
-//       .from("fletes")
-//       .select("etapa, fleteroId")
-//       .eq("id", fleteId)
-//       .eq("clienteId", actor.perfilId)
-//       .maybeSingle();
-//     fallar(errorFlete);
-//     if (!flete) throw new ActionError("No encontramos ese flete.");
-//     if (flete.etapa !== "CERRADO") throw new ActionError("Vas a poder calificar cuando cierres el flete.");
-//     try {
-//       const { error: errorCalificacion } = await db().from("calificaciones").insert({
-//         id: nuevoId(),
-//         fleteId,
-//         clienteId: actor.perfilId,
-//         fleteroId: flete.fleteroId,
-//         puntaje,
-//         comentario,
-//       });
-//       if (errorCalificacion) throw errorCalificacion;
-//       // El promedio vive desnormalizado en el perfil (feed, búsqueda y perfil público lo leen).
-//       const { data: notas, error: errorNotas } = await db()
-//         .from("calificaciones")
-//         .select("puntaje")
-//         .eq("fleteroId", flete.fleteroId as string);
-//       fallar(errorNotas);
-//       const puntajes = (notas ?? []).map((n) => numero(n.puntaje));
-//       const promedio = puntajes.length ? redondear(puntajes.reduce((suma, n) => suma + n, 0) / puntajes.length, 2) : 0;
-//       const { error: errorPerfil } = await db()
-//         .from("perfiles_fletero")
-//         .update({ ratingPromedio: promedio, cantidadCalificaciones: puntajes.length })
-//         .eq("id", flete.fleteroId as string);
-//       fallar(errorPerfil);
-//     } catch (error) {
-//       if (esViolacionUnica(error)) throw new ActionError("Ya calificaste este flete.");
-//       throw error;
-//     }
-//     refrescar();
-//     revalidatePath(`/fleteros/${flete.fleteroId}`);
-//     return null;
-//   },
-// });
+/** Una calificación por flete, solo del cliente y con el flete cerrado. */
+export const calificarFlete = createAction({
+  schema: calificarSchema,
+  roles: ["CLIENTE"],
+  handler: async ({ fleteId, puntaje, comentario }, { usuario }) => {
+    const actor = actorDe(usuario);
+    const { data: flete, error: errorFlete } = await db()
+      .from("fletes")
+      .select("etapa, fleteroId")
+      .eq("id", fleteId)
+      .eq("clienteId", actor.perfilId)
+      .maybeSingle();
+    fallar(errorFlete);
+    if (!flete) throw new ActionError("No encontramos ese flete.");
+    if (flete.etapa !== "CERRADO") throw new ActionError("Vas a poder calificar cuando cierres el flete.");
+    try {
+      const { error: errorCalificacion } = await db().from("calificaciones").insert({
+        id: nuevoId(),
+        fleteId,
+        clienteId: actor.perfilId,
+        fleteroId: flete.fleteroId,
+        puntaje,
+        comentario,
+      });
+      if (errorCalificacion) throw errorCalificacion;
+      // El promedio vive desnormalizado en el perfil (feed, búsqueda y perfil público lo leen).
+      const { data: notas, error: errorNotas } = await db()
+        .from("calificaciones")
+        .select("puntaje")
+        .eq("fleteroId", flete.fleteroId as string);
+      fallar(errorNotas);
+      const puntajes = (notas ?? []).map((n) => numero(n.puntaje));
+      const promedio = puntajes.length ? redondear(puntajes.reduce((suma, n) => suma + n, 0) / puntajes.length, 2) : 0;
+      const { error: errorPerfil } = await db()
+        .from("perfiles_fletero")
+        .update({ ratingPromedio: promedio, cantidadCalificaciones: puntajes.length })
+        .eq("id", flete.fleteroId as string);
+      fallar(errorPerfil);
+    } catch (error) {
+      if (esViolacionUnica(error)) throw new ActionError("Ya calificaste este flete.");
+      throw error;
+    }
+    refrescar();
+    revalidatePath(`/fleteros/${flete.fleteroId}`);
+    return null;
+  },
+});

@@ -26,8 +26,7 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "portada", ruta: "/" },
     { nombre: "login", ruta: "/login" },
     { nombre: "registro", ruta: "/registro" },
-    // [FUERA-S3] [BE] Cambiar y recuperar contraseña
-    // { nombre: "recuperar contraseña", ruta: "/recuperar" },
+    { nombre: "recuperar contraseña", ruta: "/recuperar" },
   ],
   ana: [
     { nombre: "mis pedidos", ruta: "/cliente" },
@@ -47,9 +46,7 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "mis presupuestos", ruta: "/fletero/trabajos?tab=presupuestos" },
     // [FUERA-S3] Ganancias del fletero
     // { nombre: "ganancias", ruta: "/fletero/trabajos?tab=ganancias" },
-    // [FUERA-S3] [BE] Verificación de documentos
-    // { nombre: "vehículo, zona y documentos", ruta: "/fletero/perfil" },
-    { nombre: "vehículo, zona y tarifas", ruta: "/fletero/perfil" },
+    { nombre: "vehículo, zona y documentos", ruta: "/fletero/perfil" },
   ],
   valeria: [
     { nombre: "revisar lo recibido", ruta: "/cliente", abrir: primerEnlace(/Escritorio y biblioteca/) },

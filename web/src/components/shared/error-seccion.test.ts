@@ -32,6 +32,9 @@ describe("pantalla de error de un área", () => {
     ["cliente", "src/app/cliente/error.tsx", "/cliente"],
     ["fletero", "src/app/fletero/(app)/error.tsx", "/fletero"],
     ["admin", "src/app/admin/error.tsx", "/admin"],
+    ["común (chat, notificaciones, cuenta)", "src/app/(comun)/error.tsx", "/panel"],
+    ["login y registro", "src/app/(auth)/error.tsx", "/"],
+    ["pública", "src/app/error.tsx", "/"],
   ])("el área %s tiene su error.tsx, que vuelve a su inicio", (_area, archivo, inicio) => {
     const ruta = join(process.cwd(), archivo);
     expect(existsSync(ruta)).toBe(true);

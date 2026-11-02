@@ -44,11 +44,11 @@ export function AppShell({
             {headerExtra}
             <Link
               href="/perfil"
-              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:pr-3"
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-on-dark sm:pr-3"
             >
               <span
                 aria-hidden="true"
-                className="grid size-9 place-items-center rounded-full bg-accent font-heading text-base font-extrabold text-accent-foreground"
+                className="grid size-9 place-items-center rounded-full bg-secondary-muted font-heading text-base font-extrabold text-secondary"
               >
                 {usuario.nombre.charAt(0).toUpperCase()}
               </span>

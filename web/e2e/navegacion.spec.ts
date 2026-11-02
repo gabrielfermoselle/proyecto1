@@ -79,10 +79,22 @@ test("un fletero con el perfil incompleto va directo al onboarding", async ({ pa
   await expect(page.getByRole("heading", { name: "Configurá tu perfil de fletero" })).toBeVisible();
 });
 
-test("cerrar sesión vuelve a pedir el login", async ({ page }) => {
+test("cerrar sesión pide confirmación y vuelve a pedir el login", async ({ page }) => {
   await ingresar(page, CUENTAS.valeria.email);
   await expect(page).toHaveURL("/cliente");
+  const dialogo = page.getByRole("dialog", { name: "¿Cerrar sesión?" });
+
+  // Volver deja la sesión como estaba.
+  await expect(async () => {
+    await page.getByRole("button", { name: "Salir" }).click({ timeout: 3_000 });
+    await expect(dialogo).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await dialogo.getByRole("button", { name: "Volver" }).click();
+  await expect(dialogo).toBeHidden();
+  await expect(page).toHaveURL("/cliente");
+
   await page.getByRole("button", { name: "Salir" }).click();
+  await dialogo.getByRole("button", { name: "Cerrar sesión" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/cliente"));
   await page.goto("/cliente");
   await expect(page).toHaveURL(/\/login/);

@@ -49,7 +49,7 @@ export function PresupuestosRecibidos({
   if (vigentes.length === 0) {
     return (
       <div className="grid justify-items-center gap-2 rounded-xl border border-dashed bg-card/60 px-6 py-10 text-center">
-        <span className="relative grid size-12 place-items-center rounded-full bg-accent/20 text-foreground">
+        <span className="relative grid size-12 place-items-center rounded-full bg-primary-soft text-foreground">
           <Clock className="size-6" aria-hidden="true" />
         </span>
         <p className="font-bold">Esperando presupuestos</p>
@@ -134,7 +134,7 @@ export function PresupuestosRecibidos({
                   <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
                     {p.rating !== null ? (
                       <>
-                        <Star className="size-4 fill-accent text-accent" aria-hidden="true" />
+                        <Star className="size-4 fill-rating text-rating" aria-hidden="true" />
                         <span className="font-semibold text-foreground">{formatearRating(p.rating)}</span>
                         <span>
                           ({p.calificaciones} {p.calificaciones === 1 ? "reseña" : "reseñas"})

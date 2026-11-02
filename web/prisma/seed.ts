@@ -165,8 +165,7 @@ async function crearFletero(f: FleteroSeed) {
     radioCoberturaKm: f.radioCoberturaKm,
     ...f.tarifas,
     disponible: f.disponible ?? true,
-    // [FUERA-S3] [BE] Verificación de documentos: nadie está verificado. Antes: verificado: f.verificado ?? true,
-    verificado: f.verificado ?? false,
+    verificado: f.verificado ?? true,
     onboardingCompletadoEn: hace(118),
   });
   const vehiculos = [];
@@ -666,22 +665,20 @@ async function adjudicar(
   return { fleteId: flete.id, cliente, fletero, conversacionId: ganador.conversacionId };
 }
 
-// [FUERA-S3] [BE] Reclamos, firmas y calificación: los fletes cerrados quedan sin calificación.
-// Se conservan la firma y las llamadas; solo se comenta el insert.
 async function calificar(
-  _adjudicado: Awaited<ReturnType<typeof adjudicar>>,
-  _puntaje: number,
-  _comentario: string,
-  _haceDias: number,
+  adjudicado: Awaited<ReturnType<typeof adjudicar>>,
+  puntaje: number,
+  comentario: string,
+  haceDias: number,
 ) {
-  // await insertar(sb, "calificaciones", {
-  //   fleteId: adjudicado.fleteId,
-  //   clienteId: adjudicado.cliente.clienteId,
-  //   fleteroId: adjudicado.fletero.fleteroId,
-  //   puntaje,
-  //   comentario,
-  //   createdAt: hace(haceDias),
-  // });
+  await insertar(sb, "calificaciones", {
+    fleteId: adjudicado.fleteId,
+    clienteId: adjudicado.cliente.clienteId,
+    fleteroId: adjudicado.fletero.fleteroId,
+    puntaje,
+    comentario,
+    createdAt: hace(haceDias),
+  });
 }
 
 /** Agrega mensajes de texto a la conversación del par (ya creada al presupuestar). */
@@ -834,10 +831,9 @@ async function main() {
     rol: "CLIENTE",
   });
   await insertar(sb, "perfiles_cliente", { userId: paula.id });
-  // [FUERA-S3] [BE] Cambiar y recuperar contraseña: rocio (contraseñas).
-  // // Cuenta para mostrar "cambiar contraseña" y "¿Olvidaste tu contraseña?" en la defensa sin
-  // // cerrar las sesiones de las cuentas del recorrido principal.
-  // await crearCliente("Rocío", "Medina", "rocio@demo.test", "3816009988", LUGARES.parque);
+  // Cuenta para mostrar "cambiar contraseña" y "¿Olvidaste tu contraseña?" en la defensa sin
+  // cerrar las sesiones de las cuentas del recorrido principal.
+  await crearCliente("Rocío", "Medina", "rocio@demo.test", "3816009988", LUGARES.parque);
 
   // --- Fleteros: todos los tipos de vehículo, repartidos por el Gran Tucumán ---
   const T = (
@@ -1657,8 +1653,7 @@ main()
     console.log(
       "  Clientes: ana, luis, valeria, martin, carolina, jorge, florencia, sebastian  (@demo.test)",
     );
-    // [FUERA-S3] [BE] Cambiar y recuperar contraseña: «, rocio (para la demo de contraseñas)»
-    console.log("            paula (sin dirección habitual)");
+    console.log("            paula (sin dirección habitual), rocio (para la demo de contraseñas)");
     console.log(
       "  Fleteros: carlos (camioneta), marta (moto), jose (camión), soledad (auto), ramon, gustavo,",
     );

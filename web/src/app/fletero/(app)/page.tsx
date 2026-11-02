@@ -62,8 +62,7 @@ export default async function PedidosDisponiblesPage({
           <PartyPopper aria-hidden="true" />
           <p>
             <strong>¡Tu perfil está listo!</strong> Ya aparecés en el buscador y podés presupuestar pedidos
-            {/* [FUERA-S3] [BE] Verificación de documentos: «Subí tus documentos para que te verifiquemos.» */}
-            cerca tuyo.
+            cerca tuyo. Subí tus documentos para que te verifiquemos.
           </p>
         </Alert>
       ) : null}

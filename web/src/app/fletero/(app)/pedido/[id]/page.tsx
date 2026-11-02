@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BloquePedido, CabeceraPedido } from "@/components/shared/cabecera-pedido";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación
-// import { Estrellas } from "@/components/shared/estrellas";
+import { Estrellas } from "@/components/shared/estrellas";
 import { GaleriaFotos } from "@/components/shared/galeria-fotos";
 import { TimelineEtapas } from "@/components/shared/timeline/timeline-etapas";
 import { Alert } from "@/components/ui/alert";
@@ -264,14 +263,12 @@ function GestionFlete({ f }: { f: FleteDetalle }) {
         {!controlando ? <InventarioLectura items={f.items} /> : null}
         <FirmasYComprobante f={f} />
 
-        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
         {f.calificacion ? (
           <BloquePedido titulo="Calificación del cliente">
             <Estrellas puntaje={f.calificacion.puntaje} className="text-xl" />
             {f.calificacion.comentario ? <p>“{f.calificacion.comentario}”</p> : null}
           </BloquePedido>
         ) : null}
-        */}
 
         <CancelarFlete fleteId={f.id} etapa={f.etapa} rol="FLETERO" resumen={f.resumen} />
         <AccionEtapa fleteId={f.id} etapa={f.etapa} rol="FLETERO" resumen={f.resumen} />

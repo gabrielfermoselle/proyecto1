@@ -289,6 +289,12 @@ Otros índices compuestos según las consultas reales: `solicitudes(estado, fech
 `mensajes(conversacionId, createdAt DESC, id)` (paginación por cursor),
 `fletero_profiles(disponible, ratingPromedio)`.
 
+Para el panel de administración y la baja de vehículos (migración `indices_faltantes`):
+`usuarios(rol, createdAt)`, `perfiles_fletero(verificado, onboardingCompletadoEn)`,
+`solicitudes(createdAt)`, `reclamos(estado, createdAt)`, `fletes(etapa)`,
+`fletes(vehiculoId, etapa)` y `presupuestos(vehiculoId, estado)`. Además, toda clave foránea
+tiene un índice que empieza por sus columnas; `invariantes-base.db.test.ts` lo verifica.
+
 ### Integridad en la base (no solo en el código)
 
 - `CHECK` de rangos: radio 1–100 km, tarifas ≥ 0, puntaje 1–5, cantidades > 0, montos > 0.
@@ -822,9 +828,10 @@ accesibilidad, guía de deploy.
 | Capturas y video del recorrido | ⬜ | Para la presentación, siguiendo `docs/DEMO.md` |
 
 **Deuda técnica conocida** (documentada en los tests):
-- Se puede dar de baja un vehículo comprometido en un presupuesto pendiente
-  (`it.fails` en `perfil.db.test.ts`).
-- Dos claves foráneas hacia `vehiculos` no tienen índice propio (`invariantes-base.db.test.ts`).
+- ~~Se puede dar de baja un vehículo comprometido en un presupuesto pendiente~~: resuelto en el
+  sprint 5 (también bloquea la baja con un flete en curso).
+- ~~Dos claves foráneas hacia `vehiculos` no tienen índice propio~~: resuelto en el sprint 5
+  (migración `indices_faltantes`).
 - `npm audit` informa vulnerabilidades en dependencias (revisar antes de producción).
 
 ### Sprint 9 — Organización por rol y rediseño ✅

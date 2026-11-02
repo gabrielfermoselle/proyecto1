@@ -52,7 +52,7 @@ function EstadoEnvio({ mensaje, leidoHastaOtro }: { mensaje: MensajeVista; leido
   }
   const leido = estaLeido(new Date(mensaje.creadoEn), leidoHastaOtro ? new Date(leidoHastaOtro) : null);
   return leido ? (
-    <span title="Leído" className="inline-flex text-accent">
+    <span title="Leído" className="inline-flex text-primary">
       <CheckCheck className="size-4" aria-hidden="true" />
       <span className="sr-only">Leído</span>
     </span>
@@ -191,9 +191,9 @@ export function TarjetaPropuesta({
   const respondible = !propia && p.estado === "PENDIENTE" && puedeResponder && !mensaje.envio;
   return (
     <li className={cn("flex px-2 py-1", propia ? "justify-end" : "justify-start")}>
-      <div className="grid w-full max-w-xs gap-3 rounded-2xl border-2 border-accent/60 bg-card p-3 shadow-sm">
+      <div className="grid w-full max-w-xs gap-3 rounded-2xl border-2 border-primary/40 bg-card p-3 shadow-sm">
         <p className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-          <CalendarClock className="size-4 text-accent-foreground" aria-hidden="true" />
+          <CalendarClock className="size-4 text-primary" aria-hidden="true" />
           {propia ? "Propusiste otra fecha" : "Te propone otra fecha"}
         </p>
         <p className="font-heading text-lg font-extrabold leading-tight">
