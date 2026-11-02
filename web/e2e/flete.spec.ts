@@ -39,7 +39,9 @@ test("el fletero ve el pedido cerca suyo y presupuesta", async () => {
   await carlos.getByLabel("Mensaje para el cliente (opcional)").fill("Llevo la bici parada y atada.");
   const enviar = carlos.getByRole("button", { name: "Enviar presupuesto de $ 23.500" });
   await enviar.click();
-  await expect(enviar).toBeHidden();
+  // Mientras se envía, el botón pasa a «Enviando…» y deja de existir: esperar a que se oculte no
+  // asegura que el presupuesto se guardó. Se espera a que la página muestre el presupuesto enviado.
+  await expect(carlos.getByRole("heading", { name: "Tu presupuesto" })).toBeVisible();
 
   await carlos.goto("/fletero/trabajos?tab=presupuestos");
   await expect(carlos.getByRole("heading", { name: SOLICITUD })).toBeVisible();
