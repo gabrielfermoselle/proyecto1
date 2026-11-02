@@ -21,12 +21,6 @@ const primeraSolicitud = async (page: Page) => {
   await page.waitForURL((url) => url.href !== antes);
 };
 
-/** Perfil público del primer fletero que presupuestó la mudanza de Ana. */
-const abrirPerfilDesdePresupuesto = async (page: Page) => {
-  await primerEnlace(/Mudanza de monoambiente/)(page);
-  await primerEnlace(/Carlos R\./)(page);
-};
-
 const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
   anonimo: [
     { nombre: "portada", ruta: "/" },
@@ -39,16 +33,11 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     { nombre: "mis pedidos", ruta: "/cliente" },
     { nombre: "comparar presupuestos", ruta: "/cliente", abrir: primerEnlace(/Mudanza de monoambiente/) },
     { nombre: "nuevo pedido", ruta: "/cliente/nuevo" },
-    // [FUERA-S3] [FE] Buscador de fleteros
-    // { nombre: "buscar fleteros", ruta: "/cliente/fleteros" },
-    // [FUERA-S3] [FE] Perfil del cliente
-    // { nombre: "mi cuenta", ruta: "/perfil" },
+    { nombre: "buscar fleteros", ruta: "/cliente/fleteros" },
+    { nombre: "mi cuenta", ruta: "/perfil" },
     { nombre: "notificaciones", ruta: "/notificaciones" },
-    // [FUERA-S3] [FE] Buscador de fleteros: el perfil público se abre desde un presupuesto recibido.
-    // { nombre: "perfil público de un fletero", ruta: "/cliente/fleteros", abrir: primerEnlace(/Carlos R\./) },
-    { nombre: "perfil público de un fletero", ruta: "/cliente", abrir: abrirPerfilDesdePresupuesto },
-    // [FUERA-S3] [FE] Pantalla del chat
-    // { nombre: "chat", ruta: "/chat", abrir: primerEnlace(/Carlos R\./) },
+    { nombre: "perfil público de un fletero", ruta: "/cliente/fleteros", abrir: primerEnlace(/Carlos R\./) },
+    { nombre: "chat", ruta: "/chat", abrir: primerEnlace(/Carlos R\./) },
     { nombre: "seguimiento del flete", ruta: "/cliente", abrir: primerEnlace(/Compra del mayorista/) },
   ],
   carlos: [
@@ -62,18 +51,15 @@ const PANTALLAS: Record<Cuenta | "anonimo", Pantalla[]> = {
     // { nombre: "vehículo, zona y documentos", ruta: "/fletero/perfil" },
     { nombre: "vehículo, zona y tarifas", ruta: "/fletero/perfil" },
   ],
-  // [FUERA-S3] [BE] Reclamos, firmas y calificación: valeria tenía un flete entregado para revisar.
-  valeria: [],
-  // valeria: [
-  //   { nombre: "revisar lo recibido", ruta: "/cliente", abrir: primerEnlace(/Escritorio y biblioteca/) },
-  // ],
-  // [FUERA-S3] [FE] Panel de administración
-  // admin: [
-  //   { nombre: "verificar fleteros", ruta: "/admin/fleteros" },
-  //   { nombre: "cuentas", ruta: "/admin/fleteros?tab=cuentas" },
-  //   { nombre: "denuncias", ruta: "/admin/reportes" },
-  //   { nombre: "pedidos", ruta: "/admin/reportes?tab=pedidos" },
-  // ],
+  valeria: [
+    { nombre: "revisar lo recibido", ruta: "/cliente", abrir: primerEnlace(/Escritorio y biblioteca/) },
+  ],
+  admin: [
+    { nombre: "verificar fleteros", ruta: "/admin/fleteros" },
+    { nombre: "cuentas", ruta: "/admin/fleteros?tab=cuentas" },
+    { nombre: "denuncias", ruta: "/admin/reportes" },
+    { nombre: "pedidos", ruta: "/admin/reportes?tab=pedidos" },
+  ],
   soledad: [{ nombre: "agenda con fletes", ruta: "/fletero/trabajos" }],
   florencia: [],
   lucia: [],

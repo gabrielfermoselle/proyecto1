@@ -1,7 +1,6 @@
 import "server-only";
 import { notFound, redirect } from "next/navigation";
-// [FUERA-S3] [FE] Pantalla del chat
-// import { hrefConversacion } from "@/features/chat/acceso-rutas";
+import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { perfilChat } from "@/features/chat/acceso";
 import { hrefPedido } from "@/features/fletes/rutas";
 import { db, fallar } from "@/lib/db";
@@ -32,16 +31,15 @@ export async function redirigirFlete(fleteId: string, usuario: UsuarioActual): P
   redirect(hrefPedido(perfil.rol, data.solicitudId));
 }
 
-// [FUERA-S3] [FE] Pantalla del chat (ruta vieja de una conversación)
-// export async function redirigirConversacion(conversacionId: string, usuario: UsuarioActual): Promise<never> {
-//   const { perfil, columna } = delUsuario(usuario);
-//   const { data, error } = await db()
-//     .from("conversaciones")
-//     .select("solicitudId, fleteroId")
-//     .eq("id", conversacionId)
-//     .eq(columna, perfil.perfilId)
-//     .maybeSingle();
-//   fallar(error);
-//   if (!data) notFound();
-//   redirect(hrefConversacion(perfil.rol, data.solicitudId, data.fleteroId));
-// }
+export async function redirigirConversacion(conversacionId: string, usuario: UsuarioActual): Promise<never> {
+  const { perfil, columna } = delUsuario(usuario);
+  const { data, error } = await db()
+    .from("conversaciones")
+    .select("solicitudId, fleteroId")
+    .eq("id", conversacionId)
+    .eq(columna, perfil.perfilId)
+    .maybeSingle();
+  fallar(error);
+  if (!data) notFound();
+  redirect(hrefConversacion(perfil.rol, data.solicitudId, data.fleteroId));
+}

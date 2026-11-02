@@ -25,8 +25,7 @@ function descripcion(hacia: EtapaFlete, r: ResumenInventario): string {
     case "EN_CAMINO_A_ORIGEN":
       return "Le avisamos al cliente que saliste a buscar la carga.";
     case "CARGANDO":
-      // [FUERA-S3] [FE] Pantalla de control de inventario: «Le avisamos al cliente que llegaste. Después marcá cada ítem a medida que lo cargás.»
-      return "Le avisamos al cliente que llegaste y empezás a cargar.";
+      return "Le avisamos al cliente que llegaste. Después marcá cada ítem a medida que lo cargás.";
     case "EN_TRASLADO":
       return (
         `Cargaste ${plural(r.cargados, "ítem", "ítems")}` +

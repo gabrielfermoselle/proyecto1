@@ -20,8 +20,7 @@ export function ContactoDirecto({
   if (!enlaces) {
     return (
       <p className="text-sm text-muted-foreground">
-        {/* [FUERA-S3] [FE] Pantalla del chat: «Coordiná por el chat de la plataforma.» */}
-        {nombre} no cargó un teléfono.
+        {nombre} no cargó un teléfono. Coordiná por el chat de la plataforma.
       </p>
     );
   }
