@@ -262,8 +262,7 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
         rows={3}
         maxLength={500}
         placeholder="Ej.: Voy con mantas y un ayudante. Puedo pasar a partir de las 9."
-        // [FUERA-S3] [FE] Pantalla del chat: «No compartas tu teléfono: la coordinación es por el chat de la plataforma.»
-        hint="No compartas tu teléfono: el cliente lo ve cuando acepta tu presupuesto."
+        hint="No compartas tu teléfono: la coordinación es por el chat de la plataforma."
         error={errors.mensaje?.message}
         {...register("mensaje")}
       />

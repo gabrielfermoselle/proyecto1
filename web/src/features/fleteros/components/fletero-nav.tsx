@@ -1,10 +1,8 @@
 "use client";
 
-import { BriefcaseBusiness, Inbox, Truck } from "lucide-react";
-// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
+import { BriefcaseBusiness, Inbox, MessagesSquare, Truck } from "lucide-react";
 import { NavInferior, NavTabs, type SeccionNav } from "@/components/shared/area-nav";
-// [FUERA-S3] [FE] Pantalla del chat
-// import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
+import { NoLeidosBadge } from "@/features/chat/components/no-leidos-badge";
 
 const secciones = (): SeccionNav[] => [
   {
@@ -23,15 +21,14 @@ const secciones = (): SeccionNav[] => [
     prefijos: ["/fletero/trabajos"],
     enInferior: true,
   },
-  // [FUERA-S3] [FE] Pantalla del chat
-  // {
-  //   href: "/chat",
-  //   label: "Chat",
-  //   Icono: MessagesSquare,
-  //   prefijos: ["/chat"],
-  //   enInferior: true,
-  //   extra: <NoLeidosBadge />,
-  // },
+  {
+    href: "/chat",
+    label: "Chat",
+    Icono: MessagesSquare,
+    prefijos: ["/chat"],
+    enInferior: true,
+    extra: <NoLeidosBadge />,
+  },
   {
     href: "/fletero/perfil",
     label: "Vehículo y zona",

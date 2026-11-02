@@ -40,8 +40,7 @@ export default async function PerfilFleteroPage() {
       <PageHeader
         // [FUERA-S3] [BE] Verificación de documentos: «Vehículo, zona y documentos»
         title="Vehículo, zona y tarifas"
-        // [FUERA-S3] [FE] Buscador de fleteros: «…se aplica al instante en el buscador y en tus próximos presupuestos.»
-        description="Lo que cambies acá se aplica al instante en los pedidos que ves y en tus próximos presupuestos."
+        description="Lo que cambies acá se aplica al instante en el buscador y en tus próximos presupuestos."
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={`/fleteros/${fleteroId}`}>

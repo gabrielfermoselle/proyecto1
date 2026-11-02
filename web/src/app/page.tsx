@@ -1,5 +1,4 @@
-import { ArrowRight, BadgeCheck, Calculator, CalendarDays, MapPin, Star, Truck } from "lucide-react";
-// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
+import { ArrowRight, BadgeCheck, Calculator, CalendarDays, MapPin, MessagesSquare, Star, Truck } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
 import { iconoTipoFlete } from "@/components/shared/tipo-flete-icono";
@@ -21,8 +20,7 @@ const PASOS = [
   { titulo: "Publicás", detalle: "Qué llevás, de dónde a dónde y cuándo. Con fotos, mejor." },
   {
     titulo: "Recibís presupuestos",
-    // [FUERA-S3] [FE] Pantalla del chat: «Fleteros de tu zona te mandan su precio. Les preguntás por el chat.»
-    detalle: "Fleteros de tu zona te mandan su precio y un mensaje.",
+    detalle: "Fleteros de tu zona te mandan su precio. Les preguntás por el chat.",
   },
   // [FUERA-S3] [BE] Reclamos, firmas y calificación: «Comparás precio, vehículo y reseñas. Seguís el flete hasta que llega.»
   { titulo: "Elegís", detalle: "Comparás precio y vehículo. Seguís cada etapa del flete." },
@@ -259,8 +257,8 @@ export default async function InicioPage() {
                 ¿Tenés moto, auto, camioneta o camión?
               </h2>
               <p className="max-w-2xl text-lg text-primary-foreground/85">
-                {/* [FUERA-S3] [FE] Pantalla del chat: «El chat con el cliente se abre cuando le mandás tu precio.» */}
-                Mirá los pedidos cerca de tu base, con fotos y medidas, y presupuestá los que te convienen.
+                Mirá los pedidos cerca de tu base, con fotos y medidas, y presupuestá los que te convienen. El
+                chat con el cliente se abre cuando le mandás tu precio.
               </p>
               <p className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-primary-foreground/85">
                 {/* [FUERA-S3] [BE] Verificación de documentos
@@ -269,12 +267,10 @@ export default async function InicioPage() {
                   Insignia de verificado
                 </span>
                 */}
-                {/* [FUERA-S3] [FE] Pantalla del chat
                 <span className="inline-flex items-center gap-1.5">
                   <MessagesSquare className="size-4" aria-hidden="true" />
                   Chat por pedido
                 </span>
-                */}
                 {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
                 <span className="inline-flex items-center gap-1.5">
                   <Star className="size-4" aria-hidden="true" />

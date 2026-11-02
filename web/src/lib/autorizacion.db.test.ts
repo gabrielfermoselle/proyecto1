@@ -2,12 +2,10 @@ import { randomUUID } from "node:crypto";
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-// [FUERA-S3] [BE] Chat en tiempo real
-// import { fechaIsoAr, sumarDias } from "@/domain/fechas";
+import { fechaIsoAr, sumarDias } from "@/domain/fechas";
 import type { Rol } from "@/domain/roles";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
-// [FUERA-S3] [BE] Chat en tiempo real
-// import { proponerHorario } from "@/features/chat/actions";
+import { proponerHorario } from "@/features/chat/actions";
 import type { ActionResult } from "@/lib/action-result";
 import type { UsuarioActual } from "@/lib/session";
 import {
@@ -55,25 +53,24 @@ async function crearMundo() {
   // Una solicitud en negociación (con presupuesto, chat y una propuesta de horario)...
   const abierta = await crearSolicitud(cliente);
   const negociacion = await presupuestar(abierta.id, fletero);
-  // [FUERA-S3] [BE] Chat en tiempo real: sin propuesta de horario.
-  // comoUsuario(fletero);
-  // ok(
-  //   await proponerHorario({
-  //     conversacionId: negociacion.conversacionId,
-  //     clientId: randomUUID(),
-  //     fecha: sumarDias(fechaIsoAr(), 5),
-  //     franja: "TARDE",
-  //   }),
-  // );
-  // const mensajesNegociacion = await filas<{ id: string }>("mensajes", {
-  //   conversacionId: negociacion.conversacionId,
-  // });
-  // let propuesta: { id: string } | null = null;
-  // for (const mensaje of mensajesNegociacion) {
-  //   propuesta = await unoONull<{ id: string }>("propuestas_horario", { mensajeId: mensaje.id });
-  //   if (propuesta) break;
-  // }
-  // if (!propuesta) throw new Error("No hay fila en propuestas_horario");
+  comoUsuario(fletero);
+  ok(
+    await proponerHorario({
+      conversacionId: negociacion.conversacionId,
+      clientId: randomUUID(),
+      fecha: sumarDias(fechaIsoAr(), 5),
+      franja: "TARDE",
+    }),
+  );
+  const mensajesNegociacion = await filas<{ id: string }>("mensajes", {
+    conversacionId: negociacion.conversacionId,
+  });
+  let propuesta: { id: string } | null = null;
+  for (const mensaje of mensajesNegociacion) {
+    propuesta = await unoONull<{ id: string }>("propuestas_horario", { mensajeId: mensaje.id });
+    if (propuesta) break;
+  }
+  if (!propuesta) throw new Error("No hay fila en propuestas_horario");
 
   // ...y otra con el flete ya confirmado.
   const adjudicada = await crearSolicitud(cliente);
@@ -105,8 +102,7 @@ async function crearMundo() {
     abierta,
     presupuestoId: negociacion.presupuestoId,
     conversacionId: negociacion.conversacionId,
-    // [FUERA-S3] [BE] Chat en tiempo real
-    // propuestaId: propuesta.id,
+    propuestaId: propuesta.id,
     fleteId,
     itemId: adjudicada.items[0]!.id,
     fotoSolicitudId: fotoSolicitud.id,
@@ -161,9 +157,8 @@ const MATRIZ: Record<string, Caso> = {
   },
 
   // --- perfil del cliente (operan sobre el perfil de la sesión) ---
-  // [FUERA-S3] [FE] Perfil del cliente
-  // guardarDatosCliente: { roles: ["CLIENTE"] },
-  // guardarDireccionHabitual: { roles: ["CLIENTE"] },
+  guardarDatosCliente: { roles: ["CLIENTE"] },
+  guardarDireccionHabitual: { roles: ["CLIENTE"] },
 
   // --- presupuestos (fletero) ---
   enviarPresupuesto: {
@@ -219,48 +214,47 @@ const MATRIZ: Record<string, Caso> = {
   // eliminarDocumento: { roles: ["FLETERO"] },
 
   // --- chat ---
-  // [FUERA-S3] [BE] Chat en tiempo real
-  // enviarMensaje: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({
-  //     como: m.otroCliente,
-  //     input: { conversacionId: m.conversacionId, clientId: randomUUID(), texto: "hola" },
-  //   }),
-  // },
-  // prepararFotoChat: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({ como: m.otroFletero, input: { conversacionId: m.conversacionId } }),
-  // },
-  // enviarFotoChat: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({
-  //     como: m.otroCliente,
-  //     input: { conversacionId: m.conversacionId, clientId: randomUUID(), texto: "", ...fotoInput },
-  //   }),
-  // },
-  // marcarLeido: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({
-  //     como: m.otroFletero,
-  //     input: { conversacionId: m.conversacionId, hasta: new Date().toISOString() },
-  //   }),
-  // },
-  // proponerHorario: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({
-  //     como: m.otroCliente,
-  //     input: {
-  //       conversacionId: m.conversacionId,
-  //       clientId: randomUUID(),
-  //       fecha: sumarDias(fechaIsoAr(), 3),
-  //       franja: "MANANA",
-  //     },
-  //   }),
-  // },
-  // responderPropuesta: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({ como: m.otroCliente, input: { propuestaId: m.propuestaId, aceptar: true } }),
-  // },
+  enviarMensaje: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({
+      como: m.otroCliente,
+      input: { conversacionId: m.conversacionId, clientId: randomUUID(), texto: "hola" },
+    }),
+  },
+  prepararFotoChat: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({ como: m.otroFletero, input: { conversacionId: m.conversacionId } }),
+  },
+  enviarFotoChat: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({
+      como: m.otroCliente,
+      input: { conversacionId: m.conversacionId, clientId: randomUUID(), texto: "", ...fotoInput },
+    }),
+  },
+  marcarLeido: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({
+      como: m.otroFletero,
+      input: { conversacionId: m.conversacionId, hasta: new Date().toISOString() },
+    }),
+  },
+  proponerHorario: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({
+      como: m.otroCliente,
+      input: {
+        conversacionId: m.conversacionId,
+        clientId: randomUUID(),
+        fecha: sumarDias(fechaIsoAr(), 3),
+        franja: "MANANA",
+      },
+    }),
+  },
+  responderPropuesta: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({ como: m.otroCliente, input: { propuestaId: m.propuestaId, aceptar: true } }),
+  },
   obtenerTokenRealtime: { roles: ["CLIENTE", "FLETERO"] },
 
   // --- fletes ---
@@ -275,26 +269,26 @@ const MATRIZ: Record<string, Caso> = {
       input: { fleteId: m.fleteId, motivo: "Ya no lo necesito, gracias" },
     }),
   },
-  // [FUERA-S3] [BE] Control de carga y descarga / [BE] Reclamos, firmas y calificación
-  // prepararFotoFlete: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId } }),
-  // },
-  // registrarControl: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({
-  //     como: m.otroFletero,
-  //     input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA", resultado: "CARGADO", observacion: "" },
-  //   }),
-  // },
-  // marcarTodos: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, fase: "CARGA" } }),
-  // },
-  // quitarControl: {
-  //   roles: ["CLIENTE", "FLETERO"],
-  //   ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA" } }),
-  // },
+  prepararFotoFlete: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId } }),
+  },
+  registrarControl: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({
+      como: m.otroFletero,
+      input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA", resultado: "CARGADO", observacion: "" },
+    }),
+  },
+  marcarTodos: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, fase: "CARGA" } }),
+  },
+  quitarControl: {
+    roles: ["CLIENTE", "FLETERO"],
+    ajeno: (m) => ({ como: m.otroFletero, input: { fleteId: m.fleteId, itemId: m.itemId, fase: "CARGA" } }),
+  },
+  // [FUERA-S3] [BE] Reclamos, firmas y calificación
   // calificarFlete: {
   //   roles: ["CLIENTE"],
   //   ajeno: (m) => ({ como: m.otroCliente, input: { fleteId: m.fleteId, puntaje: 1, comentario: "" } }),
@@ -303,11 +297,10 @@ const MATRIZ: Record<string, Caso> = {
   // --- notificaciones: con IDs ajenos no falla, pero no marca nada ---
   marcarNotificacionesLeidas: { roles: TODOS_LOS_ROLES },
 
-  // [FUERA-S3] [FE] Panel de administración
-  // // --- admin (poder global sobre la plataforma: no hay recurso "ajeno") ---
-  // cambiarEstadoUsuario: { roles: ["ADMIN"] },
-  // verificarFletero: { roles: ["ADMIN"] },
-  // resolverReclamo: { roles: ["ADMIN"] },
+  // --- admin (poder global sobre la plataforma: no hay recurso "ajeno") ---
+  cambiarEstadoUsuario: { roles: ["ADMIN"] },
+  verificarFletero: { roles: ["ADMIN"] },
+  resolverReclamo: { roles: ["ADMIN"] },
 };
 
 /** Todas las Server Actions exportadas por los `actions.ts` del proyecto. */
@@ -386,14 +379,13 @@ describe("matriz de autorización", () => {
 
 describe("el recurso ajeno no se modificó", () => {
   it("después de todos los intentos, todo sigue como estaba", async () => {
-    // [FUERA-S3] [BE] Chat en tiempo real: sin propuesta de horario.
-    const [presupuesto, flete, foto, fotoVehiculo, /* propuesta, */ vehiculoDuenio, solicitud, mensajes] =
+    const [presupuesto, flete, foto, fotoVehiculo, propuesta, vehiculoDuenio, solicitud, mensajes] =
       await Promise.all([
         uno<{ estado: string }>("presupuestos", { id: mundo.presupuestoId }),
         uno<{ etapa: string }>("fletes", { id: mundo.fleteId }),
         unoONull("fotos", { id: mundo.fotoSolicitudId }),
         unoONull("fotos", { id: mundo.fotoVehiculoId }),
-        // uno<{ estado: string }>("propuestas_horario", { id: mundo.propuestaId }),
+        uno<{ estado: string }>("propuestas_horario", { id: mundo.propuestaId }),
         uno<{ activo: boolean; marca: string }>("vehiculos", { id: mundo.fletero.vehiculoId }),
         uno<{ estado: string }>("solicitudes", { id: mundo.abierta.id }),
         filas<{ autorId: string | null }>("mensajes", { conversacionId: mundo.conversacionId }),
@@ -405,7 +397,7 @@ describe("el recurso ajeno no se modificó", () => {
     expect(flete.etapa).toBe("CONFIRMADO");
     expect(foto).not.toBeNull();
     expect(fotoVehiculo).not.toBeNull();
-    // expect(propuesta.estado).toBe("PENDIENTE");
+    expect(propuesta.estado).toBe("PENDIENTE");
     expect(vehiculoDuenio).toMatchObject({ activo: true, marca: "Ford" });
     expect(solicitud.estado).toBe("ABIERTA");
     expect(textosIntrusos).toBe(0);

@@ -40,13 +40,12 @@ test.describe("cada rol entra a su área", () => {
   const casos = [
     { cuenta: "ana", inicio: "/cliente", titulo: "Mis pedidos", ajenas: ["/fletero", "/admin"] },
     { cuenta: "carlos", inicio: "/fletero", titulo: "Pedidos disponibles", ajenas: ["/cliente", "/admin"] },
-    // [FUERA-S3] [FE] Panel de administración
-    // {
-    //   cuenta: "admin",
-    //   inicio: "/admin/fleteros",
-    //   titulo: "Fleteros",
-    //   ajenas: ["/cliente", "/fletero", "/chat"],
-    // },
+    {
+      cuenta: "admin",
+      inicio: "/admin/fleteros",
+      titulo: "Fleteros",
+      ajenas: ["/cliente", "/fletero", "/chat"],
+    },
   ] as const;
 
   for (const { cuenta, inicio, titulo, ajenas } of casos) {
@@ -66,18 +65,10 @@ test.describe("cada rol entra a su área", () => {
         });
       }
 
-      // [FUERA-S3] [FE] Perfil del cliente: el cliente no tiene "Mi cuenta"; /perfil lo devuelve a sus pedidos.
-      if (cuenta === "ana") {
-        test("/perfil lo devuelve a sus pedidos", async ({ page }) => {
-          await page.goto("/perfil");
-          await expect(page).toHaveURL(inicio);
-        });
-      } else {
-        test("Mi cuenta es común a todos los roles", async ({ page }) => {
-          await page.goto("/perfil");
-          await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mi cuenta");
-        });
-      }
+      test("Mi cuenta es común a todos los roles", async ({ page }) => {
+        await page.goto("/perfil");
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Mi cuenta");
+      });
     });
   }
 });
@@ -118,11 +109,8 @@ test.describe("las rutas anteriores siguen funcionando", () => {
   for (const [vieja, nueva] of [
     ["/cliente/solicitudes", "/cliente"],
     ["/cliente/solicitudes/nueva", "/cliente/nuevo"],
-    // [FUERA-S3] [FE] Pantalla del chat
-    // ["/cliente/mensajes", "/chat"],
-    // [FUERA-S3] [FE] Perfil del cliente: /perfil devuelve al cliente a sus pedidos.
-    // ["/cliente/perfil", "/perfil"],
-    ["/cliente/perfil", "/cliente"],
+    ["/cliente/mensajes", "/chat"],
+    ["/cliente/perfil", "/perfil"],
   ] as const) {
     test(`${vieja} lleva a ${nueva}`, async ({ page }) => {
       await page.goto(vieja);
@@ -131,19 +119,18 @@ test.describe("las rutas anteriores siguen funcionando", () => {
   }
 });
 
-// [FUERA-S3] [FE] Pantalla del chat
-// test.describe("chat", () => {
-//   test.use({ storageState: sesionDe("ana") });
-//
-//   test("la bandeja se pide al abrir el chat, no en bucle", async ({ page }) => {
-//     let pedidos = 0;
-//     page.on("request", (r) => {
-//       if (r.url().includes("/api/chat/bandeja")) pedidos++;
-//     });
-//     await page.goto("/chat");
-//     await expect(page.getByRole("list", { name: "Conversaciones" })).toBeVisible();
-//     await page.waitForTimeout(6_000);
-//     // Una al montar la lista y, como mucho, otra al conectarse el chat en vivo.
-//     expect(pedidos).toBeLessThanOrEqual(2);
-//   });
-// });
+test.describe("chat", () => {
+  test.use({ storageState: sesionDe("ana") });
+
+  test("la bandeja se pide al abrir el chat, no en bucle", async ({ page }) => {
+    let pedidos = 0;
+    page.on("request", (r) => {
+      if (r.url().includes("/api/chat/bandeja")) pedidos++;
+    });
+    await page.goto("/chat");
+    await expect(page.getByRole("list", { name: "Conversaciones" })).toBeVisible();
+    await page.waitForTimeout(6_000);
+    // Una al montar la lista y, como mucho, otra al conectarse el chat en vivo.
+    expect(pedidos).toBeLessThanOrEqual(2);
+  });
+});

@@ -29,8 +29,7 @@ export default async function LoginPage({
     <Card className="w-full max-w-md">
       <CardHeader>
         <h1 className="text-2xl font-extrabold">Ingresá a tu cuenta</h1>
-        {/* [FUERA-S3] [FE] Pantalla del chat: «Seguí tus fletes, presupuestos y mensajes.» */}
-        <CardDescription>Seguí tus fletes y presupuestos.</CardDescription>
+        <CardDescription>Seguí tus fletes, presupuestos y mensajes.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         {textoAviso ? (

@@ -1,5 +1,4 @@
-import { ArrowRight, ChevronRight, ClipboardList, Plus } from "lucide-react";
-// [FUERA-S3] [FE] Buscador de fleteros: import { Search } from "lucide-react";
+import { ArrowRight, ChevronRight, ClipboardList, Plus, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -133,7 +132,6 @@ export default async function MisPedidosPage() {
       <Seccion id="titulo-en-curso" titulo="En curso" pedidos={enCurso} />
       <Seccion id="titulo-anteriores" titulo="Anteriores" pedidos={anteriores} />
 
-      {/* [FUERA-S3] [FE] Buscador de fleteros
       <Link
         href="/cliente/fleteros"
         className="group flex items-center gap-4 rounded-xl border border-dashed p-4 text-sm transition-colors hover:border-primary/40 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -147,7 +145,6 @@ export default async function MisPedidosPage() {
           aria-hidden="true"
         />
       </Link>
-      */}
     </div>
   );
 }

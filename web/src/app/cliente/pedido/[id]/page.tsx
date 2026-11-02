@@ -20,13 +20,14 @@ import { getSolicitudDelCliente, type SolicitudDelCliente } from "@/features/cli
 import { AccionEtapa } from "@/features/fletes/components/accion-etapa";
 import { CancelarFlete } from "@/features/fletes/components/cancelar-flete";
 import { FleteEnVivo } from "@/features/fletes/components/flete-en-vivo";
-// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario
-// import { InventarioControl } from "@/features/fletes/components/inventario-control";
-import { InventarioLectura } from "@/features/fletes/components/inventario-lectura";
-// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: import { ResumenInventarioTiles } from "@/features/fletes/components/inventario-lectura";
+import { InventarioControl } from "@/features/fletes/components/inventario-control";
+import { InventarioLectura, ResumenInventarioTiles } from "@/features/fletes/components/inventario-lectura";
 import { MapaSeguimiento } from "@/features/fletes/components/mapa-seguimiento";
-import { RecorridoFlete, TarjetaContraparte } from "@/features/fletes/components/secciones";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación y [BE] Comprobante en PDF: import { FirmasYComprobante } from "@/features/fletes/components/secciones";
+import {
+  FirmasYComprobante,
+  RecorridoFlete,
+  TarjetaContraparte,
+} from "@/features/fletes/components/secciones";
 import { etapaEnCurso, pasosTimeline } from "@/features/fletes/presentacion";
 import { getFleteDetalle, type FleteDetalle } from "@/features/fletes/queries";
 // [FUERA-S3] [BE] Reclamos, firmas y calificación
@@ -191,14 +192,12 @@ function PedidoSinFlete({ s, nueva }: { s: SolicitudDelCliente; nueva: boolean }
 
 /** Con flete: seguimiento, recepción, calificación y contacto con el fletero. */
 function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
-  // [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: sin recepción ni inventario movido en los sprints 1-3.
-  // const recibiendo = f.etapa === "ENTREGADO";
-  // const conInventarioMovido = f.resumen.cargados + f.resumen.noCargados > 0;
+  const recibiendo = f.etapa === "ENTREGADO";
+  const conInventarioMovido = f.resumen.cargados + f.resumen.noCargados > 0;
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <FleteEnVivo fleteId={f.id} activo={esEtapaActiva(f.etapa)} />
       <div className="grid gap-6">
-        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
         {recibiendo ? (
           <Alert>
             <p>
@@ -207,7 +206,6 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
             </p>
           </Alert>
         ) : null}
-        */}
         {f.cancelacion ? (
           <Alert variant="destructive">
             <p>
@@ -217,7 +215,7 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           </Alert>
         ) : null}
 
-        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación / [BE] Control de carga y descarga / [FE] Pantalla de control de inventario
+        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación: la calificación del flete cerrado.
         {f.etapa === "CERRADO" ? (
           f.calificacion ? (
             <BloquePedido titulo="Tu calificación">
@@ -242,6 +240,7 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
             </Link>
           )
         ) : null}
+        */}
 
         {recibiendo ? (
           <InventarioControl
@@ -252,12 +251,10 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           />
         ) : null}
 
-        */}
         <BloquePedido titulo="Seguimiento" descripcion="Cada etapa con la hora en que pasó.">
           <TimelineEtapas pasos={pasosTimeline(f.pasos, f.cancelacion)} etiqueta="Etapas del flete" />
         </BloquePedido>
 
-        {/* [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario, [BE] Reclamos, firmas y calificación y [BE] Comprobante en PDF
         {conInventarioMovido ? <ResumenInventarioTiles resumen={f.resumen} /> : null}
         {!recibiendo ? (
           <InventarioLectura
@@ -266,8 +263,6 @@ function PedidoConFlete({ s, f }: { s: SolicitudDelCliente; f: FleteDetalle }) {
           />
         ) : null}
         <FirmasYComprobante f={f} />
-        */}
-        <InventarioLectura items={f.items} />
         <CancelarFlete fleteId={f.id} etapa={f.etapa} rol="CLIENTE" resumen={f.resumen} />
         <AccionEtapa fleteId={f.id} etapa={f.etapa} rol="CLIENTE" resumen={f.resumen} />
       </div>

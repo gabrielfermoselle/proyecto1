@@ -4,17 +4,7 @@ import { defineConfig } from "vitest/config";
 const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
 
 // [FUERA-S3] Tests de lo que queda fuera de los sprints 1-3: los archivos siguen en el repo, comentados.
-const FUERA_S3 = [
-  "src/features/chat/hilo.test.ts",
-  "src/features/chat/bandeja.integration.test.ts",
-  "src/features/chat/chat.db.test.ts",
-  "src/features/clientes/fleteros/buscador.db.test.ts",
-  "src/features/clientes/fleteros/buscador.integration.test.ts",
-  "src/features/clientes/fleteros/parametros.test.ts",
-  "src/features/clientes/perfil/perfil-cliente.db.test.ts",
-  "src/features/auth/recuperacion.db.test.ts",
-  "src/features/admin/admin.db.test.ts",
-];
+const FUERA_S3 = ["src/features/auth/recuperacion.db.test.ts"];
 
 export default defineConfig({
   resolve: { alias },

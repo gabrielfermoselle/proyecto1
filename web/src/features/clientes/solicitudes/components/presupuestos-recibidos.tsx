@@ -1,7 +1,6 @@
 "use client";
 
-import { BadgeCheck, Clock, Package, Star, Truck, Users } from "lucide-react";
-// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
+import { BadgeCheck, Clock, MessagesSquare, Package, Star, Truck, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ETIQUETA_VEHICULO } from "@/domain/catalogos";
 import { destacados, ordenarPresupuestos, type CriterioOrden } from "@/domain/solicitud";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
-// [FUERA-S3] [FE] Pantalla del chat
-// import { hrefConversacion } from "@/features/chat/acceso-rutas";
+import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { formatearFechaHora, formatearPesos, formatearRating } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import type { PresupuestoRecibido } from "../queries";
@@ -28,9 +26,8 @@ const CRITERIOS: { valor: CriterioOrden; etiqueta: string }[] = [
  * vehículo, precio y acciones. Se ordenan por precio, calificación (ponderada por la cantidad de
  * reseñas) o vencimiento, y se marcan el más barato y el mejor calificado.
  */
-// [FUERA-S3] [FE] Pantalla del chat: solicitudId solo se usaba para el enlace al chat.
 export function PresupuestosRecibidos({
-  solicitudId: _solicitudId,
+  solicitudId,
   presupuestos,
   textoCuando,
   puedeAceptar,
@@ -99,8 +96,7 @@ export function PresupuestosRecibidos({
       {pideEmbalaje ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="size-4 shrink-0" aria-hidden="true" />
-          {/* [FUERA-S3] [FE] Pantalla del chat: «confirmá con cada fletero por el chat si lo incluye.» */}
-          Pediste embalaje: fijate en el mensaje de cada fletero si lo incluye.
+          Pediste embalaje: confirmá con cada fletero por el chat si lo incluye.
         </p>
       ) : null}
       <ul className="grid gap-3">
@@ -198,7 +194,6 @@ export function PresupuestosRecibidos({
             ) : null}
 
             <div className="flex flex-wrap justify-end gap-2">
-              {/* [FUERA-S3] [FE] Pantalla del chat
               {p.conversacionId ? (
                 <Button asChild variant="outline" className="max-sm:flex-1">
                   <Link href={hrefConversacion("CLIENTE", solicitudId, p.fletero.id)}>
@@ -207,7 +202,6 @@ export function PresupuestosRecibidos({
                   </Link>
                 </Button>
               ) : null}
-              */}
               {puedeAceptar ? (
                 <ConfirmDialog
                   title="¿Aceptar este presupuesto?"

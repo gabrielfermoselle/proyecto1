@@ -1,5 +1,4 @@
-import { CheckCircle2, Clock, Lock, Package, PauseCircle, Users } from "lucide-react";
-// [FUERA-S3] [FE] Pantalla del chat: import { MessagesSquare } from "lucide-react";
+import { CheckCircle2, Clock, Lock, MessagesSquare, Package, PauseCircle, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,13 +8,10 @@ import { BloquePedido, CabeceraPedido } from "@/components/shared/cabecera-pedid
 import { GaleriaFotos } from "@/components/shared/galeria-fotos";
 import { TimelineEtapas } from "@/components/shared/timeline/timeline-etapas";
 import { Alert } from "@/components/ui/alert";
-// [FUERA-S3] [FE] Pantalla del chat: import { Button } from "@/components/ui/button";
-// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: ACTOR_DE_FASE, FASE_DE_ETAPA
-// import { ACTOR_DE_FASE, esEtapaActiva, FASE_DE_ETAPA } from "@/domain/ciclo-flete";
-import { esEtapaActiva } from "@/domain/ciclo-flete";
+import { Button } from "@/components/ui/button";
+import { ACTOR_DE_FASE, esEtapaActiva, FASE_DE_ETAPA } from "@/domain/ciclo-flete";
 import type { EstadoSolicitudPedido } from "@/domain/pedido";
-// [FUERA-S3] [FE] Pantalla del chat
-// import { hrefConversacion } from "@/features/chat/acceso-rutas";
+import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { EstadoPresupuestoBadge } from "@/features/fleteros/presupuestos/components/estado-presupuesto";
 import { PresupuestoForm } from "@/features/fleteros/presupuestos/components/presupuesto-form";
 import { RetirarPresupuesto } from "@/features/fleteros/presupuestos/components/retirar-presupuesto";
@@ -24,18 +20,18 @@ import { getSolicitudParaFletero } from "@/features/fleteros/solicitudes/queries
 import { AccionEtapa } from "@/features/fletes/components/accion-etapa";
 import { CancelarFlete } from "@/features/fletes/components/cancelar-flete";
 import { FleteEnVivo } from "@/features/fletes/components/flete-en-vivo";
-// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario
-// import { InventarioControl } from "@/features/fletes/components/inventario-control";
-import { InventarioLectura } from "@/features/fletes/components/inventario-lectura";
-// [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: import { ResumenInventarioTiles } from "@/features/fletes/components/inventario-lectura";
+import { InventarioControl } from "@/features/fletes/components/inventario-control";
+import { InventarioLectura, ResumenInventarioTiles } from "@/features/fletes/components/inventario-lectura";
 import { MapaSeguimiento } from "@/features/fletes/components/mapa-seguimiento";
-import { RecorridoFlete, TarjetaContraparte } from "@/features/fletes/components/secciones";
-// [FUERA-S3] [BE] Reclamos, firmas y calificación y [BE] Comprobante en PDF: import { FirmasYComprobante } from "@/features/fletes/components/secciones";
+import {
+  FirmasYComprobante,
+  RecorridoFlete,
+  TarjetaContraparte,
+} from "@/features/fletes/components/secciones";
 import { etapaEnCurso, pasosTimeline } from "@/features/fletes/presentacion";
 import { getFleteDetalle, type FleteDetalle } from "@/features/fletes/queries";
 import { MapaPuntos } from "@/features/mapas/components/mapas-dinamicos";
-// [FUERA-S3] [FE] Pantalla de control de inventario
-// import { fotosHabilitadas } from "@/features/uploads/storage";
+import { fotosHabilitadas } from "@/features/uploads/storage";
 import { formatearFechaHora, formatearKm, formatearPesos } from "@/lib/formato";
 import { requireFletero } from "@/lib/session";
 
@@ -44,8 +40,7 @@ export const metadata: Metadata = { title: "Pedido" };
 type Solicitud = NonNullable<Awaited<ReturnType<typeof getSolicitudParaFletero>>>;
 
 /** El presupuesto: el formulario para enviarlo, o el enviado con su estado. */
-// [FUERA-S3] [FE] Pantalla del chat: fleteroId solo se usaba para el enlace al chat.
-function PanelPresupuesto({ s, fleteroId: _fleteroId }: { s: Solicitud; fleteroId: string }) {
+function PanelPresupuesto({ s, fleteroId }: { s: Solicitud; fleteroId: string }) {
   const abierta = s.estado === "ABIERTA";
   const mio = s.miPresupuesto;
   return (
@@ -130,7 +125,6 @@ function PanelPresupuesto({ s, fleteroId: _fleteroId }: { s: Solicitud; fleteroI
           conflictos={s.conflictos}
         />
       )}
-      {/* [FUERA-S3] [FE] Pantalla del chat
       {s.conversacionId ? (
         <Button asChild variant="outline" className="justify-self-start">
           <Link href={hrefConversacion("FLETERO", s.id, fleteroId)}>
@@ -143,7 +137,6 @@ function PanelPresupuesto({ s, fleteroId: _fleteroId }: { s: Solicitud; fleteroI
           El chat con el cliente se abre cuando le presupuestás.
         </p>
       )}
-      */}
     </section>
   );
 }
@@ -230,22 +223,19 @@ function VerPedido({ s, fleteroId }: { s: Solicitud; fleteroId: string }) {
 
 /** El flete es suyo: control de carga y descarga, etapas y contacto con el cliente. */
 function GestionFlete({ f }: { f: FleteDetalle }) {
-  // [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario: sin control de carga ni descarga en los sprints 1-3.
-  // const fase = FASE_DE_ETAPA[f.etapa];
-  // // En carga y descarga el inventario es lo primero: es lo que el fletero está haciendo.
-  // const controlando = fase && ACTOR_DE_FASE[fase] === "FLETERO" ? fase : null;
+  const fase = FASE_DE_ETAPA[f.etapa];
+  // En carga y descarga el inventario es lo primero: es lo que el fletero está haciendo.
+  const controlando = fase && ACTOR_DE_FASE[fase] === "FLETERO" ? fase : null;
   const activo = esEtapaActiva(f.etapa);
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <FleteEnVivo fleteId={f.id} activo={activo} />
       <div className="grid gap-6">
-        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
         {f.etapa === "ENTREGADO" ? (
           <Alert>
             <p>Entregaste la carga. Falta que el cliente revise los ítems y cierre el flete.</p>
           </Alert>
         ) : null}
-        */}
         {f.cancelacion ? (
           <Alert variant="destructive">
             <p>
@@ -255,7 +245,6 @@ function GestionFlete({ f }: { f: FleteDetalle }) {
           </Alert>
         ) : null}
 
-        {/* [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario
         {controlando ? (
           <InventarioControl
             fleteId={f.id}
@@ -265,18 +254,17 @@ function GestionFlete({ f }: { f: FleteDetalle }) {
           />
         ) : null}
 
-        */}
         <BloquePedido titulo="Seguimiento" descripcion="Cada etapa con la hora en que pasó.">
           <TimelineEtapas pasos={pasosTimeline(f.pasos, f.cancelacion)} etiqueta="Etapas del flete" />
         </BloquePedido>
 
-        {/* [FUERA-S3] [BE] Control de carga y descarga / [FE] Pantalla de control de inventario, [BE] Reclamos, firmas y calificación y [BE] Comprobante en PDF
         {!controlando && f.resumen.cargados + f.resumen.noCargados > 0 ? (
           <ResumenInventarioTiles resumen={f.resumen} />
         ) : null}
         {!controlando ? <InventarioLectura items={f.items} /> : null}
         <FirmasYComprobante f={f} />
 
+        {/* [FUERA-S3] [BE] Reclamos, firmas y calificación
         {f.calificacion ? (
           <BloquePedido titulo="Calificación del cliente">
             <Estrellas puntaje={f.calificacion.puntaje} className="text-xl" />
@@ -284,7 +272,6 @@ function GestionFlete({ f }: { f: FleteDetalle }) {
           </BloquePedido>
         ) : null}
         */}
-        <InventarioLectura items={f.items} />
 
         <CancelarFlete fleteId={f.id} etapa={f.etapa} rol="FLETERO" resumen={f.resumen} />
         <AccionEtapa fleteId={f.id} etapa={f.etapa} rol="FLETERO" resumen={f.resumen} />

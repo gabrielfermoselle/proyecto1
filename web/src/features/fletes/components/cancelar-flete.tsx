@@ -18,8 +18,7 @@ const TEXTOS: Record<Actor, { boton: string; descripcion: string; placeholder: s
   },
   CLIENTE: {
     boton: "Cancelar el flete",
-    // [FUERA-S3] [FE] Pantalla del chat: «El chat queda bloqueado y vas a tener que publicar la solicitud de nuevo.»
-    descripcion: "Vas a tener que publicar la solicitud de nuevo.",
+    descripcion: "El chat queda bloqueado y vas a tener que publicar la solicitud de nuevo.",
     placeholder: "Ej.: Se postergó la mudanza y todavía no tengo fecha nueva.",
   },
 };
