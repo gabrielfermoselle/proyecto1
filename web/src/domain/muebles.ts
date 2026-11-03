@@ -1,6 +1,8 @@
 // Medidas típicas de muebles y electrodomésticos. El cliente elige uno al cargar el inventario y
 // se completan el tamaño y el peso; después los puede corregir.
 
+import type { TipoFlete } from "./catalogos";
+
 export type TipoMueble = "Mueble" | "Electrodoméstico" | "Otro";
 
 export interface MuebleEstandar {
@@ -11,8 +13,8 @@ export interface MuebleEstandar {
   anchoCm: number;
   altoCm: number;
   pesoKgAprox: number;
-  /** Archivo de la miniatura en el bucket público `FotosCosas` de Supabase. */
-  foto: string;
+  /** Archivo de la miniatura en el bucket público `FotosCosas` de Supabase; `null` si todavía no tiene. */
+  foto: string | null;
 }
 
 type Medidas = Omit<MuebleEstandar, "categoria" | "tipo" | "foto">;
@@ -27,6 +29,9 @@ const slug = (nombre: string) =>
 
 const grupo = (categoria: string, tipo: TipoMueble, muebles: Medidas[]): MuebleEstandar[] =>
   muebles.map((m) => ({ ...m, categoria, tipo, foto: `${slug(m.nombre)}.webp` }));
+
+const grupoSinFoto = (categoria: string, muebles: Medidas[]): MuebleEstandar[] =>
+  muebles.map((m) => ({ ...m, categoria, tipo: "Otro", foto: null }));
 
 export const MUEBLES_ESTANDAR: readonly MuebleEstandar[] = [
   ...grupo("Cocina", "Electrodoméstico", [
@@ -185,7 +190,48 @@ export const MUEBLES_ESTANDAR: readonly MuebleEstandar[] = [
     { nombre: "Valija", largoCm: 70, anchoCm: 45, altoCm: 30, pesoKgAprox: 20 },
     { nombre: "Bolso de ropa", largoCm: 70, anchoCm: 40, altoCm: 40, pesoKgAprox: 10 },
   ]),
+
+  ...grupoSinFoto("Corralón", [
+    { nombre: "Bolsa de cemento (50 kg)", largoCm: 60, anchoCm: 40, altoCm: 12, pesoKgAprox: 50 },
+    { nombre: "Bolsa de cal (25 kg)", largoCm: 55, anchoCm: 35, altoCm: 10, pesoKgAprox: 25 },
+    { nombre: "Bolsa de pegamento para cerámicos", largoCm: 50, anchoCm: 35, altoCm: 10, pesoKgAprox: 30 },
+    { nombre: "Caja de cerámicos", largoCm: 60, anchoCm: 40, altoCm: 10, pesoKgAprox: 25 },
+    { nombre: "Pallet de ladrillos", largoCm: 120, anchoCm: 100, altoCm: 100, pesoKgAprox: 1000 },
+    { nombre: "Bolsón de arena (1 m³)", largoCm: 100, anchoCm: 100, altoCm: 100, pesoKgAprox: 1400 },
+    { nombre: "Chapa (3 m)", largoCm: 300, anchoCm: 110, altoCm: 2, pesoKgAprox: 15 },
+    { nombre: "Caño (6 m)", largoCm: 600, anchoCm: 10, altoCm: 10, pesoKgAprox: 8 },
+    { nombre: "Tirante de madera (3 m)", largoCm: 300, anchoCm: 10, altoCm: 5, pesoKgAprox: 12 },
+    { nombre: "Placa de durlock", largoCm: 240, anchoCm: 120, altoCm: 2, pesoKgAprox: 25 },
+    { nombre: "Placa de melamina", largoCm: 275, anchoCm: 183, altoCm: 2, pesoKgAprox: 50 },
+    { nombre: "Balde de pintura (20 L)", largoCm: 35, anchoCm: 35, altoCm: 40, pesoKgAprox: 28 },
+  ]),
+  ...grupoSinFoto("Bebidas y mercadería", [
+    { nombre: "Bidón de agua (20 L)", largoCm: 30, anchoCm: 30, altoCm: 50, pesoKgAprox: 21 },
+    { nombre: "Pack de gaseosas", largoCm: 30, anchoCm: 20, altoCm: 35, pesoKgAprox: 14 },
+    { nombre: "Cajón de bebidas", largoCm: 45, anchoCm: 30, altoCm: 30, pesoKgAprox: 18 },
+    { nombre: "Bolsa de alimento para mascotas", largoCm: 70, anchoCm: 45, altoCm: 15, pesoKgAprox: 20 },
+    { nombre: "Bolsa de mercadería", largoCm: 40, anchoCm: 30, altoCm: 30, pesoKgAprox: 8 },
+  ]),
+
+  ...grupoSinFoto("Paquetes", [
+    { nombre: "Sobre", largoCm: 35, anchoCm: 25, altoCm: 2, pesoKgAprox: 0.5 },
+    { nombre: "Paquete chico", largoCm: 30, anchoCm: 20, altoCm: 10, pesoKgAprox: 2 },
+    { nombre: "Paquete mediano", largoCm: 40, anchoCm: 30, altoCm: 30, pesoKgAprox: 6 },
+    { nombre: "Paquete grande", largoCm: 60, anchoCm: 40, altoCm: 40, pesoKgAprox: 12 },
+  ]),
 ];
+
+const CATEGORIAS_COMPRAS = ["Corralón", "Bebidas y mercadería"];
+const CATEGORIAS_BULTOS = ["Cajas y bultos", "Paquetes"];
+
+/** Qué productos se sugieren para cada tipo de flete; "Otro" sugiere todos. */
+const SUGERIDOS_POR_TIPO: Record<TipoFlete, (m: MuebleEstandar) => boolean> = {
+  MUDANZA: (m) => !CATEGORIAS_COMPRAS.includes(m.categoria) && m.categoria !== "Paquetes",
+  MUEBLES: (m) => !CATEGORIAS_COMPRAS.includes(m.categoria) && !CATEGORIAS_BULTOS.includes(m.categoria),
+  COMPRAS: (m) => CATEGORIAS_COMPRAS.includes(m.categoria),
+  PAQUETERIA: (m) => CATEGORIAS_BULTOS.includes(m.categoria),
+  OTRO: () => true,
+};
 
 const normalizar = (texto: string) =>
   texto
@@ -207,14 +253,16 @@ export function buscarMueble(nombre: string): MuebleEstandar | null {
 
 /**
  * Los muebles cuyo nombre contiene lo escrito, seguidos de los que coinciden por tipo o ambiente
- * ("muebles", "electrodomésticos", "cocina"…). Vacío si no se escribió nada.
+ * ("muebles", "electrodomésticos", "cocina"…). Vacío si no se escribió nada. Con un tipo de flete,
+ * solo los productos que corresponden a ese tipo.
  */
-export function sugerirMuebles(texto: string): MuebleEstandar[] {
+export function sugerirMuebles(texto: string, tipoFlete?: TipoFlete): MuebleEstandar[] {
   const buscado = normalizar(texto);
   if (!buscado) return [];
-  const porNombre = MUEBLES_ESTANDAR.filter((m) => normalizar(m.nombre).includes(buscado));
+  const catalogo = tipoFlete ? MUEBLES_ESTANDAR.filter(SUGERIDOS_POR_TIPO[tipoFlete]) : MUEBLES_ESTANDAR;
+  const porNombre = catalogo.filter((m) => normalizar(m.nombre).includes(buscado));
   const palabras = buscado.split(" ").map(singular);
-  const porGrupo = MUEBLES_ESTANDAR.filter((m) => {
+  const porGrupo = catalogo.filter((m) => {
     if (porNombre.includes(m)) return false;
     const grupoNormalizado = normalizar(`${m.tipo} ${m.categoria}`);
     return palabras.every((p) => grupoNormalizado.includes(p));

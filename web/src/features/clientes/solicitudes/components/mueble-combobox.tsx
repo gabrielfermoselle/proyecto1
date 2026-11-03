@@ -4,6 +4,7 @@ import { Package, PencilLine } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
 import { FormField } from "@/components/shared/form-field";
+import type { TipoFlete } from "@/domain/catalogos";
 import { buscarMueble, sugerirMuebles, type MuebleEstandar } from "@/domain/muebles";
 import { cn } from "@/lib/utils";
 
@@ -11,20 +12,22 @@ type MuebleComboboxProps = React.ComponentProps<typeof FormField> & {
   texto: string;
   /** Base de las miniaturas en Supabase; sin ella se muestra un ícono. */
   urlFotos: string | null;
+  /** Limita las sugerencias a los productos de ese tipo de flete. */
+  tipoFlete?: TipoFlete | undefined;
   /** `null` cuando se elige lo escrito tal cual, sin medidas típicas. */
   onElegir: (mueble: MuebleEstandar | null) => void;
 };
 
 /** Campo "Qué es" que sugiere muebles comunes (patrón combobox ARIA 1.2) mientras se escribe. */
 export const MuebleCombobox = React.forwardRef<HTMLInputElement, MuebleComboboxProps>(
-  ({ texto, urlFotos, onElegir, id, name, onChange, onBlur, ...props }, ref) => {
+  ({ texto, urlFotos, tipoFlete, onElegir, id, name, onChange, onBlur, ...props }, ref) => {
     const listboxId = `${id ?? name}-muebles`;
     const [abierto, setAbierto] = React.useState(false);
     const [activo, setActivo] = React.useState(-1);
     const escrito = texto.trim();
     const opciones: (MuebleEstandar | null)[] = [
       ...(escrito && !buscarMueble(escrito) ? [null] : []),
-      ...sugerirMuebles(texto),
+      ...sugerirMuebles(texto, tipoFlete),
     ];
     const mostrar = abierto && opciones.length > 0;
 
@@ -99,7 +102,7 @@ export const MuebleCombobox = React.forwardRef<HTMLInputElement, MuebleComboboxP
             >
               {m ? (
                 <>
-                  {urlFotos ? (
+                  {urlFotos && m.foto ? (
                     <Image
                       src={`${urlFotos}/${m.foto}`}
                       alt=""
