@@ -13,10 +13,12 @@ describe("MUEBLES_ESTANDAR", () => {
     }
   });
 
-  it("cada mueble tiene su propia foto con un nombre de archivo simple", () => {
-    for (const m of MUEBLES_ESTANDAR) expect(m.foto, m.nombre).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*\.webp$/);
-    expect(new Set(MUEBLES_ESTANDAR.map((m) => m.foto)).size).toBe(MUEBLES_ESTANDAR.length);
+  it("cada mueble con foto tiene la suya, con un nombre de archivo simple", () => {
+    const fotos = MUEBLES_ESTANDAR.flatMap((m) => (m.foto ? [m.foto] : []));
+    for (const foto of fotos) expect(foto).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*\.webp$/);
+    expect(new Set(fotos).size).toBe(fotos.length);
     expect(buscarMueble("Colchón king")?.foto).toBe("colchon-king.webp");
+    expect(buscarMueble("Paquete mediano")?.foto).toBeNull();
   });
 
   it("no repite nombres", () => {
@@ -68,5 +70,16 @@ describe("sugerirMuebles", () => {
 
   it("con el nombre completo sugiere solo ese", () => {
     expect(nombres("Heladera doble")).toEqual(["Heladera doble"]);
+  });
+
+  it("con un tipo de flete sugiere solo los productos de ese tipo", () => {
+    const de = (texto: string, tipo: Parameters<typeof sugerirMuebles>[1]) =>
+      sugerirMuebles(texto, tipo).map((m) => m.nombre);
+    expect(de("bolsa", "COMPRAS")).toContain("Bolsa de cemento (50 kg)");
+    expect(de("helad", "COMPRAS")).toEqual([]);
+    expect(de("caja", "PAQUETERIA")).toContain("Caja de mudanza");
+    expect(de("paquete", "MUDANZA")).toEqual([]);
+    expect(de("caja", "MUEBLES")).not.toContain("Caja de mudanza");
+    expect(de("cemento", "OTRO")).toEqual(["Bolsa de cemento (50 kg)"]);
   });
 });

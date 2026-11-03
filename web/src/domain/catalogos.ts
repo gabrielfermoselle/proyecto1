@@ -99,7 +99,7 @@ export type EstadoPresupuesto = (typeof ESTADOS_PRESUPUESTO)[number];
 export const AYUDA_TIPO_FLETE: Record<TipoFlete, string> = {
   MUDANZA: "Casa, departamento u oficina",
   MUEBLES: "Un mueble suelto o un electrodoméstico",
-  COMPRAS: "Materiales, compras del corralón o del mayorista",
+  COMPRAS: "Algo que ya compraste: retiro en el corralón, mayorista o negocio",
   PAQUETERIA: "Cajas y bultos chicos",
   OTRO: "Cualquier otra cosa",
 };

@@ -21,6 +21,7 @@ import {
   FRANJAS_HORARIAS,
   TIPOS_FLETE,
   TIPOS_VEHICULO,
+  type TipoFlete,
 } from "@/domain/catalogos";
 import { resumirCarga, type ItemCarga } from "@/domain/carga";
 import { fechaIsoAr, sumarDias } from "@/domain/fechas";
@@ -83,6 +84,43 @@ const PASOS = [
     campos: ["ayudantesRequeridos", "requiereEmbalaje", "tipoVehiculoSugerido"],
   },
 ] as const satisfies readonly { titulo: string; ayuda: string; campos: readonly Campo[] }[];
+
+/** Ejemplos del paso "Qué llevás" según el tipo de flete elegido. */
+const EJEMPLOS_CARGA: Record<
+  TipoFlete,
+  { titulo: string; descripcion: string; lista: string; item: string }
+> = {
+  MUDANZA: {
+    titulo: "Mudanza de 2 ambientes",
+    descripcion: "Es un 3er piso por escalera. La heladera es de dos puertas.",
+    lista: "heladera, cama, cajas…",
+    item: "Heladera simple",
+  },
+  MUEBLES: {
+    titulo: "Heladera y lavarropas",
+    descripcion: "La heladera es de dos puertas. Hay que bajarla por escalera.",
+    lista: "heladera, sillón, mesa…",
+    item: "Sillón de 3 cuerpos",
+  },
+  COMPRAS: {
+    titulo: "Materiales del corralón",
+    descripcion: "Ya está pago. Hay que retirarlo en el corralón y descargarlo en la vereda.",
+    lista: "cemento, cerámicos, chapas…",
+    item: "Bolsa de cemento",
+  },
+  PAQUETERIA: {
+    titulo: "3 cajas para enviar",
+    descripcion: "Son cajas cerradas, una tiene vajilla.",
+    lista: "paquete, caja, bolso…",
+    item: "Paquete mediano",
+  },
+  OTRO: {
+    titulo: "Mudanza de 2 ambientes",
+    descripcion: "La heladera es de dos puertas. Hay que bajarla por escalera.",
+    lista: "heladera, mesa, sillón…",
+    item: "Heladera simple",
+  },
+};
 
 /** Dirección + punto en el mapa + piso y ascensor, para el origen o el destino. */
 function Lugar({ form, prefijo }: { form: Formulario; prefijo: "origen" | "destino" }) {
@@ -364,6 +402,7 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
   const [muebleDe, setMuebleDe] = useState<Record<string, string>>({});
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
   const tipoFlete = watch("tipoFlete");
+  const ejemplos = EJEMPLOS_CARGA[tipoFlete ?? "OTRO"];
   const franja = watch("franja");
   const items = watch("items");
   const ayudantes = Number(watch("ayudantesRequeridos")) || 0;
@@ -498,7 +537,7 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
             <>
               <FormField
                 label="Título"
-                placeholder="Ej.: Mudanza de 2 ambientes"
+                placeholder={`Ej.: ${ejemplos.titulo}`}
                 hint="Es lo primero que ven los fleteros."
                 error={errors.titulo?.message}
                 {...register("titulo")}
@@ -506,7 +545,7 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
               <TextareaField
                 label="Descripción (opcional)"
                 rows={3}
-                placeholder="Ej.: La heladera es de dos puertas. Hay que bajarla por escalera."
+                placeholder={`Ej.: ${ejemplos.descripcion}`}
                 error={errors.descripcion?.message}
                 {...register("descripcion")}
               />
@@ -518,8 +557,8 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
                   </span>
                 </legend>
                 <p className="text-sm text-muted-foreground">
-                  Escribí qué es y elegilo de la lista (heladera, mesa, sillón…): completamos las medidas
-                  típicas y las podés cambiar.
+                  Escribí qué es y elegilo de la lista ({ejemplos.lista}): completamos las medidas típicas y
+                  las podés cambiar.
                 </p>
                 <ol className="grid gap-3">
                   {fields.map((campo, i) => {
@@ -533,10 +572,11 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
                           <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_7rem]">
                             <MuebleCombobox
                               label="Qué es"
-                              placeholder="Ej.: Heladera simple"
+                              placeholder={`Ej.: ${ejemplos.item}`}
                               error={e?.nombre?.message}
                               texto={items[i]?.nombre ?? ""}
                               urlFotos={urlFotosMuebles}
+                              tipoFlete={tipoFlete}
                               onElegir={(mueble) => {
                                 if (!mueble) {
                                   setAbiertos((a) => ({ ...a, [campo.id]: true }));
