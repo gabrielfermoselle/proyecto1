@@ -1,7 +1,7 @@
 "use client";
 
 import L from "leaflet";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Circle, Marker, useMap, useMapEvents } from "react-leaflet";
 import { CENTRO_TUCUMAN, type Coordenadas } from "@/domain/geo";
 import { MapaBase, pin } from "./mapa-base";
@@ -12,11 +12,18 @@ interface MapaZonaProps {
   onMover: (punto: Coordenadas) => void;
 }
 
-/** Ajusta la vista para que se vea todo el círculo de cobertura. */
+/**
+ * Ajusta la vista para que se vea todo el círculo de cobertura cuando cambia el radio o el punto
+ * queda fuera de la vista. Si el usuario movió el pin dentro de lo que ve, se respeta su zoom.
+ */
 function AjustarVista({ punto, radioKm }: { punto: Coordenadas | null; radioKm: number }) {
   const mapa = useMap();
+  const radioAjustado = useRef<number | null>(null);
   useEffect(() => {
     if (!punto) return;
+    const cambioRadio = radioAjustado.current !== radioKm;
+    if (!cambioRadio && mapa.getBounds().contains([punto.lat, punto.lng])) return;
+    radioAjustado.current = radioKm;
     mapa.fitBounds(L.latLng(punto.lat, punto.lng).toBounds(radioKm * 2000), {
       padding: [16, 16],
       animate: true,

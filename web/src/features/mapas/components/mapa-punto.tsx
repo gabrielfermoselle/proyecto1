@@ -13,10 +13,16 @@ interface MapaPuntoProps {
   etiqueta: string;
 }
 
+const ZOOM_PUNTO = 15;
+
+/** Lleva el mapa al punto, sin pisar el zoom ni el encuadre que eligió el usuario si ya se ve. */
 function Centrar({ punto }: { punto: Coordenadas | null }) {
   const mapa = useMap();
   useEffect(() => {
-    if (punto) mapa.setView([punto.lat, punto.lng], Math.max(mapa.getZoom(), 15), { animate: true });
+    if (!punto) return;
+    const visible = mapa.getBounds().contains([punto.lat, punto.lng]);
+    if (visible && mapa.getZoom() >= ZOOM_PUNTO) return;
+    mapa.setView([punto.lat, punto.lng], Math.max(mapa.getZoom(), ZOOM_PUNTO), { animate: true });
   }, [mapa, punto]);
   return null;
 }
@@ -40,7 +46,7 @@ export function MapaPunto({ punto, onMover, variante = "origen", etiqueta }: Map
   return (
     <MapaBase
       centro={punto ?? CENTRO_TUCUMAN}
-      zoom={punto ? 15 : 12}
+      zoom={punto ? ZOOM_PUNTO : 12}
       etiqueta={etiqueta}
       className="h-56 sm:h-64"
     >
