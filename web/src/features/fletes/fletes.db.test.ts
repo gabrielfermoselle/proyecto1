@@ -104,7 +104,6 @@ describe("flete de punta a punta por las acciones", () => {
       ["CERRADO", false],
     ]);
     expect(await eventosDelChat(solicitud.id, fletero.fleteroProfile!.id)).toEqual([
-      "PRESUPUESTO_ENVIADO",
       "FLETE_CONFIRMADO",
       "EN_CAMINO_A_ORIGEN",
       "LLEGADA_ORIGEN",

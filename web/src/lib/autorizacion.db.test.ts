@@ -9,6 +9,7 @@ import { proponerHorario } from "@/features/chat/actions";
 import type { ActionResult } from "@/lib/action-result";
 import type { UsuarioActual } from "@/lib/session";
 import {
+  chatPrevio,
   crearAdmin,
   crearCliente,
   crearFletero,
@@ -50,9 +51,13 @@ async function crearMundo() {
   const otroFletero = await crearFletero("Intruso");
   const admin = await crearAdmin();
 
-  // Una solicitud en negociación (con presupuesto, chat y una propuesta de horario)...
+  // Una solicitud en negociación (con presupuesto, un chat de antes y una propuesta de horario)...
   const abierta = await crearSolicitud(cliente);
-  const negociacion = await presupuestar(abierta.id, fletero);
+  const presupuestada = await presupuestar(abierta.id, fletero);
+  const negociacion = {
+    presupuestoId: presupuestada.presupuestoId,
+    conversacionId: await chatPrevio(abierta.id, cliente, fletero),
+  };
   comoUsuario(fletero);
   ok(
     await proponerHorario({

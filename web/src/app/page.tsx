@@ -20,7 +20,7 @@ const PASOS = [
   { titulo: "Publicás", detalle: "Qué llevás, de dónde a dónde y cuándo. Con fotos, mejor." },
   {
     titulo: "Recibís presupuestos",
-    detalle: "Fleteros de tu zona te mandan su precio. Les preguntás por el chat.",
+    detalle: "Fleteros de tu zona te mandan su precio. Al aceptar uno, se abre el chat.",
   },
   { titulo: "Elegís", detalle: "Comparás precio, vehículo y reseñas. Seguís el flete hasta que llega." },
 ];
@@ -289,7 +289,7 @@ export default async function InicioPage() {
               </h2>
               <p className="max-w-2xl text-lg text-muted-foreground">
                 Mirá los pedidos cerca de tu base, con fotos y medidas, y presupuestá los que te convienen. El
-                chat con el cliente se abre cuando le mandás tu precio.
+                chat con el cliente se abre cuando acepta tu precio.
               </p>
               <ul className="flex flex-wrap gap-2 pt-1 text-sm font-semibold">
                 <li className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1.5 text-primary">

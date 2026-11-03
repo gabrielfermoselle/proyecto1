@@ -96,7 +96,7 @@ export function PresupuestosRecibidos({
       {pideEmbalaje ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="size-4 shrink-0" aria-hidden="true" />
-          Pediste embalaje: confirmá con cada fletero por el chat si lo incluye.
+          Pediste embalaje: fijate en la descripción de cada presupuesto si lo incluye.
         </p>
       ) : null}
       <ul className="grid gap-3">
@@ -189,7 +189,7 @@ export function PresupuestosRecibidos({
 
             {p.mensaje ? (
               <p className="whitespace-pre-line rounded-lg bg-muted/50 px-4 py-3 text-sm">
-                <span className="sr-only">Mensaje de {p.fletero.nombre}: </span>«{p.mensaje}»
+                <span className="sr-only">Descripción de {p.fletero.nombre}: </span>«{p.mensaje}»
               </p>
             ) : null}
 

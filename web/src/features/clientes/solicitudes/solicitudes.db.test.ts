@@ -3,6 +3,7 @@ import { sumarDias, fechaIsoAr } from "@/domain/fechas";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
 import { numero } from "@/lib/db";
 import {
+  chatPrevio,
   crearCliente,
   crearFletero,
   crearSolicitud,
@@ -105,12 +106,14 @@ describe("publicar una solicitud", () => {
 });
 
 describe("cancelar una solicitud", () => {
-  it("rechaza los presupuestos pendientes y avisa a cada fletero en su chat", async () => {
+  it("rechaza los presupuestos pendientes y avisa a cada fletero", async () => {
     const cliente = await crearCliente();
     const [f1, f2] = [await crearFletero("Uno"), await crearFletero("Dos")];
     const s = await crearSolicitud(cliente);
     await presupuestar(s.id, f1);
     await presupuestar(s.id, f2);
+    // Un chat de cuando presupuestar lo abría: el aviso también queda ahí.
+    await chatPrevio(s.id, cliente, f2);
 
     comoUsuario(cliente);
     ok(await cancelarSolicitud({ solicitudId: s.id }));
@@ -119,11 +122,8 @@ describe("cancelar una solicitud", () => {
     const presupuestos = await filas<{ estado: string }>("presupuestos", { solicitudId: s.id });
     expect(final.estado).toBe("CANCELADA");
     expect(presupuestos.map((p) => p.estado)).toEqual(["RECHAZADO", "RECHAZADO"]);
-    expect(await eventosDelChat(s.id, f1.fleteroProfile!.id)).toEqual([
-      "PRESUPUESTO_ENVIADO",
-      "SOLICITUD_CANCELADA",
-    ]);
-    expect(await eventosDelChat(s.id, f2.fleteroProfile!.id)).toContain("SOLICITUD_CANCELADA");
+    expect(await eventosDelChat(s.id, f1.fleteroProfile!.id)).toEqual([]);
+    expect(await eventosDelChat(s.id, f2.fleteroProfile!.id)).toEqual(["SOLICITUD_CANCELADA"]);
     const avisos = (
       await Promise.all([
         filas<{ titulo: string }>("notificaciones", { userId: f1.id }),
@@ -157,7 +157,7 @@ describe("cancelar una solicitud", () => {
 });
 
 describe("aceptar un presupuesto", () => {
-  it("crea el flete, rechaza los demás y deja los mensajes en cada chat", async () => {
+  it("crea el flete, abre el chat solo con el elegido y avisa al otro", async () => {
     const cliente = await crearCliente();
     const [elegido, otro] = [await crearFletero("Elegido"), await crearFletero("Otro")];
     const s = await crearSolicitud(cliente);
@@ -176,19 +176,22 @@ describe("aceptar un presupuesto", () => {
     expect(presupuestos.find((p) => p.id === presupuestoId)?.estado).toBe("ACEPTADO");
     expect(presupuestos.filter((p) => p.estado === "RECHAZADO")).toHaveLength(1);
     expect((await uno<{ estado: string }>("solicitudes", { id: s.id })).estado).toBe("ADJUDICADA");
-    expect(await eventosDelChat(s.id, elegido.fleteroProfile!.id)).toContain("FLETE_CONFIRMADO");
-    expect(await eventosDelChat(s.id, otro.fleteroProfile!.id)).toContain("PRESUPUESTO_NO_ELEGIDO");
+    expect(await eventosDelChat(s.id, elegido.fleteroProfile!.id)).toEqual(["FLETE_CONFIRMADO"]);
+    expect(await eventosDelChat(s.id, otro.fleteroProfile!.id)).toEqual([]);
+    const avisosOtro = await filas<{ titulo: string }>("notificaciones", { userId: otro.id });
+    expect(avisosOtro.map((a) => a.titulo)).toContain("El cliente eligió otro presupuesto");
 
     // Una segunda aceptación (doble clic, otra pestaña) no crea otro flete.
     expect(error(await aceptarPresupuesto({ presupuestoId }))).toMatch(/ya no está abierta/);
     expect(await contar("fletes", { solicitudId: s.id })).toBe(1);
   });
 
-  it("aplica la fecha que se acordó en el chat", async () => {
+  it("aplica la fecha que se acordó en un chat de antes de aceptar", async () => {
     const cliente = await crearCliente();
     const fletero = await crearFletero();
     const s = await crearSolicitud(cliente, { fecha: dia(3), franja: "MANANA" });
-    const { presupuestoId, conversacionId } = await presupuestar(s.id, fletero);
+    const { presupuestoId } = await presupuestar(s.id, fletero);
+    const conversacionId = await chatPrevio(s.id, cliente, fletero);
     const mensaje = await insertar<{ id: string }>("mensajes", {
       conversacionId,
       tipo: "PROPUESTA",

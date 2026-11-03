@@ -124,7 +124,10 @@ export function ZonaForm({ inicial, siguienteHref }: ZonaFormProps) {
       () => guardarZona(getValues()),
       siguienteHref ? undefined : "Guardamos tu zona de trabajo.",
     );
-    if (resultado && siguienteHref) router.push(siguienteHref);
+    if (!resultado) return;
+    // Si el refresco que pide la acción se descarta, el listado de pedidos seguiría con la zona vieja.
+    if (siguienteHref) router.push(siguienteHref);
+    else router.refresh();
   });
 
   return (

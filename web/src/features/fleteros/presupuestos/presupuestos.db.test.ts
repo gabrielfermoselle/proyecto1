@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { finDelDiaAr, fechaIsoDeDia } from "@/domain/fechas";
 import { numero } from "@/lib/db";
 import {
+  chatPrevio,
   crearCliente,
   crearFletero,
   crearSolicitud,
@@ -44,12 +45,13 @@ async function presupuestoDe(solicitudId: string, fletero: Fletero) {
     montoSugerido: unknown;
     incluyeAyudantes: number;
     validoHasta: string;
+    mensaje: string | null;
   }>("presupuestos", { solicitudId, fleteroId: fletero.fleteroProfile!.id });
 }
 
 describe("enviarPresupuesto", () => {
-  it("crea el presupuesto, abre el chat y deja el mensaje del fletero como primer mensaje", async () => {
-    const { fletero, solicitud } = await escenario();
+  it("crea el presupuesto con su descripción y avisa al cliente, sin abrir el chat", async () => {
+    const { cliente, fletero, solicitud } = await escenario();
     comoUsuario(fletero);
 
     ok(await enviarPresupuesto({ ...base(fletero, solicitud.id), mensaje: "Lo hago a la mañana" }));
@@ -57,20 +59,11 @@ describe("enviarPresupuesto", () => {
     const p = await presupuestoDe(solicitud.id, fletero);
     expect(p.estado).toBe("PENDIENTE");
     expect(numero(p.monto)).toBe(30_000);
-    expect(await eventosDelChat(solicitud.id, fletero.fleteroProfile!.id)).toEqual(["PRESUPUESTO_ENVIADO"]);
-    const conversaciones = await filas<{ id: string }>("conversaciones", { solicitudId: solicitud.id });
-    const textos = (
-      await Promise.all(
-        conversaciones.map((c) =>
-          filas<{ contenido: string | null; autorId: string | null }>("mensajes", {
-            conversacionId: c.id,
-            tipo: "TEXTO",
-          }),
-        ),
-      )
-    ).flat();
-    expect(textos.map((m) => ({ contenido: m.contenido, autorId: m.autorId }))).toEqual([
-      { contenido: "Lo hago a la mañana", autorId: fletero.id },
+    expect(p.mensaje).toBe("Lo hago a la mañana");
+    expect(await contar("conversaciones", { solicitudId: solicitud.id })).toBe(0);
+    const avisos = await filas<{ tipo: string; href: string }>("notificaciones", { userId: cliente.id });
+    expect(avisos).toEqual([
+      expect.objectContaining({ tipo: "PRESUPUESTO", href: `/cliente/pedido/${solicitud.id}` }),
     ]);
   });
 
@@ -227,8 +220,8 @@ describe("enviarPresupuesto", () => {
 });
 
 describe("retirarPresupuesto", () => {
-  it("lo retira, avisa en el chat y no permite volver a presupuestar", async () => {
-    const { fletero, solicitud } = await escenario();
+  it("lo retira, avisa al cliente y no permite volver a presupuestar", async () => {
+    const { cliente, fletero, solicitud } = await escenario();
     comoUsuario(fletero);
     ok(await enviarPresupuesto(base(fletero, solicitud.id)));
     const { id } = await presupuestoDe(solicitud.id, fletero);
@@ -236,11 +229,22 @@ describe("retirarPresupuesto", () => {
     ok(await retirarPresupuesto({ presupuestoId: id }));
 
     expect((await presupuestoDe(solicitud.id, fletero)).estado).toBe("RETIRADO");
-    expect(await eventosDelChat(solicitud.id, fletero.fleteroProfile!.id)).toEqual([
-      "PRESUPUESTO_ENVIADO",
-      "PRESUPUESTO_RETIRADO",
-    ]);
+    expect(await contar("conversaciones", { solicitudId: solicitud.id })).toBe(0);
+    const avisos = await filas<{ titulo: string }>("notificaciones", { userId: cliente.id });
+    expect(avisos.map((a) => a.titulo)).toContainEqual(expect.stringMatching(/retiró su presupuesto/));
     expect(error(await enviarPresupuesto(base(fletero, solicitud.id)))).toMatch(/Ya enviaste/);
+  });
+
+  it("si ya había un chat de antes, el retiro queda avisado ahí", async () => {
+    const { cliente, fletero, solicitud } = await escenario();
+    comoUsuario(fletero);
+    ok(await enviarPresupuesto(base(fletero, solicitud.id)));
+    await chatPrevio(solicitud.id, cliente, fletero);
+    const { id } = await presupuestoDe(solicitud.id, fletero);
+
+    ok(await retirarPresupuesto({ presupuestoId: id }));
+
+    expect(await eventosDelChat(solicitud.id, fletero.fleteroProfile!.id)).toEqual(["PRESUPUESTO_RETIRADO"]);
   });
 
   it("no se puede retirar dos veces", async () => {
