@@ -2,7 +2,7 @@
 
 import L from "leaflet";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Circle, Marker, Popup, useMap } from "react-leaflet";
 import { CENTRO_TUCUMAN, type Coordenadas } from "@/domain/geo";
 import { MapaBase, pin, type VariantePin } from "./mapa-base";
@@ -25,10 +25,21 @@ interface MapaPuntosProps {
   className?: string;
 }
 
-/** Encuadra todos los puntos (y el círculo de cobertura, si hay). */
+/**
+ * Encuadra todos los puntos (y el círculo de cobertura, si hay). Solo vuelve a encuadrar si cambian
+ * las coordenadas, así no se pierde el zoom del usuario cuando la página se vuelve a renderizar.
+ */
 function Encuadrar({ puntos, base, radioKm }: Pick<MapaPuntosProps, "puntos" | "base" | "radioKm">) {
   const mapa = useMap();
+  const clave = JSON.stringify([
+    puntos.map((p) => [p.lat, p.lng]),
+    base ? [base.lat, base.lng] : null,
+    radioKm,
+  ]);
+  const datos = useRef({ puntos, base, radioKm });
+  datos.current = { puntos, base, radioKm };
   useEffect(() => {
+    const { puntos, base, radioKm } = datos.current;
     const limites = L.latLngBounds([]);
     for (const p of puntos) limites.extend([p.lat, p.lng]);
     if (base)
@@ -36,7 +47,7 @@ function Encuadrar({ puntos, base, radioKm }: Pick<MapaPuntosProps, "puntos" | "
         radioKm ? L.latLng(base.lat, base.lng).toBounds(radioKm * 2000) : L.latLng(base.lat, base.lng),
       );
     if (limites.isValid()) mapa.fitBounds(limites, { padding: [24, 24], maxZoom: 15 });
-  }, [mapa, puntos, base, radioKm]);
+  }, [mapa, clave]);
   return null;
 }
 

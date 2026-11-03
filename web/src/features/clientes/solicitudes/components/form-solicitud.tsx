@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, Camera, Check, Minus, Plus, Route, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
-import { useFieldArray, useForm, type FieldPath, type UseFormReturn } from "react-hook-form";
+import { Controller, useFieldArray, useForm, type FieldPath, type UseFormReturn } from "react-hook-form";
 import { FormField, SelectField, TextareaField } from "@/components/shared/form-field";
 import { FormMensaje } from "@/components/shared/form-mensaje";
 import { RadioCard } from "@/components/shared/radio-card";
@@ -29,6 +29,7 @@ import { buscarMueble } from "@/domain/muebles";
 import { DIAS_MAXIMOS_ANTICIPACION, MAXIMO_ITEMS } from "@/domain/solicitud";
 import { hrefPedido } from "@/features/fletes/rutas";
 import { AddressAutocomplete } from "@/features/mapas/components/address-autocomplete";
+import { ErrorPunto } from "@/features/mapas/components/error-punto";
 import { MapaPunto } from "@/features/mapas/components/mapas-dinamicos";
 import { direccionDePunto } from "@/features/mapas/geocoding";
 import { formatearDia, formatearKg, formatearKm, formatearM3 } from "@/lib/formato";
@@ -85,7 +86,7 @@ const PASOS = [
 
 /** Dirección + punto en el mapa + piso y ascensor, para el origen o el destino. */
 function Lugar({ form, prefijo }: { form: Formulario; prefijo: "origen" | "destino" }) {
-  const { register, setValue, getValues, formState } = form;
+  const { register, setValue, getValues, clearErrors, formState } = form;
   const campo = <S extends string>(sufijo: S) => `${prefijo}${sufijo}` as `${typeof prefijo}${S}`;
   const lat = getValues(campo("Lat"));
   const lng = getValues(campo("Lng"));
@@ -93,16 +94,21 @@ function Lugar({ form, prefijo }: { form: Formulario; prefijo: "origen" | "desti
     typeof lat === "number" && typeof lng === "number" ? { lat, lng } : null,
   );
   const inversa = useRef<AbortController | null>(null);
+  // Si el texto lo escribió el usuario o la altura es aproximada, mover el pin ajusta el punto
+  // pero no reemplaza la dirección.
+  const conservarDireccion = useRef(false);
 
   const fijar = useCallback(
     (nuevo: Coordenadas, direccion?: string) => {
       setPunto(nuevo);
       setValue(campo("Lat"), nuevo.lat);
       setValue(campo("Lng"), nuevo.lng);
+      clearErrors([campo("Lat"), campo("Lng")]);
       if (direccion) {
         setValue(campo("Direccion"), direccion, { shouldValidate: true });
         return;
       }
+      if (conservarDireccion.current && getValues(campo("Direccion"))?.trim()) return;
       // Pin movido a mano: se busca la dirección más cercana.
       inversa.current?.abort();
       const controlador = new AbortController();
@@ -112,11 +118,10 @@ function Lugar({ form, prefijo }: { form: Formulario; prefijo: "origen" | "desti
         .catch(() => undefined);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `campo` depende solo de `prefijo`
-    [setValue, prefijo],
+    [setValue, getValues, clearErrors, prefijo],
   );
 
   const errores = formState.errors;
-  const errorDireccion = errores[campo("Direccion")]?.message;
   const esOrigen = prefijo === "origen";
   return (
     <fieldset className="grid content-start gap-3">
@@ -127,10 +132,31 @@ function Lugar({ form, prefijo }: { form: Formulario; prefijo: "origen" | "desti
         />
         {esOrigen ? "Desde dónde" : "Hasta dónde"}
       </legend>
-      <AddressAutocomplete
-        label={esOrigen ? "Buscá la dirección de retiro" : "Buscá la dirección de entrega"}
-        placeholder="Ej.: Av. Mate de Luna 2400"
-        onSelect={({ lat, lng, direccion }) => fijar({ lat, lng }, direccion)}
+      <Controller
+        control={form.control}
+        name={campo("Direccion")}
+        render={({ field, fieldState }) => (
+          <AddressAutocomplete
+            label={esOrigen ? "Dirección de retiro" : "Dirección de entrega"}
+            placeholder="Ej.: Laprida 463, Barrio Norte"
+            hint="Para una búsqueda óptima, poné calle, número y barrio. El fletero ve solo la calle y el barrio hasta que aceptes su presupuesto."
+            name={field.name}
+            value={field.value ?? ""}
+            onTextoChange={(texto) => {
+              conservarDireccion.current = true;
+              field.onChange(texto);
+              // El paso se valida antes del envío; sin esto el error quedaría hasta tocar "Siguiente".
+              if (fieldState.error) void form.trigger(campo("Direccion"));
+            }}
+            onBlur={field.onBlur}
+            inputRef={field.ref}
+            error={fieldState.error?.message}
+            onSelect={({ lat, lng, direccion, aproximada }) => {
+              conservarDireccion.current = aproximada;
+              fijar({ lat, lng }, direccion);
+            }}
+          />
+        )}
       />
       <MapaPunto
         punto={punto}
@@ -138,12 +164,7 @@ function Lugar({ form, prefijo }: { form: Formulario; prefijo: "origen" | "desti
         variante={esOrigen ? "origen" : "destino"}
         etiqueta={`Mapa para marcar el punto de ${esOrigen ? "retiro" : "entrega"}`}
       />
-      <FormField
-        label="Dirección"
-        hint="El fletero ve solo la calle y el barrio hasta que aceptes su presupuesto."
-        error={errorDireccion}
-        {...register(campo("Direccion"))}
-      />
+      {errores[campo("Lat")] || errores[campo("Lng")] ? <ErrorPunto /> : null}
       <div className="grid grid-cols-2 gap-3">
         <FormField
           label="Piso"

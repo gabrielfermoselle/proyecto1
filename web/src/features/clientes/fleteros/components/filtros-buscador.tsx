@@ -125,6 +125,7 @@ export function FiltrosBuscador({
               label="Dirección"
               placeholder="Ej.: Av. Aconquija 1500, Yerba Buena"
               {...(escrita?.direccion ? { hint: `Elegida: ${escrita.direccion}` } : {})}
+              avisoAproximada="Encontramos la calle, pero no la altura exacta: la distancia es aproximada."
               onSelect={({ lat, lng, direccion }) => setEscrita({ lat, lng, direccion })}
             />
             {escrita ? (

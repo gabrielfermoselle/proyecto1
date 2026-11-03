@@ -40,7 +40,7 @@ export function MapaBase({ centro, zoom = 13, className, etiqueta, children }: M
       <MapContainer
         center={[centro.lat, centro.lng]}
         zoom={zoom}
-        scrollWheelZoom={false}
+        scrollWheelZoom
         className="size-full"
       >
         <TileLayer

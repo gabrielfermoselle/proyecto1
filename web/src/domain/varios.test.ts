@@ -28,6 +28,16 @@ describe("direccionAproximada", () => {
     );
     expect(direccionAproximada("Pasaje Padilla 1100")).toBe("Pasaje Padilla");
     expect(direccionAproximada("Lavalle N° 350, Yerba Buena")).toBe("Lavalle, Yerba Buena");
+    expect(direccionAproximada("Mendoza al 1288, Centro")).toBe("Mendoza, Centro");
+  });
+
+  it("no deja ver la altura aunque el cliente escriba algo después", () => {
+    expect(direccionAproximada("Mendoza 1288 Dpto 3B, Centro, San Miguel de Tucumán")).toBe(
+      "Mendoza, Centro, San Miguel de Tucumán",
+    );
+    expect(direccionAproximada("Mendoza 1288 piso 2, Centro")).toBe("Mendoza, Centro");
+    expect(direccionAproximada("Mendoza 1288 - Centro")).toBe("Mendoza");
+    expect(direccionAproximada("Barrio Sur, manzana B casa 12")).toBe("Barrio Sur, manzana B casa");
   });
 
   it("no rompe nombres de calles con números ni rutas", () => {
@@ -38,6 +48,7 @@ describe("direccionAproximada", () => {
       "Av. 9 de Julio, San Isidro de Lules",
     );
     expect(direccionAproximada("Ruta 338, El Manantial")).toBe("Ruta 338, El Manantial");
+    expect(direccionAproximada("Ruta 9 km 1290, Tapia")).toBe("Ruta 9 km 1290, Tapia");
   });
 
   it("deja igual una dirección sin altura", () => {
