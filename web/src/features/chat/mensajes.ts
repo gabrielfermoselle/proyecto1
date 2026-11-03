@@ -1,8 +1,8 @@
 import "server-only";
-import type { EtapaFlete, FranjaHoraria } from "@/domain/catalogos";
-import { contactoVisible as calcularContactoVisible, ocultarContacto, sanitizarTexto } from "@/domain/chat";
+import type { FranjaHoraria } from "@/domain/catalogos";
+import { ocultarContacto } from "@/domain/chat";
 import { notificar } from "@/features/notificaciones/servidor";
-import { fallar, nuevoId, relacion } from "@/lib/db";
+import { fallar, nuevoId } from "@/lib/db";
 import { nombrePublico } from "@/lib/formato";
 import type { Publicacion } from "@/lib/supabase";
 import type { UsuarioActual } from "@/lib/session";
@@ -129,55 +129,4 @@ export async function insertarMensaje(
       ...avisos,
     ],
   };
-}
-
-/**
- * Mensaje de texto escrito desde otra operación (p. ej. el mensaje que acompaña un presupuesto).
- * La conversación puede haberse creado recién en la misma operación.
- */
-export async function crearMensajeDeTexto(
-  tx: Tx,
-  { conversacionId, autor, texto }: { conversacionId: string; autor: UsuarioActual; texto: string },
-): Promise<Publicacion[]> {
-  const limpio = sanitizarTexto(texto);
-  if (!limpio) return [];
-  const { data, error } = await tx
-    .from("conversaciones")
-    .select(
-      "solicitudId, fleteroId, cliente:perfiles_cliente!conversaciones_clienteId_fkey(userId), fletero:perfiles_fletero!conversaciones_fleteroId_fkey(userId)",
-    )
-    .eq("id", conversacionId)
-    .single();
-  fallar(error);
-  if (!data) throw new Error(`No existe la conversación ${conversacionId}`);
-  const cliente = relacion(data.cliente as { userId: string } | { userId: string }[] | null);
-  const fletero = relacion(data.fletero as { userId: string } | { userId: string }[] | null);
-  if (!cliente || !fletero) throw new Error(`La conversación ${conversacionId} no tiene participantes`);
-
-  const { data: flete, error: errorFlete } = await tx
-    .from("fletes")
-    .select("etapa, fleteroId")
-    .eq("solicitudId", data.solicitudId as string)
-    .maybeSingle();
-  fallar(errorFlete);
-
-  const esCliente = autor.rol === "CLIENTE";
-  const { publicaciones } = await insertarMensaje(
-    tx,
-    {
-      conversacionId,
-      solicitudId: data.solicitudId as string,
-      fleteroId: data.fleteroId as string,
-      autorId: autor.id,
-      autorRol: esCliente ? "CLIENTE" : "FLETERO",
-      autorNombre: nombrePublico(autor.nombre, autor.apellido),
-      destinatarioUserId: esCliente ? fletero.userId : cliente.userId,
-      destinatarioRol: esCliente ? "FLETERO" : "CLIENTE",
-      contactoVisible: calcularContactoVisible(
-        flete && flete.fleteroId === data.fleteroId ? (flete.etapa as EtapaFlete) : null,
-      ),
-    },
-    { tipo: "TEXTO", texto: limpio },
-  );
-  return publicaciones;
 }

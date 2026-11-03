@@ -4,6 +4,7 @@ import { fechaIsoAr, sumarDias } from "@/domain/fechas";
 import { aceptarPresupuesto } from "@/features/clientes/presupuestos/actions";
 import { cancelarFlete } from "@/features/fletes/actions";
 import {
+  chatPrevio,
   crearAdmin,
   crearCliente,
   crearFletero,
@@ -24,7 +25,8 @@ async function negociacion() {
   const cliente = await crearCliente();
   const fletero = await crearFletero();
   const solicitud = await crearSolicitud(cliente);
-  const { presupuestoId, conversacionId } = await presupuestar(solicitud.id, fletero);
+  const { presupuestoId } = await presupuestar(solicitud.id, fletero);
+  const conversacionId = await chatPrevio(solicitud.id, cliente, fletero);
   return { cliente, fletero, solicitud, presupuestoId, conversacionId };
 }
 

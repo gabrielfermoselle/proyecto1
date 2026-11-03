@@ -5,7 +5,7 @@ import { Logo } from "@/components/shared/logo";
 const PUNTOS = [
   { Icono: ClipboardList, texto: "Publicás qué necesitás mover y recibís presupuestos." },
   { Icono: BadgeCheck, texto: "Fleteros con reseñas de clientes reales y documentación verificada." },
-  { Icono: MessagesSquare, texto: "Hablás por el chat; el teléfono se comparte al aceptar." },
+  { Icono: MessagesSquare, texto: "El chat y el teléfono se habilitan al aceptar un presupuesto." },
 ];
 
 /**

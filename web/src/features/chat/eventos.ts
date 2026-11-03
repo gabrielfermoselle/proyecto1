@@ -142,6 +142,28 @@ export function publicacionesDeMensaje(
   ];
 }
 
+/**
+ * Avisos de antes de aceptar un presupuesto: el chat se abre recién al aceptar, así que no lo
+ * crean. Si el par ya tenía una conversación (abierta cuando presupuestar abría el chat), quedan ahí.
+ */
+const EVENTOS_SIN_CHAT_PROPIO = new Set<EventoChat>([
+  "PRESUPUESTO_ENVIADO",
+  "PRESUPUESTO_RETIRADO",
+  "PRESUPUESTO_NO_ELEGIDO",
+  "SOLICITUD_CANCELADA",
+]);
+
+async function buscarConversacion(tx: Tx, solicitudId: string, fleteroId: string): Promise<string | null> {
+  const { data, error } = await tx
+    .from("conversaciones")
+    .select("id")
+    .eq("solicitudId", solicitudId)
+    .eq("fleteroId", fleteroId)
+    .maybeSingle();
+  fallar(error);
+  return (data?.id as string | undefined) ?? null;
+}
+
 /** Crea la conversación del par si no existe. En conflicto no pisa el id que ya tenía. */
 async function asegurarConversacion(
   tx: Tx,
@@ -170,15 +192,17 @@ async function asegurarConversacion(
 }
 
 /**
- * Registra el evento en el chat del par (solicitud, fletero). Si la conversación no existe, la
- * crea: así el chat se habilita cuando el fletero presupuesta. `notificarA` permite elegir el
- * destinatario cuando depende de quién actuó (p. ej. una fecha que acepta el fletero).
+ * Registra el evento en el chat del par (solicitud, fletero) y avisa a la otra parte. Si la
+ * conversación no existe, la crea: así el chat se habilita cuando el cliente acepta el presupuesto.
+ * Los avisos de antes de aceptar solo notifican (`conversacionId` null) si no hay chat.
+ * `notificarA` permite elegir el destinatario cuando depende de quién actuó (p. ej. una fecha que
+ * acepta el fletero).
  */
 export async function registrarEvento<E extends EventoChat>(
   tx: Tx,
   e: EventoNegocio<E>,
   opciones: { notificarA?: RolChat } = {},
-): Promise<{ conversacionId: string; publicaciones: Publicacion[] }> {
+): Promise<{ conversacionId: string | null; publicaciones: Publicacion[] }> {
   const { data: solicitud, error: errorSolicitud } = await tx
     .from("solicitudes")
     .select(
@@ -204,26 +228,14 @@ export async function registrarEvento<E extends EventoChat>(
   const fleteroUser = relacion(fletero.user as UsuarioNombre | UsuarioNombre[] | null);
   if (!fleteroUser) throw new Error(`El fletero ${e.fleteroId} no tiene usuario`);
 
-  const conversacionId = await asegurarConversacion(tx, {
-    solicitudId: e.solicitudId,
-    fleteroId: e.fleteroId,
-    clienteId: solicitud.clienteId as string,
-  });
-  const mensajeId = nuevoId();
-  const { error: errorMensaje } = await tx.from("mensajes").insert({
-    id: mensajeId,
-    conversacionId,
-    tipo: "SISTEMA",
-    evento: e.evento,
-    datos: e.datos,
-  });
-  fallar(errorMensaje);
-  const mensaje = await cargarMensaje(tx, mensajeId);
-  const { error: errorActividad } = await tx
-    .from("conversaciones")
-    .update({ ultimaActividadEn: mensaje.createdAt.toISOString() })
-    .eq("id", conversacionId);
-  fallar(errorActividad);
+  const conversacionId = EVENTOS_SIN_CHAT_PROPIO.has(e.evento)
+    ? await buscarConversacion(tx, e.solicitudId, e.fleteroId)
+    : await asegurarConversacion(tx, {
+        solicitudId: e.solicitudId,
+        fleteroId: e.fleteroId,
+        clienteId: solicitud.clienteId as string,
+      });
+  const mensaje = conversacionId ? await insertarMensajeSistema(tx, conversacionId, e) : null;
 
   const partes: Partes = {
     titulo: solicitud.titulo as string,
@@ -254,10 +266,12 @@ export async function registrarEvento<E extends EventoChat>(
     tipo: config.tipo,
     titulo: config.titulo(partes, e.datos),
     cuerpo: solicitud.titulo as string,
-    href: flete
-      ? hrefPedido(destinatario, e.solicitudId)
-      : hrefConversacion(destinatario, e.solicitudId, e.fleteroId),
+    href:
+      flete || !conversacionId
+        ? hrefPedido(destinatario, e.solicitudId)
+        : hrefConversacion(destinatario, e.solicitudId, e.fleteroId),
   });
+  if (!conversacionId || !mensaje) return { conversacionId: null, publicaciones: avisos };
 
   // Los mensajes de sistema no tienen datos de contacto ni fotos: no hace falta ocultar ni firmar.
   const dto = aMensajeDto(mensaje, true, new Map());
@@ -270,9 +284,31 @@ export async function registrarEvento<E extends EventoChat>(
   };
 }
 
+async function insertarMensajeSistema(tx: Tx, conversacionId: string, e: EventoNegocio) {
+  const mensajeId = nuevoId();
+  const { error: errorMensaje } = await tx.from("mensajes").insert({
+    id: mensajeId,
+    conversacionId,
+    tipo: "SISTEMA",
+    evento: e.evento,
+    datos: e.datos,
+  });
+  fallar(errorMensaje);
+  const mensaje = await cargarMensaje(tx, mensajeId);
+  const { error: errorActividad } = await tx
+    .from("conversaciones")
+    .update({ ultimaActividadEn: mensaje.createdAt.toISOString() })
+    .eq("id", conversacionId);
+  fallar(errorActividad);
+  return mensaje;
+}
+
 export interface ContextoEventos {
-  /** Registra un evento de negocio y devuelve el id de la conversación del par. */
-  emitir: <E extends EventoChat>(e: EventoNegocio<E>, opciones?: { notificarA?: RolChat }) => Promise<string>;
+  /** Registra un evento de negocio y devuelve el id de la conversación del par (null si no hay chat). */
+  emitir: <E extends EventoChat>(
+    e: EventoNegocio<E>,
+    opciones?: { notificarA?: RolChat },
+  ) => Promise<string | null>;
   /** Encola avisos en vivo propios (se publican si la operación termina bien). */
   publicarDespues: (publicaciones: Publicacion[]) => void;
 }

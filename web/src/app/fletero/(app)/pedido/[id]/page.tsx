@@ -133,7 +133,7 @@ function PanelPresupuesto({ s, fleteroId }: { s: Solicitud; fleteroId: string })
         </Button>
       ) : (
         <p className="text-xs text-muted-foreground">
-          El chat con el cliente se abre cuando le presupuestás.
+          El chat con el cliente se abre cuando acepta tu presupuesto.
         </p>
       )}
     </section>

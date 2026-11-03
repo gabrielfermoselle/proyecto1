@@ -7,7 +7,6 @@ import { precioSugerido } from "@/domain/precio";
 import { FRANJA, type FranjaHoraria } from "@/domain/catalogos";
 import { calcularValidoHasta, horaEnFranja } from "@/domain/presupuesto";
 import { conEventos } from "@/features/chat/eventos";
-import { crearMensajeDeTexto } from "@/features/chat/mensajes";
 import { consultaAccesoSolicitud } from "@/features/fleteros/solicitudes/consultas-sql";
 import { ActionError, createFleteroAction, esViolacionUnica } from "@/lib/action";
 import { ahoraIso, consulta, db, fallar, nuevoId, numero } from "@/lib/db";
@@ -33,7 +32,7 @@ export const enviarPresupuesto = createFleteroAction({
   schema: presupuestoSchema,
   handler: async (
     { solicitudId, vehiculoId, monto, ayudantes, horaLlegada, validez, mensaje },
-    { fleteroId, usuario },
+    { fleteroId },
   ) => {
     const hoy = fechaIsoAr();
     const accesoSql = consultaAccesoSolicitud(fleteroId, solicitudId, hoy);
@@ -78,7 +77,7 @@ export const enviarPresupuesto = createFleteroAction({
       });
 
     try {
-      await conEventos(async (tx, { emitir, publicarDespues }) => {
+      await conEventos(async (tx, { emitir }) => {
         // Sin FOR SHARE: el update condicional reclama la fila solo si sigue abierta y vigente.
         // Después de insertar se relee el estado; si el cliente la adjudicó en el medio, se borra el presupuesto.
         const { data: reclamada, error: errorReclamo } = await tx
@@ -155,17 +154,13 @@ export const enviarPresupuesto = createFleteroAction({
           throw new ActionError("Esta solicitud ya no recibe presupuestos.");
         }
 
-        // Presupuestar habilita el chat: crea la conversación y deja el aviso del sistema.
-        const conversacionId = await emitir({
+        // Solo avisa al cliente: el chat se abre recién cuando acepta el presupuesto.
+        await emitir({
           solicitudId,
           fleteroId,
           evento: "PRESUPUESTO_ENVIADO",
           datos: { monto, validoHasta: validoHasta.toISOString() },
         });
-        // El mensaje del presupuesto abre la conversación, como si el fletero lo hubiera escrito.
-        if (mensaje) {
-          publicarDespues(await crearMensajeDeTexto(tx, { conversacionId, autor: usuario, texto: mensaje }));
-        }
       });
     } catch (error) {
       if (esViolacionUnica(error)) throw new ActionError(YA_PRESUPUESTADA);

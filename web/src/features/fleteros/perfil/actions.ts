@@ -40,6 +40,8 @@ const VEHICULO_NO_ENCONTRADO = "No encontramos ese vehículo.";
 
 function refrescar() {
   revalidatePath("/fletero", "layout");
+  revalidatePath("/fletero/perfil");
+  revalidatePath("/cliente/fleteros");
   revalidatePath("/perfil");
 }
 

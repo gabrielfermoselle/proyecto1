@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, CalendarX, Minus, Package, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -54,6 +55,7 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
   const sugeridoPara = (ayudantes: number) =>
     precioSugerido({ distanciaLinealKm, volumenM3, ayudantes }, tarifas);
 
+  const router = useRouter();
   const [montoEditado, setMontoEditado] = useState(false);
   const {
     register,
@@ -90,7 +92,9 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
   }
 
   const onSubmit = handleSubmit(async () => {
-    await enviar(() => enviarPresupuesto(getValues()));
+    // Si el refresco que pide la acción se descarta (p. ej. por una navegación en curso), el
+    // formulario quedaría a la vista con el presupuesto ya guardado.
+    if (await enviar(() => enviarPresupuesto(getValues()))) router.refresh();
   });
 
   const montoRegistro = register("monto", { onChange: () => setMontoEditado(true) });
@@ -232,7 +236,7 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
       {props.pideEmbalaje ? (
         <p className="flex items-start gap-2 rounded-lg bg-primary-soft px-3 py-2 text-sm">
           <Package className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          El cliente pidió embalaje: si lo incluís, contalo en el mensaje.
+          El cliente pidió embalaje: si lo incluís, contalo en la descripción.
         </p>
       ) : null}
 
@@ -258,11 +262,11 @@ export function PresupuestoForm(props: PresupuestoFormProps) {
       </fieldset>
 
       <TextareaField
-        label="Mensaje para el cliente (opcional)"
+        label="Descripción del presupuesto (opcional)"
         rows={3}
         maxLength={500}
-        placeholder="Ej.: Voy con mantas y un ayudante. Puedo pasar a partir de las 9."
-        hint="No compartas tu teléfono: la coordinación es por el chat de la plataforma."
+        placeholder="Ej.: Incluye mantas para proteger los muebles y un ayudante para cargar."
+        hint="Contá qué incluye tu precio. No pongas tu teléfono: el chat se habilita cuando el cliente acepta."
         error={errors.mensaje?.message}
         {...register("mensaje")}
       />

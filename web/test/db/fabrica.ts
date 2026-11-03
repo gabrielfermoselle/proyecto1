@@ -133,7 +133,7 @@ export async function crearSolicitud(
   return { id: solicitud.id, items };
 }
 
-/** Un presupuesto pendiente, con su conversación y el mensaje de sistema, como lo deja la app. */
+/** Un presupuesto pendiente y el aviso al cliente, como lo deja la app (sin chat todavía). */
 export async function presupuestar(
   solicitudId: string,
   fletero: UsuarioActual & { vehiculoId: string },
@@ -149,14 +149,27 @@ export async function presupuestar(
       montoSugerido: monto,
       validoHasta,
     });
-    const conversacionId = await emitir({
+    await emitir({
       solicitudId,
       fleteroId: fletero.fleteroProfile!.id,
       evento: "PRESUPUESTO_ENVIADO",
       datos: { monto, validoHasta: validoHasta.toISOString() },
     });
-    return { presupuestoId: p.id, conversacionId };
+    return { presupuestoId: p.id };
   });
+}
+
+/**
+ * Conversación de un presupuesto todavía sin aceptar, como las que quedaron de cuando presupuestar
+ * abría el chat. La app ya no las crea, pero las que existen siguen funcionando.
+ */
+export async function chatPrevio(solicitudId: string, cliente: UsuarioActual, fletero: UsuarioActual) {
+  const conversacion = await insertar<{ id: string }>("conversaciones", {
+    solicitudId,
+    clienteId: cliente.clienteProfile!.id,
+    fleteroId: fletero.fleteroProfile!.id,
+  });
+  return conversacion.id;
 }
 
 /** Eventos de sistema de la conversación de un par, en orden. */
