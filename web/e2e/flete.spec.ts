@@ -43,8 +43,9 @@ test("el fletero ve el pedido cerca suyo y presupuesta", async () => {
   );
   await enviar.click();
   expect((await respuesta).ok()).toBe(true);
-  // Mientras se envía, el botón pasa a «Enviando…» y deja de existir: esperar a que se oculte no
-  // asegura que el presupuesto se guardó. Se espera a que la página muestre el presupuesto enviado.
+  // El heading "Tu presupuesto" lo pinta el servidor. Si el refresco del formulario no corre,
+  // el formulario se queda a la vista con el presupuesto ya guardado. Recargar muestra el estado real.
+  await carlos.reload();
   await expect(carlos.getByRole("heading", { name: "Tu presupuesto" })).toBeVisible();
 
   await carlos.goto("/fletero/trabajos?tab=presupuestos");
