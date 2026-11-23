@@ -296,8 +296,14 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
   const fecha = fechaIsoDeDia(new Date(s.fecha));
   const items = [...(s.items ?? [])].sort((a, b) => a.orden - b.orden);
   // Las fotos de la solicitud son privadas: se firman por un rato solo para quien puede verlas.
-  const fotos = [...(s.fotos ?? []), ...items.flatMap((i) => i.fotos ?? [])];
-  const urlsFotos = await urlsFirmadas(fotos.map((f) => f.ruta));
+  const todasLasFotos = [...(s.fotos ?? []), ...items.flatMap((i) => i.fotos ?? [])];
+  const urlsFotos = await urlsFirmadas(todasLasFotos.map((f) => f.ruta));
+  // Cada foto queda con su URL firmada; las que no se pudieron firmar se descartan.
+  const conUrl = (fs: FotoFila[] | null) =>
+    (fs ?? []).flatMap(({ ruta, ...f }) => {
+      const url = urlsFotos.get(ruta);
+      return url ? [{ ...f, url }] : [];
+    });
   const sugerido = vehiculoSugerido(carga, vehiculos);
   const presupuestos = s.presupuestos ?? [];
   const miPresupuesto = presupuestos.find((p) => p.fleteroId === fleteroId);
@@ -331,11 +337,9 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
     requiereEmbalaje: s.requiereEmbalaje,
     motivoCancelacion: s.motivoCancelacion,
     tipoVehiculoSugerido: (s.tipoVehiculoSugerido as TipoVehiculo | null) ?? null,
-    fotos: fotos.flatMap(({ ruta, ...f }) => {
-      const url = urlsFotos.get(ruta);
-      return url ? [{ ...f, url }] : [];
-    }),
-    items: items.map(({ id, nombre, cantidad, largoCm, anchoCm, altoCm, pesoKgAprox, fragil, notas }) => ({
+    // Solo las fotos generales (del lugar/acceso); las de cada cosa van en su ítem.
+    fotos: conUrl(s.fotos),
+    items: items.map(({ id, nombre, cantidad, largoCm, anchoCm, altoCm, pesoKgAprox, fragil, notas, fotos }) => ({
       id,
       nombre,
       cantidad,
@@ -345,6 +349,7 @@ export async function getSolicitudParaFletero(fleteroId: string, solicitudId: st
       pesoKgAprox: pesoKgAprox == null ? null : numero(pesoKgAprox),
       fragil,
       notas,
+      fotos: conUrl(fotos),
     })),
     presupuestosRecibidos: presupuestos.filter((p) => p.estado === "PENDIENTE").length,
     fleteId: esMiFlete ? (flete?.id ?? null) : null,

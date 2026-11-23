@@ -3,7 +3,7 @@
 import { ImagePlus, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { useId, useRef, useState } from "react";
-import { comprimirImagen, subirImagen, type ConfigStorageCliente } from "@/features/uploads/subir-imagen";
+import { comprimirImagen, subirImagen } from "@/features/uploads/subir-imagen";
 import { agregarFotoVehiculo, eliminarFotoVehiculo, firmarSubidaFotoVehiculo } from "../actions";
 
 interface Foto {
@@ -17,18 +17,18 @@ interface FotosVehiculoProps {
   vehiculoId: string;
   descripcion: string;
   fotos: Foto[];
-  storage: ConfigStorageCliente | null;
+  habilitadas: boolean;
 }
 
 const MAX_FOTOS = 6;
 
-export function FotosVehiculo({ vehiculoId, descripcion, fotos, storage }: FotosVehiculoProps) {
+export function FotosVehiculo({ vehiculoId, descripcion, fotos, habilitadas }: FotosVehiculoProps) {
   const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!storage) {
+  if (!habilitadas) {
     return (
       <p className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
         <ImagePlus className="size-4 shrink-0" aria-hidden="true" />
@@ -37,7 +37,7 @@ export function FotosVehiculo({ vehiculoId, descripcion, fotos, storage }: Fotos
     );
   }
 
-  async function onArchivos(archivos: FileList | null, config: ConfigStorageCliente) {
+  async function onArchivos(archivos: FileList | null) {
     const lista = [...(archivos ?? [])].slice(0, MAX_FOTOS - fotos.length);
     if (lista.length === 0) return;
     setSubiendo(true);
@@ -46,7 +46,7 @@ export function FotosVehiculo({ vehiculoId, descripcion, fotos, storage }: Fotos
       for (const archivo of lista) {
         const firma = await firmarSubidaFotoVehiculo({ vehiculoId });
         if (!firma.ok) throw new Error(firma.error);
-        const subida = await subirImagen(await comprimirImagen(archivo), firma.data, config);
+        const subida = await subirImagen(await comprimirImagen(archivo), firma.data);
         const guardada = await agregarFotoVehiculo({ vehiculoId, ...subida });
         if (!guardada.ok) throw new Error(guardada.error);
       }
@@ -105,7 +105,7 @@ export function FotosVehiculo({ vehiculoId, descripcion, fotos, storage }: Fotos
                 multiple
                 className="sr-only"
                 disabled={subiendo}
-                onChange={(e) => onArchivos(e.target.files, storage)}
+                onChange={(e) => onArchivos(e.target.files)}
               />
             </label>
           </li>

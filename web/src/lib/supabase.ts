@@ -4,9 +4,9 @@ import { env } from "./env";
 import { firmarJwtHs256 } from "./jwt";
 import { log } from "./log";
 
-// Los datos se leen y escriben con el cliente de Supabase (service_role, solo en el servidor).
-// Realtime y Storage siguen siendo opcionales: sin anon key y JWT el chat en vivo y las fotos
-// se degradan, pero las consultas a la base siguen funcionando.
+// Los datos y las fotos se leen y escriben con el cliente de Supabase (service_role, solo en el
+// servidor). Realtime en vivo (chat con "escribiendo…" y "en línea") sí necesita además la anon
+// key y el JWT; sin ellos el chat sigue funcionando por consultas periódicas.
 
 interface ConfigSupabase {
   url: string;
@@ -20,11 +20,6 @@ function config(): ConfigSupabase | null {
   const jwtSecret = env.SUPABASE_JWT_SECRET;
   if (!url || !serviceRoleKey) return null;
   return { url, serviceRoleKey, ...(anonKey ? { anonKey } : {}), ...(jwtSecret ? { jwtSecret } : {}) };
-}
-
-export function supabaseHabilitado(): boolean {
-  const c = config();
-  return Boolean(c?.anonKey && c.jwtSecret);
 }
 
 /** Lo que el navegador necesita para conectarse (la anon key es pública por diseño). */

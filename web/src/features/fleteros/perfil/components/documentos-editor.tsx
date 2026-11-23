@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ETIQUETA_DOCUMENTO, TIPOS_DOCUMENTO, type TipoDocumento } from "@/domain/catalogos";
-import { comprimirImagen, subirImagen, type ConfigStorageCliente } from "@/features/uploads/subir-imagen";
+import { comprimirImagen, subirImagen } from "@/features/uploads/subir-imagen";
 import { formatearFecha } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { eliminarDocumento, firmarSubidaDocumento, guardarDocumento } from "../actions";
@@ -21,11 +21,9 @@ const AYUDA: Record<TipoDocumento, string> = {
 function Documento({
   tipo,
   subido,
-  storage,
 }: {
   tipo: TipoDocumento;
   subido: DocumentoSubido | undefined;
-  storage: ConfigStorageCliente;
 }) {
   const inputId = useId();
   const [subiendo, setSubiendo] = useState(false);
@@ -38,7 +36,7 @@ function Documento({
     try {
       const firma = await firmarSubidaDocumento({ tipo });
       if (!firma.ok) throw new Error(firma.error);
-      const { ruta } = await subirImagen(await comprimirImagen(archivo), firma.data, storage);
+      const { ruta } = await subirImagen(await comprimirImagen(archivo), firma.data);
       const guardado = await guardarDocumento({ tipo, ruta });
       if (!guardado.ok) throw new Error(guardado.error);
     } catch (e) {
@@ -126,11 +124,11 @@ function Documento({
 export function DocumentosEditor({
   documentos,
   verificado,
-  storage,
+  habilitadas,
 }: {
   documentos: DocumentoSubido[];
   verificado: boolean;
-  storage: ConfigStorageCliente | null;
+  habilitadas: boolean;
 }) {
   const faltan = TIPOS_DOCUMENTO.filter((t) => !documentos.some((d) => d.tipo === t)).length;
   return (
@@ -147,10 +145,10 @@ export function DocumentosEditor({
             : "Ya cargaste todo. La administración lo revisa y te verifica."}
         </p>
       )}
-      {storage ? (
+      {habilitadas ? (
         <ul className="grid gap-3 sm:grid-cols-2">
           {TIPOS_DOCUMENTO.map((t) => (
-            <Documento key={t} tipo={t} subido={documentos.find((d) => d.tipo === t)} storage={storage} />
+            <Documento key={t} tipo={t} subido={documentos.find((d) => d.tipo === t)} />
           ))}
         </ul>
       ) : (

@@ -10,7 +10,6 @@ import { ActionError, createAction, esViolacionUnica } from "@/lib/action";
 import { db, fallar, nuevoId, numero } from "@/lib/db";
 import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
 import type { UsuarioActual } from "@/lib/session";
-import { configPublicaSupabase } from "@/lib/supabase";
 import { patronPedido } from "./rutas";
 import {
   avanzarEtapaSchema,
@@ -103,9 +102,8 @@ export const prepararFotoFlete = createAction({
     if (!fase || ACTOR_DE_FASE[fase] !== actor.rol) throw new ActionError("En esta etapa no se suben fotos.");
     await consumirLimite(LIMITES.imagenes(usuario.id));
     const subida = await prepararSubida(BUCKET_PRIVADO, carpetaFotos(fleteId, usuario.id));
-    const storage = configPublicaSupabase();
-    if (!subida || !storage) throw new ActionError("La carga de fotos todavía no está habilitada.");
-    return { subida, storage };
+    if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
+    return subida;
   },
 });
 

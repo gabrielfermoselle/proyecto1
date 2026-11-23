@@ -1,9 +1,23 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, Camera, Check, Minus, Plus, Route, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  Check,
+  ImagePlus,
+  Loader2,
+  Minus,
+  Plus,
+  RefreshCw,
+  Route,
+  Trash2,
+  X,
+} from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, type FieldPath, type UseFormReturn } from "react-hook-form";
 import { FormField, SelectField, TextareaField } from "@/components/shared/form-field";
 import { FormMensaje } from "@/components/shared/form-mensaje";
@@ -27,18 +41,20 @@ import { resumirCarga, type ItemCarga } from "@/domain/carga";
 import { fechaIsoAr, sumarDias } from "@/domain/fechas";
 import { haversineKm, type Coordenadas } from "@/domain/geo";
 import { buscarMueble } from "@/domain/muebles";
-import { DIAS_MAXIMOS_ANTICIPACION, MAXIMO_ITEMS } from "@/domain/solicitud";
+import { DIAS_MAXIMOS_ANTICIPACION, MAXIMO_FOTOS_SOLICITUD, MAXIMO_ITEMS } from "@/domain/solicitud";
 import { hrefPedido } from "@/features/fletes/rutas";
 import { AddressAutocomplete } from "@/features/mapas/components/address-autocomplete";
 import { ErrorPunto } from "@/features/mapas/components/error-punto";
 import { MapaPunto } from "@/features/mapas/components/mapas-dinamicos";
 import { direccionDePunto } from "@/features/mapas/geocoding";
+import { comprimirImagen, subirImagen } from "@/features/uploads/subir-imagen";
 import { formatearDia, formatearKg, formatearKm, formatearM3 } from "@/lib/formato";
 import { useEnvio } from "@/lib/use-envio";
 import { cn } from "@/lib/utils";
-import { crearSolicitud } from "../actions";
+import { crearSolicitud, prepararFotoBorrador } from "../actions";
 import { solicitudSchema, type SolicitudDatos, type SolicitudInput } from "../schemas";
 import { MuebleCombobox } from "./mueble-combobox";
+import { VisorFoto, type FotoVisible } from "./visor-foto";
 
 type Formulario = UseFormReturn<SolicitudInput, unknown, SolicitudDatos>;
 type Campo = FieldPath<SolicitudInput>;
@@ -369,7 +385,172 @@ function FilaResumen({ etiqueta, children }: { etiqueta: string; children: React
   );
 }
 
-export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | null }) {
+/** Nombre visible de un ítem por su posición; si todavía no tiene nombre, "Ítem N". */
+function nombreItem(items: SolicitudInput["items"], indice: number) {
+  return items[indice]?.nombre?.trim() || `Ítem ${indice + 1}`;
+}
+
+interface FotoBorrador {
+  ruta: string;
+  ancho: number;
+  alto: number;
+}
+
+/**
+ * Fotos de un ítem (o generales) mientras se arma el pedido: miniaturas a la izquierda y, a la
+ * derecha, los botones para sumar. Si ya hay fotos, primero muestra "Cambiar foto". Las fotos se
+ * suben a un borrador; la gestión (estado, previews, visor) vive en `FormSolicitud`.
+ */
+function FotosItemBorrador({
+  etiqueta,
+  fotos,
+  previews,
+  subiendo,
+  total,
+  onArchivos,
+  onAbrir,
+  onQuitar,
+}: {
+  etiqueta: string;
+  fotos: FotoBorrador[];
+  previews: Record<string, string>;
+  subiendo: boolean;
+  total: number;
+  onArchivos: (archivos: FileList | null) => void;
+  onAbrir: (foto: FotoVisible) => void;
+  onQuitar: (ruta: string) => void;
+}) {
+  const inputId = useId();
+  const camaraId = useId();
+  const [hayCamara, setHayCamara] = useState(false);
+  const [abierto, setAbierto] = useState(false);
+
+  useEffect(() => {
+    let activo = true;
+    navigator.mediaDevices
+      ?.enumerateDevices?.()
+      .then((dispositivos) => {
+        if (activo) setHayCamara(dispositivos.some((d) => d.kind === "videoinput"));
+      })
+      .catch(() => {});
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  // Al terminar de subir, vuelve a colapsar en "Cambiar foto".
+  useEffect(() => {
+    if (!subiendo) setAbierto(false);
+  }, [subiendo]);
+
+  const chico =
+    "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border-2 border-dashed px-3 text-sm font-semibold text-muted-foreground hover:border-primary/50 hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring";
+  const lleno = total >= MAXIMO_FOTOS_SOLICITUD;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {fotos.map((foto, i) => {
+        const preview = previews[foto.ruta];
+        return (
+          <div key={foto.ruta} className="relative">
+            {preview ? (
+              <button
+                type="button"
+                onClick={() => onAbrir({ src: preview, alt: etiqueta, ancho: foto.ancho, alto: foto.alto })}
+                className="block overflow-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Image
+                  src={preview}
+                  alt={`Ver foto de ${etiqueta}`}
+                  width={72}
+                  height={56}
+                  unoptimized
+                  className="h-14 w-[72px] object-cover transition-transform hover:scale-105"
+                />
+              </button>
+            ) : (
+              <span className="grid h-14 w-[72px] place-items-center rounded-md border bg-muted text-muted-foreground">
+                <ImagePlus className="size-4" aria-hidden="true" />
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onQuitar(foto.ruta)}
+              className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full border bg-card shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+              <span className="sr-only">
+                Quitar foto {i + 1} de {etiqueta}
+              </span>
+            </button>
+          </div>
+        );
+      })}
+      {lleno ? null : fotos.length > 0 && !abierto ? (
+        <button type="button" onClick={() => setAbierto(true)} className={chico}>
+          <RefreshCw className="size-4" aria-hidden="true" />
+          Cambiar foto
+          <span className="sr-only">de {etiqueta}</span>
+        </button>
+      ) : (
+        <>
+          {hayCamara ? (
+            <label htmlFor={camaraId} className={chico}>
+              {subiendo ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Camera className="size-4" aria-hidden="true" />
+              )}
+              Sacar foto
+              <span className="sr-only">de {etiqueta}</span>
+              <input
+                id={camaraId}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                disabled={subiendo}
+                onChange={(e) => {
+                  onArchivos(e.target.files);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+          ) : null}
+          <label htmlFor={inputId} className={chico}>
+            {subiendo ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <ImagePlus className="size-4" aria-hidden="true" />
+            )}
+            {hayCamara ? "Elegir" : "Agregar foto"}
+            <span className="sr-only">de {etiqueta}</span>
+            <input
+              id={inputId}
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              disabled={subiendo}
+              onChange={(e) => {
+                onArchivos(e.target.files);
+                e.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function FormSolicitud({
+  urlFotosMuebles,
+  fotosHabilitadas,
+}: {
+  urlFotosMuebles: string | null;
+  fotosHabilitadas: boolean;
+}) {
   const router = useRouter();
   const hoy = fechaIsoAr();
   const [paso, setPaso] = useState(0);
@@ -392,15 +573,22 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
       origenAscensor: false,
       destinoAscensor: false,
       items: [ITEM_VACIO],
+      fotos: [],
     },
   });
   const { register, control, handleSubmit, getValues, setValue, watch, trigger, setError, formState } = form;
   const { errors, isSubmitting } = formState;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  const fotos = useFieldArray({ control, name: "fotos" });
   const { mensaje, enviar } = useEnvio(setError);
   // Por ítem (id del campo): el mueble cuyas medidas se completaron y si el detalle está abierto.
   const [muebleDe, setMuebleDe] = useState<Record<string, string>>({});
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
+  // Fotos del borrador: previews locales, el visor a pantalla completa, qué destino está subiendo y errores.
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [fotoVisor, setFotoVisor] = useState<FotoVisible | null>(null);
+  const [subiendoEn, setSubiendoEn] = useState<string | null>(null);
+  const [fotoError, setFotoError] = useState<string | null>(null);
   const tipoFlete = watch("tipoFlete");
   const ejemplos = EJEMPLOS_CARGA[tipoFlete ?? "OTRO"];
   const franja = watch("franja");
@@ -441,6 +629,67 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
 
   async function avanzar() {
     if (await trigger([...PASOS[paso]!.campos])) irA(paso + 1);
+  }
+
+  const clave = (itemIndice: number | null) => (itemIndice == null ? "general" : String(itemIndice));
+
+  /** Fotos cargadas para un destino (un ítem por su índice, o `null` para las generales). */
+  function fotosDe(itemIndice: number | null): FotoBorrador[] {
+    return fotos.fields
+      .filter((f) => (f.itemIndice ?? null) === itemIndice)
+      .map((f) => ({ ruta: f.ruta, ancho: f.ancho, alto: f.alto }));
+  }
+
+  /** Sube una o varias fotos al borrador y las vincula a un ítem (o a las generales). */
+  async function subirFotoBorrador(itemIndice: number | null, archivos: FileList | null) {
+    const lista = [...(archivos ?? [])].slice(0, MAXIMO_FOTOS_SOLICITUD - fotos.fields.length);
+    if (lista.length === 0) return;
+    setSubiendoEn(clave(itemIndice));
+    setFotoError(null);
+    try {
+      for (const archivo of lista) {
+        const preparada = await prepararFotoBorrador({});
+        if (!preparada.ok) throw new Error(preparada.error);
+        const comprimida = await comprimirImagen(archivo);
+        const subida = await subirImagen(comprimida, preparada.data);
+        setPreviews((p) => ({ ...p, [subida.ruta]: URL.createObjectURL(comprimida.blob) }));
+        fotos.append({ ...subida, itemIndice });
+      }
+    } catch (e) {
+      setFotoError(e instanceof Error ? e.message : "No se pudo subir la foto.");
+    } finally {
+      setSubiendoEn(null);
+    }
+  }
+
+  function quitarFotoBorrador(ruta: string) {
+    const i = fotos.fields.findIndex((f) => f.ruta === ruta);
+    if (i < 0) return;
+    const url = previews[ruta];
+    if (url) URL.revokeObjectURL(url);
+    setPreviews((p) => {
+      const resto = { ...p };
+      delete resto[ruta];
+      return resto;
+    });
+    fotos.remove(i);
+  }
+
+  /** Quita un ítem y reacomoda las fotos: las de ese ítem pasan a generales; las de más abajo, suben. */
+  function quitarItem(i: number) {
+    fotos.replace(
+      fotos.fields.map((f) =>
+        f.itemIndice == null || f.itemIndice < i
+          ? { ruta: f.ruta, ancho: f.ancho, alto: f.alto, itemIndice: f.itemIndice ?? null }
+          : {
+              ruta: f.ruta,
+              ancho: f.ancho,
+              alto: f.alto,
+              itemIndice: f.itemIndice === i ? null : f.itemIndice - 1,
+            },
+      ),
+    );
+    remove(i);
   }
 
   const onSubmit = handleSubmit(
@@ -608,7 +857,7 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
                               variant="ghost"
                               size="icon"
                               className="mt-7"
-                              onClick={() => remove(i)}
+                              onClick={() => quitarItem(i)}
                             >
                               <Trash2 aria-hidden="true" />
                               <span className="sr-only">Quitar el ítem {i + 1}</span>
@@ -623,18 +872,31 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
                             ? `Pusimos las medidas típicas de «${muebleDe[campo.id]}». Si el tuyo es distinto, cambialas abajo.`
                             : null}
                         </p>
-                        <details
-                          className="group grid gap-3 sm:pl-8"
-                          open={abiertos[campo.id] ?? false}
-                          onToggle={(ev) => {
-                            const abierto = ev.currentTarget.open;
-                            setAbiertos((a) => (a[campo.id] === abierto ? a : { ...a, [campo.id]: abierto }));
-                          }}
-                        >
-                          <summary className="cursor-pointer list-none text-sm font-semibold text-primary underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
-                            <span className="group-open:hidden">+ Cambiar medidas típicas</span>
-                            <span className="hidden group-open:inline">− Ocultar medidas</span>
-                          </summary>
+                        <div className="grid gap-3 sm:pl-8">
+                          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAbiertos((a) => ({ ...a, [campo.id]: !(a[campo.id] ?? false) }))
+                              }
+                              className="cursor-pointer text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                            >
+                              {abiertos[campo.id] ? "− Ocultar medidas" : "+ Cambiar medidas típicas"}
+                            </button>
+                            {fotosHabilitadas ? (
+                              <FotosItemBorrador
+                                etiqueta={nombreItem(items, i)}
+                                fotos={fotosDe(i)}
+                                previews={previews}
+                                subiendo={subiendoEn === String(i)}
+                                total={fotos.fields.length}
+                                onArchivos={(archivos) => void subirFotoBorrador(i, archivos)}
+                                onAbrir={setFotoVisor}
+                                onQuitar={quitarFotoBorrador}
+                              />
+                            ) : null}
+                          </div>
+                          {abiertos[campo.id] ? (
                           <div className="mt-3 grid gap-3">
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                               <FormField
@@ -695,7 +957,8 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
                               {...register(`items.${i}.notas`)}
                             />
                           </div>
-                        </details>
+                          ) : null}
+                        </div>
                       </li>
                     );
                   })}
@@ -716,13 +979,38 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
                 ) : null}
                 <ResumenCargaVivo items={items} />
               </fieldset>
-              <p className="flex items-start gap-3 rounded-lg border border-dashed p-3 text-sm">
-                <Camera className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-                <span>
-                  <strong>Fotos:</strong> apenas publiques, te pedimos fotos de lo que hay que llevar. Con
-                  ellas los fleteros te presupuestan sin tener que llamarte.
-                </span>
-              </p>
+              {fotosHabilitadas ? (
+                <fieldset className="grid gap-3 rounded-lg border border-dashed p-4">
+                  <legend className="flex items-center gap-2 px-1 font-semibold">
+                    <Camera className="size-5 text-primary" aria-hidden="true" />
+                    Fotos generales{" "}
+                    <span className="font-normal text-muted-foreground">(opcional)</span>
+                  </legend>
+                  <p className="text-sm text-muted-foreground">
+                    Del lugar, el acceso o la escalera. Las de cada cosa cargalas en su ítem, arriba.
+                  </p>
+                  <FotosItemBorrador
+                    etiqueta="lo general"
+                    fotos={fotosDe(null)}
+                    previews={previews}
+                    subiendo={subiendoEn === "general"}
+                    total={fotos.fields.length}
+                    onArchivos={(archivos) => void subirFotoBorrador(null, archivos)}
+                    onAbrir={setFotoVisor}
+                    onQuitar={quitarFotoBorrador}
+                  />
+                  {fotos.fields.length >= MAXIMO_FOTOS_SOLICITUD ? (
+                    <p className="text-sm text-muted-foreground">
+                      Llegaste al máximo de {MAXIMO_FOTOS_SOLICITUD} fotos.
+                    </p>
+                  ) : null}
+                  {fotoError ? (
+                    <p role="alert" className="text-sm font-medium text-destructive">
+                      {fotoError}
+                    </p>
+                  ) : null}
+                </fieldset>
+              ) : null}
             </>
           ) : null}
 
@@ -861,6 +1149,7 @@ export function FormSolicitud({ urlFotosMuebles }: { urlFotosMuebles: string | n
           )}
         </div>
       </div>
+      {fotoVisor ? <VisorFoto foto={fotoVisor} onClose={() => setFotoVisor(null)} /> : null}
     </form>
   );
 }

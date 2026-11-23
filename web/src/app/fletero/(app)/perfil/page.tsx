@@ -63,7 +63,7 @@ export default async function PerfilFleteroPage() {
         titulo="Vehículos"
         descripcion="Solo vas a ver pedidos que entren en algún vehículo activo."
       >
-        <VehiculosEditor vehiculos={perfil.vehiculos} storage={perfil.storage} />
+        <VehiculosEditor vehiculos={perfil.vehiculos} fotosHabilitadas={perfil.fotosHabilitadas} />
       </SeccionCard>
       <SeccionCard
         id="zona"
@@ -80,7 +80,7 @@ export default async function PerfilFleteroPage() {
         <DocumentosEditor
           documentos={documentos.documentos}
           verificado={documentos.verificado}
-          storage={perfil.storage}
+          habilitadas={perfil.fotosHabilitadas}
         />
       </SeccionCard>
       <SeccionCard

@@ -55,7 +55,7 @@ export function HojaControl({ fleteId, fase, item, actual, fotosHabilitadas, tri
     const preparada = await prepararFotoFlete({ fleteId });
     if (!preparada.ok) throw new Error(preparada.error);
     const imagen = await comprimirImagen(archivo);
-    return subirImagen(imagen, preparada.data.subida, preparada.data.storage);
+    return subirImagen(imagen, preparada.data);
   }
 
   async function confirmar(): Promise<boolean> {

@@ -139,6 +139,8 @@ const MATRIZ: Record<string, Caso> = {
 
   // --- solicitudes (cliente) ---
   crearSolicitud: { roles: ["CLIENTE"] },
+  // Reserva una ruta en la carpeta de borrador del propio cliente: no recibe IDs ajenos.
+  prepararFotoBorrador: { roles: ["CLIENTE"] },
   cancelarSolicitud: {
     roles: ["CLIENTE"],
     ajeno: (m) => ({ como: m.otroCliente, input: { solicitudId: m.abierta.id } }),
@@ -159,6 +161,10 @@ const MATRIZ: Record<string, Caso> = {
     roles: ["CLIENTE"],
     ajeno: (m) => ({ como: m.otroCliente, input: { presupuestoId: m.presupuestoId } }),
   },
+
+  // --- almacén de imágenes (cliente y fletero) ---
+  // Sube bytes a una ruta ya reservada; la autorización es tener sesión de cliente o fletero.
+  subirImagenAlmacen: { roles: ["CLIENTE", "FLETERO"] },
 
   // --- perfil del cliente (operan sobre el perfil de la sesión) ---
   guardarDatosCliente: { roles: ["CLIENTE"] },
