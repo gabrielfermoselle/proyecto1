@@ -1,20 +1,29 @@
-import { CheckCircle2, Clock, Lock, MessagesSquare, Package, PauseCircle, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Lock,
+  MessagesSquare,
+  Package,
+  PauseCircle,
+  Users,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BloquePedido, CabeceraPedido } from "@/components/shared/cabecera-pedido";
 import { Estrellas } from "@/components/shared/estrellas";
-import { GaleriaFotos } from "@/components/shared/galeria-fotos";
 import { TimelineEtapas } from "@/components/shared/timeline/timeline-etapas";
 import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ACTOR_DE_FASE, esEtapaActiva, FASE_DE_ETAPA } from "@/domain/ciclo-flete";
 import type { EstadoSolicitudPedido } from "@/domain/pedido";
 import { hrefConversacion } from "@/features/chat/acceso-rutas";
 import { EstadoPresupuestoBadge } from "@/features/fleteros/presupuestos/components/estado-presupuesto";
+import { GaleriaFotos } from "@/features/clientes/solicitudes/components/galeria-fotos";
 import { PresupuestoForm } from "@/features/fleteros/presupuestos/components/presupuesto-form";
 import { RetirarPresupuesto } from "@/features/fleteros/presupuestos/components/retirar-presupuesto";
-import { InventarioLista } from "@/features/fleteros/solicitudes/components/inventario-lista";
 import { getSolicitudParaFletero } from "@/features/fleteros/solicitudes/queries";
 import { AccionEtapa } from "@/features/fletes/components/accion-etapa";
 import { CancelarFlete } from "@/features/fletes/components/cancelar-flete";
@@ -31,12 +40,86 @@ import { etapaEnCurso, pasosTimeline } from "@/features/fletes/presentacion";
 import { getFleteDetalle, type FleteDetalle } from "@/features/fletes/queries";
 import { MapaPuntos } from "@/features/mapas/components/mapas-dinamicos";
 import { fotosHabilitadas } from "@/features/uploads/storage";
-import { formatearFechaHora, formatearKm, formatearPesos } from "@/lib/formato";
+import { formatearFechaHora, formatearKg, formatearKm, formatearM3, formatearPesos } from "@/lib/formato";
 import { requireFletero } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Pedido" };
 
 type Solicitud = NonNullable<Awaited<ReturnType<typeof getSolicitudParaFletero>>>;
+type ItemFletero = Solicitud["items"][number];
+
+const medidas = ({ largoCm, anchoCm, altoCm }: ItemFletero) =>
+  largoCm && anchoCm && altoCm ? `${largoCm} × ${anchoCm} × ${altoCm} cm` : null;
+
+/**
+ * Inventario del pedido tal como lo ve el cliente: las fotos de cada cosa al lado de su
+ * descripción y, al final, las fotos generales. Para el fletero es solo lectura (sin subir ni
+ * quitar). Las fotos se abren a pantalla completa al tocarlas.
+ */
+function Inventario({ s }: { s: Solicitud }) {
+  return (
+    <BloquePedido titulo="Qué hay que llevar">
+      {s.descripcion ? <p className="whitespace-pre-line">{s.descripcion}</p> : null}
+      {s.carga.itemsSinMedidas > 0 ? (
+        <p className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {s.carga.itemsSinMedidas === 1
+            ? "Un ítem no tiene"
+            : `${s.carga.itemsSinMedidas} ítems no tienen`}{" "}
+          medidas o peso: los totales pueden ser mayores. Consultá al cliente antes de presupuestar.
+        </p>
+      ) : null}
+      <ul className="divide-y">
+        {s.items.map((i) => (
+          <li key={i.id} className="flex flex-wrap items-start gap-3 py-3 first:pt-0 last:pb-0">
+            {i.fotos.length > 0 ? <GaleriaFotos fotos={i.fotos} etiqueta={i.nombre} editable={false} /> : null}
+            <div className="flex min-w-[8rem] flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-semibold">
+                {i.cantidad > 1 ? `${i.cantidad} × ` : ""}
+                {i.nombre}
+              </span>
+              {i.fragil ? <Badge variant="destructive">Frágil</Badge> : null}
+              <span className="text-sm text-muted-foreground">
+                {[medidas(i), i.pesoKgAprox ? `~${formatearKg(i.pesoKgAprox)} c/u` : null]
+                  .filter(Boolean)
+                  .join(" · ") || "Sin medidas"}
+              </span>
+              {i.notas ? <span className="w-full text-sm text-muted-foreground">{i.notas}</span> : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="text-sm">
+        Total aproximado: <strong>{formatearKg(s.carga.pesoTotalKg)}</strong> y{" "}
+        <strong>{formatearM3(s.carga.volumenTotalM3)}</strong> (con margen de estiba).
+      </p>
+      {s.ayudantesRequeridos > 0 || s.requiereEmbalaje ? (
+        <ul className="flex flex-wrap gap-2 text-sm">
+          {s.ayudantesRequeridos > 0 ? (
+            <li className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 font-semibold">
+              <Users className="size-4" aria-hidden="true" />
+              Pide {s.ayudantesRequeridos} {s.ayudantesRequeridos === 1 ? "ayudante" : "ayudantes"}
+            </li>
+          ) : null}
+          {s.requiereEmbalaje ? (
+            <li className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 font-semibold">
+              <Package className="size-4" aria-hidden="true" />
+              Pide embalaje
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+      {s.fotos.length > 0 ? (
+        <div className="grid gap-3 border-t pt-4">
+          <p className="font-semibold">
+            Fotos generales <span className="font-normal text-muted-foreground">(del lugar o el acceso)</span>
+          </p>
+          <GaleriaFotos fotos={s.fotos} etiqueta="lo general" editable={false} />
+        </div>
+      ) : null}
+    </BloquePedido>
+  );
+}
 
 /** El presupuesto: el formulario para enviarlo, o el enviado con su estado. */
 function PanelPresupuesto({ s, fleteroId }: { s: Solicitud; fleteroId: string }) {
@@ -187,30 +270,7 @@ function VerPedido({ s, fleteroId }: { s: Solicitud; fleteroId: string }) {
           />
         </RecorridoFlete>
 
-        <BloquePedido titulo="Qué hay que llevar">
-          {s.descripcion ? <p className="whitespace-pre-line">{s.descripcion}</p> : null}
-          <InventarioLista items={s.items} totales={s.carga} />
-          {s.ayudantesRequeridos > 0 || s.requiereEmbalaje ? (
-            <ul className="flex flex-wrap gap-2 text-sm">
-              {s.ayudantesRequeridos > 0 ? (
-                <li className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 font-semibold">
-                  <Users className="size-4" aria-hidden="true" />
-                  Pide {s.ayudantesRequeridos} {s.ayudantesRequeridos === 1 ? "ayudante" : "ayudantes"}
-                </li>
-              ) : null}
-              {s.requiereEmbalaje ? (
-                <li className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 font-semibold">
-                  <Package className="size-4" aria-hidden="true" />
-                  Pide embalaje
-                </li>
-              ) : null}
-            </ul>
-          ) : null}
-        </BloquePedido>
-
-        <BloquePedido titulo="Fotos" descripcion="Para presupuestar sin tener que llamar.">
-          <GaleriaFotos fotos={s.fotos} descripcion={s.titulo} />
-        </BloquePedido>
+        <Inventario s={s} />
       </div>
 
       <aside className="lg:sticky lg:top-24">

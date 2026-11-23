@@ -13,7 +13,8 @@ import { ETIQUETA_ESTADO_INICIAL, ETIQUETA_VEHICULO, FRANJA } from "@/domain/cat
 import { esEtapaActiva } from "@/domain/ciclo-flete";
 import { esSolicitudEditable } from "@/domain/solicitud";
 import { CancelarSolicitud } from "@/features/clientes/solicitudes/components/cancelar-solicitud";
-import { FotosSolicitud } from "@/features/clientes/solicitudes/components/fotos-solicitud";
+import { GaleriaFotos } from "@/features/clientes/solicitudes/components/galeria-fotos";
+import { SubirFoto } from "@/features/clientes/solicitudes/components/subir-foto";
 import { PresupuestosRecibidos } from "@/features/clientes/solicitudes/components/presupuestos-recibidos";
 import { getSolicitudDelCliente, type SolicitudDelCliente } from "@/features/clientes/solicitudes/queries";
 import { AccionEtapa } from "@/features/fletes/components/accion-etapa";
@@ -85,27 +86,74 @@ function DatosCarga({ s }: { s: SolicitudDelCliente }) {
   );
 }
 
-function Inventario({ s }: { s: SolicitudDelCliente }) {
+function Inventario({
+  s,
+  editable,
+  habilitadas,
+}: {
+  s: SolicitudDelCliente;
+  editable: boolean;
+  habilitadas: boolean;
+}) {
+  const total = s.fotos.length + s.items.reduce((n, i) => n + i.fotos.length, 0);
   return (
     <BloquePedido titulo="Qué llevás" descripcion="Es el inventario que se controla al cargar y al entregar.">
       <ul className="divide-y">
         {s.items.map((i) => (
-          <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 first:pt-0 last:pb-0">
-            <span className="font-semibold">
-              {i.cantidad > 1 ? `${i.cantidad} × ` : ""}
-              {i.nombre}
-            </span>
-            {i.fragil ? <Badge variant="warning">Frágil</Badge> : null}
-            {i.estadoInicial !== "BUENO" ? (
-              <Badge variant="outline">{ETIQUETA_ESTADO_INICIAL[i.estadoInicial]}</Badge>
+          <li key={i.id} className="flex flex-wrap items-start gap-3 py-3 first:pt-0 last:pb-0">
+            {i.fotos.length > 0 ? (
+              <GaleriaFotos fotos={i.fotos} etiqueta={i.nombre} editable={editable} />
             ) : null}
-            <span className="text-sm text-muted-foreground">
-              {[i.medidas, i.pesoKgAprox ? formatearKg(i.pesoKgAprox) : null].filter(Boolean).join(" · ")}
-            </span>
-            {i.notas ? <span className="w-full text-sm text-muted-foreground">{i.notas}</span> : null}
+            <div className="flex min-w-[8rem] flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-semibold">
+                {i.cantidad > 1 ? `${i.cantidad} × ` : ""}
+                {i.nombre}
+              </span>
+              {i.fragil ? <Badge variant="warning">Frágil</Badge> : null}
+              {i.estadoInicial !== "BUENO" ? (
+                <Badge variant="outline">{ETIQUETA_ESTADO_INICIAL[i.estadoInicial]}</Badge>
+              ) : null}
+              <span className="text-sm text-muted-foreground">
+                {[i.medidas, i.pesoKgAprox ? formatearKg(i.pesoKgAprox) : null].filter(Boolean).join(" · ")}
+              </span>
+              {i.notas ? <span className="w-full text-sm text-muted-foreground">{i.notas}</span> : null}
+            </div>
+            {habilitadas && editable ? (
+              <SubirFoto
+                solicitudId={s.id}
+                itemId={i.id}
+                etiqueta={i.nombre}
+                total={total}
+                tieneFotos={i.fotos.length > 0}
+              />
+            ) : null}
           </li>
         ))}
       </ul>
+      {habilitadas && (editable || s.fotos.length > 0) ? (
+        <div id="fotos" className="grid gap-3 border-t pt-4">
+          <div className="grid gap-0.5">
+            <p className="font-semibold">
+              Fotos generales <span className="font-normal text-muted-foreground">(opcional)</span>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Del lugar o el acceso. Con fotos los fleteros te presupuestan sin llamarte.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-start gap-3">
+            {s.fotos.length > 0 ? <GaleriaFotos fotos={s.fotos} etiqueta="lo general" editable={editable} /> : null}
+            {editable ? (
+              <SubirFoto
+                solicitudId={s.id}
+                itemId={null}
+                etiqueta="lo general"
+                total={total}
+                tieneFotos={s.fotos.length > 0}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </BloquePedido>
   );
 }
@@ -117,21 +165,8 @@ function PedidoSinFlete({ s, nueva }: { s: SolicitudDelCliente; nueva: boolean }
   const vigentes = s.presupuestos.filter((p) => p.estado === "PENDIENTE" && !p.vencido).length;
   const sinFotos = s.fotos.length === 0 && s.items.every((i) => i.fotos.length === 0);
 
-  const fotos = editable ? (
-    <BloquePedido
-      id="fotos"
-      titulo="Fotos"
-      descripcion="Con fotos los fleteros te presupuestan sin llamarte. Solo las ven los que pueden presupuestar tu pedido."
-    >
-      <FotosSolicitud
-        solicitudId={s.id}
-        general={s.fotos}
-        items={s.items.map((i) => ({ id: i.id, nombre: i.nombre, fotos: i.fotos }))}
-        habilitadas={fotosHabilitadas()}
-      />
-    </BloquePedido>
-  ) : null;
-  // Recién publicado y sin fotos: las fotos primero, que es lo que conviene hacer ahora.
+  const inventario = <Inventario s={s} editable={editable} habilitadas={fotosHabilitadas()} />;
+  // Recién publicado y sin fotos: el inventario con las fotos va primero, que es lo que conviene hacer ahora.
   const fotosPrimero = nueva && sinFotos;
 
   return (
@@ -159,7 +194,7 @@ function PedidoSinFlete({ s, nueva }: { s: SolicitudDelCliente; nueva: boolean }
           </Alert>
         ) : null}
 
-        {fotosPrimero ? fotos : null}
+        {fotosPrimero ? inventario : null}
         <section aria-labelledby="titulo-presupuestos" className="grid gap-4">
           <h2 id="titulo-presupuestos" className="text-2xl font-extrabold">
             Presupuestos recibidos{" "}
@@ -173,8 +208,7 @@ function PedidoSinFlete({ s, nueva }: { s: SolicitudDelCliente; nueva: boolean }
             pideEmbalaje={s.requiereEmbalaje}
           />
         </section>
-        {fotosPrimero ? null : fotos}
-        <Inventario s={s} />
+        {fotosPrimero ? null : inventario}
       </div>
 
       <aside className="grid gap-4 lg:sticky lg:top-24">

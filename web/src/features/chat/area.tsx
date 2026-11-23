@@ -5,9 +5,9 @@ import { AppShell } from "@/components/shared/app-shell";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CampanaNotificaciones } from "@/features/notificaciones/components/campana-notificaciones";
 import { getNotificaciones } from "@/features/notificaciones/queries";
+import { fotosHabilitadas } from "@/features/uploads/storage";
 import { db, fallar, relacion } from "@/lib/db";
 import { nombrePublico } from "@/lib/formato";
-import { supabaseHabilitado } from "@/lib/supabase";
 import type { UsuarioActual } from "@/lib/session";
 import { MessagesSquare } from "lucide-react";
 import { hrefConversacion, perfilChat } from "./acceso";
@@ -95,7 +95,7 @@ export async function PaginaConversacion({
   const vista = await getVistaConversacion(conversacionId, usuario);
   // Si no participa, la conversación "no existe" para él.
   if (!vista) notFound();
-  return <ConversacionVista inicial={vista} fotosHabilitadas={supabaseHabilitado()} hrefBandeja="/chat" />;
+  return <ConversacionVista inicial={vista} fotosHabilitadas={fotosHabilitadas()} hrefBandeja="/chat" />;
 }
 
 /** Conversaciones de un pedido que ve el usuario: una para el fletero, una por fletero para el cliente. */

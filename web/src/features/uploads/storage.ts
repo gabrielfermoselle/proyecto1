@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import { db, fallar } from "@/lib/db";
 import { env } from "@/lib/env";
 import { log } from "@/lib/log";
-import { supabaseAdmin, supabaseHabilitado } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 
-// Fotos en Supabase Storage. El navegador sube directo con una URL firmada por el servidor;
-// el binario nunca pasa por nuestra app.
+// Fotos en Supabase Storage. El navegador comprime la imagen y el servidor la sube con la
+// service_role: así alcanza con SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (la anon key y el JWT
+// solo hacen falta para Realtime en vivo).
 //  - fotos-publicas: vehículos (se ven en el perfil público).
 //  - fotos-privadas: chat, solicitudes e ítems. Se sirven con URLs firmadas de corta duración.
 //  - FotosCosas: miniaturas fijas de los muebles típicos (`domain/muebles.ts`). Se suben a mano.
@@ -18,27 +19,54 @@ export type Bucket = typeof BUCKET_PUBLICO | typeof BUCKET_PRIVADO;
 /** Las URLs firmadas duran 6 h: alcanza para una sesión de chat larga. */
 const DURACION_URL_FIRMADA_S = 6 * 60 * 60;
 
-export const fotosHabilitadas = supabaseHabilitado;
+/** Las fotos quedan habilitadas con solo configurar el acceso de servidor a Supabase. */
+export function fotosHabilitadas(): boolean {
+  return supabaseAdmin() !== null;
+}
+
+/** Igual que el bucket, Storage solo acepta JPEG de hasta 5 MB. */
+export const TAMANO_MAXIMO_FOTO_BYTES = 5 * 1024 * 1024;
 
 export interface SubidaPreparada {
   bucket: Bucket;
   ruta: string;
-  token: string;
 }
 
 /**
- * Reserva una ruta nueva dentro de `carpeta` y devuelve el token para subir ahí. La ruta queda
- * como pendiente: si nunca se adjunta a una foto, el mantenimiento diario borra el archivo.
+ * Reserva una ruta nueva dentro de `carpeta`. La ruta queda como pendiente: si nunca se adjunta
+ * a una foto, el mantenimiento diario borra el archivo.
  */
 export async function prepararSubida(bucket: Bucket, carpeta: string): Promise<SubidaPreparada | null> {
-  const admin = supabaseAdmin();
-  if (!admin) return null;
+  if (!supabaseAdmin()) return null;
   const ruta = `${carpeta}/${randomUUID()}.jpg`;
-  const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(ruta);
+  const { error } = await db().from("subidas_pendientes").insert({ ruta, bucket });
+  fallar(error);
+  return { bucket, ruta };
+}
+
+/** Confirma que una ruta fue reservada por `prepararSubida` (no se puede escribir en cualquier lado). */
+export async function rutaReservada(bucket: Bucket, ruta: string): Promise<boolean> {
+  const { data, error } = await db()
+    .from("subidas_pendientes")
+    .select("ruta")
+    .eq("bucket", bucket)
+    .eq("ruta", ruta)
+    .maybeSingle();
+  fallar(error);
+  return Boolean(data);
+}
+
+/** Sube una imagen JPEG a una ruta ya reservada. Solo en el servidor, con la service_role. */
+export async function guardarImagen(bucket: Bucket, ruta: string, bytes: Uint8Array): Promise<void> {
+  const admin = supabaseAdmin();
+  if (!admin) throw new Error("Storage no configurado");
+  if (bytes.byteLength === 0 || bytes.byteLength > TAMANO_MAXIMO_FOTO_BYTES) {
+    throw new Error("Imagen fuera del tamaño permitido");
+  }
+  const { error } = await admin.storage
+    .from(bucket)
+    .upload(ruta, bytes, { contentType: "image/jpeg", upsert: true });
   if (error) throw error;
-  const { error: errorPendiente } = await db().from("subidas_pendientes").insert({ ruta: data.path, bucket });
-  fallar(errorPendiente);
-  return { bucket, ruta: data.path, token: data.token };
 }
 
 /**

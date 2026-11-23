@@ -22,10 +22,10 @@ import {
 import { ActionError, createClienteAction } from "@/lib/action";
 import { ahoraIso, db, fallar, nuevoId, relacion } from "@/lib/db";
 import { consumirLimite, LIMITES } from "@/lib/limite-tasa";
-import { configPublicaSupabase } from "@/lib/supabase";
 import {
   agregarFotoSolicitudSchema,
   cancelarSolicitudSchema,
+  prepararFotoBorradorSchema,
   prepararFotoSolicitudSchema,
   quitarFotoSolicitudSchema,
   solicitudSchema,
@@ -42,6 +42,23 @@ function lista<T>(valor: T | T[] | null | undefined): T[] {
   if (valor == null) return [];
   return Array.isArray(valor) ? valor : [valor];
 }
+
+/** Carpeta temporal donde el cliente sube fotos mientras arma el pedido (antes de que exista). */
+const carpetaBorrador = (clienteId: string) => `solicitudes/_borrador/${clienteId}`;
+
+/**
+ * Reserva una ruta para subir una foto durante el armado del pedido. Al publicar, `crearSolicitud`
+ * engancha las que sigan existiendo; el mantenimiento diario borra las que queden sueltas.
+ */
+export const prepararFotoBorrador = createClienteAction({
+  schema: prepararFotoBorradorSchema,
+  handler: async (_d, { clienteId, usuario }) => {
+    await consumirLimite(LIMITES.imagenes(usuario.id));
+    const subida = await prepararSubida(BUCKET_PRIVADO, carpetaBorrador(clienteId));
+    if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
+    return subida;
+  },
+});
 
 /**
  * Publica una solicitud. Los totales de la carga y la distancia se calculan en el servidor
@@ -65,7 +82,7 @@ export const crearSolicitud = createClienteAction({
     await consumirLimite(LIMITES.solicitudes(usuario.id));
 
     const carga = resumirCarga(d.items);
-    const { items, fecha, ...resto } = d;
+    const { items, fecha, fotos, ...resto } = d;
     const solicitudId = nuevoId();
     const { error } = await db()
       .from("solicitudes")
@@ -82,12 +99,41 @@ export const crearSolicitud = createClienteAction({
       });
     fallar(error);
 
-    const { error: errorItems } = await db()
-      .from("items_inventario")
-      .insert(items.map((item, orden) => ({ ...item, id: nuevoId(), solicitudId, orden })));
+    const itemsConId = items.map((item, orden) => ({ ...item, id: nuevoId(), solicitudId, orden }));
+    const { error: errorItems } = await db().from("items_inventario").insert(itemsConId);
     if (errorItems) {
       await db().from("solicitudes").delete().eq("id", solicitudId);
       fallar(errorItems);
+    }
+
+    // Fotos que el cliente subió durante el armado: se validan contra su carpeta de borrador y se
+    // enganchan al pedido. Cada foto va a su ítem (por índice) o, si es general, a la solicitud.
+    const fotosValidas = [];
+    for (const foto of fotos.slice(0, MAXIMO_FOTOS_SOLICITUD)) {
+      if (await rutaSubidaValida(BUCKET_PRIVADO, foto.ruta, carpetaBorrador(clienteId))) {
+        fotosValidas.push(foto);
+      }
+    }
+    if (fotosValidas.length > 0) {
+      // `ruta` es única: si una ya quedó enganchada antes (p. ej. al reenviar el formulario con el
+      // botón «atrás»), la salteamos en vez de romper la publicación.
+      const { error: errorFotos } = await db()
+        .from("fotos")
+        .upsert(
+          fotosValidas.map((foto) => {
+            const item = foto.itemIndice != null ? itemsConId[foto.itemIndice] : undefined;
+            return {
+              id: nuevoId(),
+              ruta: foto.ruta,
+              ancho: foto.ancho,
+              alto: foto.alto,
+              // Una foto tiene un solo dueño (CHECK en la base): el ítem o la solicitud.
+              ...(item ? { itemId: item.id } : { solicitudId }),
+            };
+          }),
+          { onConflict: "ruta", ignoreDuplicates: true },
+        );
+      fallar(errorFotos);
     }
     refrescar();
     return { id: solicitudId };
@@ -188,9 +234,8 @@ export const prepararFotoSolicitud = createClienteAction({
       throw new ActionError(`Podés subir hasta ${MAXIMO_FOTOS_SOLICITUD} fotos.`);
     await consumirLimite(LIMITES.imagenes(usuario.id));
     const subida = await prepararSubida(BUCKET_PRIVADO, carpetaFotos(solicitudId));
-    const storage = configPublicaSupabase();
-    if (!subida || !storage) throw new ActionError("La carga de fotos todavía no está habilitada.");
-    return { subida, storage };
+    if (!subida) throw new ActionError("La carga de fotos todavía no está habilitada.");
+    return subida;
   },
 });
 

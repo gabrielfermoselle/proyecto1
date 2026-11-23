@@ -1,9 +1,8 @@
 import "server-only";
 import type { TipoDocumento, TipoVehiculo } from "@/domain/catalogos";
 import type { PerfilParaOnboarding } from "@/domain/onboarding";
-import { urlPublica, urlsFirmadas } from "@/features/uploads/storage";
+import { fotosHabilitadas, urlPublica, urlsFirmadas } from "@/features/uploads/storage";
 import { db, fallar, numero, relacion } from "@/lib/db";
-import { configPublicaSupabase } from "@/lib/supabase";
 
 interface FotoFila {
   id: string;
@@ -117,8 +116,8 @@ export async function getPerfilFletero(fleteroId: string) {
     vehiculos,
     disponible: perfil.disponible,
     onboardingCompleto: perfil.onboardingCompletadoEn !== null,
-    /** Configuración para subir fotos desde el navegador; null si Storage no está configurado. */
-    storage: configPublicaSupabase(),
+    /** Si el almacenamiento de fotos está configurado (alcanza con el acceso de servidor). */
+    fotosHabilitadas: fotosHabilitadas(),
     progreso,
   };
 }

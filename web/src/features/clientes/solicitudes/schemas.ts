@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ESTADOS_INICIALES_ITEM, FRANJAS_HORARIAS, TIPOS_FLETE, TIPOS_VEHICULO } from "@/domain/catalogos";
 import { estaEnRegion } from "@/domain/geo";
-import { MAXIMO_ITEMS } from "@/domain/solicitud";
+import { MAXIMO_FOTOS_SOLICITUD, MAXIMO_ITEMS } from "@/domain/solicitud";
 
 // Schemas de la solicitud del cliente. Los campos se llaman como las columnas, así el
 // formulario, la acción y Prisma hablan el mismo idioma.
@@ -43,6 +43,17 @@ const direccion = z.string().trim().min(5, "Buscá la dirección o marcá el pun
 const coordenada = z.coerce.number({ invalid_type_error: "Marcá el punto en el mapa" });
 const piso = numeroOpcional(0, 60, "Entre 0 (planta baja) y 60");
 
+/**
+ * Una foto ya subida al borrador: la ruta reservada, sus dimensiones y, si corresponde, el índice
+ * del ítem al que pertenece (null = foto general). El índice es la posición en la lista de ítems.
+ */
+const fotoBorradorSchema = z.object({
+  ruta: z.string().min(1).max(300),
+  ancho: z.number().int().min(1).max(10_000),
+  alto: z.number().int().min(1).max(10_000),
+  itemIndice: z.number().int().min(0).max(MAXIMO_ITEMS).nullable().default(null),
+});
+
 export const solicitudSchema = z
   .object({
     tipoFlete: z.enum(TIPOS_FLETE, { errorMap: () => ({ message: "Elegí qué tipo de flete es" }) }),
@@ -70,6 +81,7 @@ export const solicitudSchema = z
       .array(itemSchema)
       .min(1, "Agregá al menos un ítem")
       .max(MAXIMO_ITEMS, `Hasta ${MAXIMO_ITEMS} ítems`),
+    fotos: z.array(fotoBorradorSchema).max(MAXIMO_FOTOS_SOLICITUD).default([]),
   })
   .refine((s) => estaEnRegion({ lat: s.origenLat, lng: s.origenLng }), {
     message: "El origen tiene que estar en Tucumán o alrededores",
@@ -93,6 +105,8 @@ export const cancelarSolicitudSchema = z.object({
     .optional()
     .transform((v) => (v ? v : null)),
 });
+
+export const prepararFotoBorradorSchema = z.object({});
 
 export const prepararFotoSolicitudSchema = z.object({ solicitudId: id });
 

@@ -104,9 +104,8 @@ export const prepararFotoChat = createAction({
     await contextoEscribible(conversacionId, usuario);
     await consumirLimite(LIMITES.imagenes(usuario.id));
     const subida = await prepararSubida(BUCKET_PRIVADO, carpetaFotosChat(conversacionId, usuario.id));
-    const storage = configPublicaSupabase();
-    if (!subida || !storage) throw new ActionError("El envío de fotos todavía no está habilitado.");
-    return { subida, storage };
+    if (!subida) throw new ActionError("El envío de fotos todavía no está habilitado.");
+    return subida;
   },
 });
 
