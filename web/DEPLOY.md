@@ -10,9 +10,11 @@ Supabase (Postgres + Realtime + Storage) y Vercel. Lleva unos 20 minutos la prim
    - **Database → Connection string**:
      - `DATABASE_URL`: el _Transaction pooler_ (puerto 6543), con `?pgbouncer=true&connection_limit=1` al final.
      - `DIRECT_URL`: el _Session pooler_ (puerto 5432). Lo usan las migraciones.
-   - **API**: `SUPABASE_URL`, la `anon` key (`SUPABASE_ANON_KEY`) y la `service_role` key
-     (`SUPABASE_SERVICE_ROLE_KEY`, secreta: solo va en el servidor).
-   - **JWT Keys → Legacy JWT secret**: `SUPABASE_JWT_SECRET`. Firma los tokens de Realtime de cada usuario.
+   - **API**: `SUPABASE_URL` y la `service_role` key (`SUPABASE_SERVICE_ROLE_KEY`, secreta: solo va
+     en el servidor). Con esas dos ya funcionan los datos y la carga de fotos (el servidor sube a
+     Storage con la service_role). La `anon` key (`SUPABASE_ANON_KEY`) es para Realtime en vivo.
+   - **JWT Keys → Legacy JWT secret**: `SUPABASE_JWT_SECRET`. Firma los tokens de Realtime de cada
+     usuario. Sin anon key ni JWT, el chat anda igual pero por consultas periódicas.
 4. **Realtime → Settings**: desactivar _Allow public access_, así los canales solo aceptan tokens firmados.
 
 ## 2. Migraciones y datos

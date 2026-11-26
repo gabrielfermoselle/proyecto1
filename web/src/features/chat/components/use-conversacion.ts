@@ -223,7 +223,7 @@ export function useConversacion(inicial: Inicial) {
           const preparada = await prepararFotoChat({ conversacionId });
           if (!preparada.ok) return preparada;
           const imagen = await comprimirImagen(archivo);
-          const subida = await subirImagen(imagen, preparada.data.subida, preparada.data.storage);
+          const subida = await subirImagen(imagen, preparada.data);
           return enviarFotoChat({ conversacionId, clientId, ...subida, texto });
         },
       );

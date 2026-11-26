@@ -21,7 +21,9 @@ const nextConfig: NextConfig = {
   // @react-pdf/renderer trae WebAssembly (yoga) y fuentes estándar: se usa tal cual desde node_modules.
   serverExternalPackages: ["@react-pdf/renderer"],
   experimental: {
-    serverActions: { bodySizeLimit: "1mb" },
+    // Las fotos (ya comprimidas a ~300 KB, hasta 5 MB) viajan al servidor en base64 por una
+    // Server Action, que las guarda en Storage con la service_role.
+    serverActions: { bodySizeLimit: "8mb" },
     // Caché del navegador para las páginas dinámicas: volver a una página visitada (o precargada
     // desde la navegación) en los últimos 30 s es instantáneo. Las Server Actions con
     // revalidatePath y router.refresh() la invalidan, así que lo que cambia el usuario se ve al toque.

@@ -1,6 +1,7 @@
-// Del lado del navegador: comprime la foto y la sube directo a Supabase Storage con el token
-// que firmó el servidor.
+// Del lado del navegador: comprime la foto y se la pasa al servidor, que la guarda en Supabase
+// Storage con la service_role (así no hace falta exponer ninguna clave en el navegador).
 
+import { subirImagenAlmacen } from "./actions";
 import type { SubidaPreparada } from "./storage";
 
 const LADO_MAXIMO_PX = 1600;
@@ -33,28 +34,26 @@ export async function comprimirImagen(archivo: File): Promise<ImagenComprimida> 
   return { blob, ancho: canvas.width, alto: canvas.height };
 }
 
-export interface ConfigStorageCliente {
-  url: string;
-  anonKey: string;
-}
-
 export interface ImagenSubida {
   ruta: string;
   ancho: number;
   alto: number;
 }
 
-export async function subirImagen(
-  imagen: ImagenComprimida,
-  subida: SubidaPreparada,
-  config: ConfigStorageCliente,
-): Promise<ImagenSubida> {
-  // Se carga recién al subir: no suma peso a las páginas que no suben fotos.
-  const { createClient } = await import("@supabase/supabase-js");
-  const supabase = createClient(config.url, config.anonKey, { auth: { persistSession: false } });
-  const { error } = await supabase.storage
-    .from(subida.bucket)
-    .uploadToSignedUrl(subida.ruta, subida.token, imagen.blob, { contentType: "image/jpeg" });
-  if (error) throw new Error("No se pudo subir la foto. Probá de nuevo.");
+/** Codifica el blob a base64 sin reventar la pila con archivos grandes. */
+async function blobABase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binario = "";
+  const tramo = 0x8000;
+  for (let i = 0; i < bytes.length; i += tramo) {
+    binario += String.fromCharCode(...bytes.subarray(i, i + tramo));
+  }
+  return btoa(binario);
+}
+
+export async function subirImagen(imagen: ImagenComprimida, subida: SubidaPreparada): Promise<ImagenSubida> {
+  const dataBase64 = await blobABase64(imagen.blob);
+  const resultado = await subirImagenAlmacen({ bucket: subida.bucket, ruta: subida.ruta, dataBase64 });
+  if (!resultado.ok) throw new Error(resultado.error);
   return { ruta: subida.ruta, ancho: imagen.ancho, alto: imagen.alto };
 }
