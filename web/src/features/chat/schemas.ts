@@ -46,7 +46,7 @@ export const proponerHorarioSchema = z
     conversacionId: id,
     clientId,
     fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Elegí una fecha"),
-    franja: z.enum(FRANJAS_HORARIAS, { errorMap: () => ({ message: "Elegí una franja horaria" }) }),
+    franja: z.enum(FRANJAS_HORARIAS, { error: "Elegí una franja horaria" }),
   })
   .refine((p) => p.fecha >= fechaIsoAr() && p.fecha <= sumarDias(fechaIsoAr(), DIAS_MAXIMOS_PROPUESTA), {
     message: `Elegí una fecha entre hoy y los próximos ${DIAS_MAXIMOS_PROPUESTA} días`,

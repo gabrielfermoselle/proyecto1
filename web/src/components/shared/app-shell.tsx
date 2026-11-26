@@ -37,7 +37,9 @@ export function AppShell({
     <div className="flex min-h-dvh flex-col">
       <header className="toldo sticky top-0 z-30 bg-secondary text-secondary-foreground">
         <div className="container flex h-16 items-center gap-6">
-          <Logo href="/panel" sobreToldo />
+          {/* En celulares de menos de 400 px el nombre no entra junto a la campana, la cuenta y
+              Salir: queda solo la chapa, como en la portada. */}
+          <Logo href="/panel" sobreToldo compactoEnCelular />
           {nav ? <div className="hidden h-full flex-1 lg:block">{nav}</div> : <div className="flex-1" />}
           <div className="flex items-center gap-1 sm:gap-2">
             {accionPrincipal ? <div className="hidden lg:block">{accionPrincipal}</div> : null}

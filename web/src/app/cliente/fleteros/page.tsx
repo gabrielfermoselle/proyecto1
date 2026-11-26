@@ -41,8 +41,10 @@ export default async function FleterosPage({ searchParams }: Props) {
     orden: valores.orden,
   });
 
+  // grid-cols-1 (minmax(0,1fr)) y no la columna automática: la zona del fletero se trunca en una
+  // sola línea y, sin tope, su ancho completo estiraba la página más que la pantalla del celular.
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-1 gap-6">
       <PageHeader
         title="Fleteros"
         description="Compará por cercanía, precio y calificación. Para recibir presupuestos, publicá tu flete: les llega a los de tu zona."
@@ -76,7 +78,7 @@ export default async function FleterosPage({ searchParams }: Props) {
           description="Probá con otra distancia, otro vehículo o sin tope de precio."
         />
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {fleteros.map((f) => (
             <li key={f.id}>
               <Link
@@ -86,7 +88,7 @@ export default async function FleterosPage({ searchParams }: Props) {
                 <span className="grid size-12 shrink-0 place-items-center rounded-full bg-secondary font-heading text-lg font-extrabold text-secondary-foreground">
                   {f.nombre.charAt(0)}
                 </span>
-                <div className="grid min-w-0 flex-1 gap-1">
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-1">
                   <p className="flex flex-wrap items-center gap-2">
                     <span className="font-bold">{f.nombre}</span>
                     {f.verificado ? (

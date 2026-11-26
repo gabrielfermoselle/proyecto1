@@ -30,7 +30,9 @@ export default async function PerfilFleteroPage() {
   ]);
 
   return (
-    <div className="mx-auto grid max-w-3xl gap-6">
+    // minmax(0,1fr): los inputs numéricos de Tarifas tienen un ancho propio que, en una columna
+    // automática, la ensanchaba más que la pantalla en celulares de 320 px.
+    <div className="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
       <PageHeader
         title="Vehículo, zona y documentos"
         description="Lo que cambies acá se aplica al instante en el buscador y en tus próximos presupuestos."

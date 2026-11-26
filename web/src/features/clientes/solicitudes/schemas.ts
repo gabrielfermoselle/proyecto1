@@ -11,7 +11,7 @@ const id = z.string().min(1).max(40);
 /** Un número opcional del formulario: "" o vacío es null. */
 const numeroOpcional = (min: number, max: number, mensaje: string, entero = true) =>
   z
-    .union([z.literal(""), z.null(), z.coerce.number({ invalid_type_error: mensaje })])
+    .union([z.literal(""), z.null(), z.coerce.number({ error: mensaje })])
     .transform((v) => (v === "" || v === null ? null : v))
     .refine((v) => v === null || (v >= min && v <= max && (!entero || Number.isInteger(v))), mensaje);
 
@@ -26,7 +26,7 @@ const textoOpcional = (max: number) =>
 export const itemSchema = z.object({
   nombre: z.string().trim().min(2, "Poné qué es (ej.: Heladera)").max(80),
   cantidad: z.coerce
-    .number({ invalid_type_error: "Ingresá la cantidad" })
+    .number({ error: "Ingresá la cantidad" })
     .int("Usá un número entero")
     .min(1, "Al menos 1")
     .max(999),
@@ -40,12 +40,12 @@ export const itemSchema = z.object({
 });
 
 const direccion = z.string().trim().min(5, "Buscá la dirección o marcá el punto en el mapa").max(200);
-const coordenada = z.coerce.number({ invalid_type_error: "Marcá el punto en el mapa" });
+const coordenada = z.coerce.number({ error: "Marcá el punto en el mapa" });
 const piso = numeroOpcional(0, 60, "Entre 0 (planta baja) y 60");
 
 export const solicitudSchema = z
   .object({
-    tipoFlete: z.enum(TIPOS_FLETE, { errorMap: () => ({ message: "Elegí qué tipo de flete es" }) }),
+    tipoFlete: z.enum(TIPOS_FLETE, { error: "Elegí qué tipo de flete es" }),
     titulo: z.string().trim().min(5, "Contalo en pocas palabras (ej.: Heladera y lavarropas)").max(120),
     descripcion: textoOpcional(1000),
     origenDireccion: direccion,
@@ -59,7 +59,7 @@ export const solicitudSchema = z
     destinoPiso: piso,
     destinoAscensor: z.boolean().default(false),
     fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Elegí el día"),
-    franja: z.enum(FRANJAS_HORARIAS, { errorMap: () => ({ message: "Elegí el horario" }) }),
+    franja: z.enum(FRANJAS_HORARIAS, { error: "Elegí el horario" }),
     tipoVehiculoSugerido: z
       .union([z.literal(""), z.enum(TIPOS_VEHICULO)])
       .optional()

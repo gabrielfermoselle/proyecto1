@@ -45,7 +45,7 @@ export const loginSchema = z.object({
 
 export const registroSchema = z
   .object({
-    rol: z.enum(ROLES_REGISTRABLES, { errorMap: () => ({ message: "Elegí cómo vas a usar la plataforma" }) }),
+    rol: z.enum(ROLES_REGISTRABLES, { error: "Elegí cómo vas a usar la plataforma" }),
     nombre: nombreSchema("nombre"),
     apellido: nombreSchema("apellido"),
     email: emailSchema,

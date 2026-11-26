@@ -10,7 +10,7 @@ export default async function FleterosPublicoLayout({ children }: { children: Re
     <div className="flex min-h-dvh flex-col">
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between gap-4">
-          <Logo href={usuario ? "/panel" : "/"} />
+          <Logo href={usuario ? "/panel" : "/"} compactoEnCelular />
           <Button asChild variant="ghost" size="sm">
             {usuario ? <Link href="/panel">Ir a mi panel</Link> : <Link href="/login">Ingresar</Link>}
           </Button>

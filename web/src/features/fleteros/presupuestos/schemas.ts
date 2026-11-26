@@ -6,11 +6,11 @@ const id = z.string().min(1).max(40);
 export const presupuestoSchema = z.object({
   solicitudId: id,
   vehiculoId: z
-    .string({ required_error: "Elegí con qué vehículo hacés el flete" })
+    .string({ error: "Elegí con qué vehículo hacés el flete" })
     .min(1, "Elegí con qué vehículo hacés el flete")
     .max(40),
   monto: z.coerce
-    .number({ invalid_type_error: "Ingresá el monto" })
+    .number({ error: "Ingresá el monto" })
     .int("Usá un monto sin centavos")
     .min(1_000, "El monto mínimo es $1.000")
     .max(50_000_000, "Revisá el monto"),
@@ -20,7 +20,7 @@ export const presupuestoSchema = z.object({
     .union([z.literal(""), z.string().regex(FORMATO_HORA, "Usá el formato HH:MM, ej. 09:30")])
     .optional()
     .transform((v) => (v ? v : null)),
-  validez: z.enum(VALIDECES, { errorMap: () => ({ message: "Elegí hasta cuándo vale el presupuesto" }) }),
+  validez: z.enum(VALIDECES, { error: "Elegí hasta cuándo vale el presupuesto" }),
   mensaje: z
     .string()
     .trim()

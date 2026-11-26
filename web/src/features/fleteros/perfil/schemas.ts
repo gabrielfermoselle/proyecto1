@@ -10,7 +10,7 @@ const id = z.string().min(1).max(40);
 
 const entero = (min: number, max: number, mensajeMin: string) =>
   z.coerce
-    .number({ invalid_type_error: "Ingresá un número" })
+    .number({ error: "Ingresá un número" })
     .int("Usá un número entero")
     .min(min, mensajeMin)
     .max(max, `El máximo es ${max.toLocaleString("es-AR")}`);
@@ -37,7 +37,7 @@ export const datosSchema = z.object({
 });
 
 export const vehiculoSchema = z.object({
-  tipo: z.enum(TIPOS_VEHICULO, { errorMap: () => ({ message: "Elegí el tipo de vehículo" }) }),
+  tipo: z.enum(TIPOS_VEHICULO, { error: "Elegí el tipo de vehículo" }),
   marca: z.string().trim().min(2, "Ingresá la marca").max(40),
   modelo: z.string().trim().min(1, "Ingresá el modelo").max(40),
   anio: z
@@ -49,7 +49,7 @@ export const vehiculoSchema = z.object({
     .refine(esPatenteValida, "Formato válido: AB123CD, ABC123, A123BCD o 123ABC"),
   capacidadKg: entero(1, 40_000, "Indicá cuántos kg puede llevar"),
   volumenM3: z.coerce
-    .number({ invalid_type_error: "Ingresá un número" })
+    .number({ error: "Ingresá un número" })
     .min(0.01, "Indicá el volumen de carga")
     .max(120, "El máximo es 120 m³"),
 });
@@ -91,7 +91,7 @@ export type VehiculoInput = z.input<typeof vehiculoSchema>;
 export type ZonaInput = z.input<typeof zonaSchema>;
 export type TarifasInput = z.input<typeof tarifasSchema>;
 
-const tipoDocumento = z.enum(TIPOS_DOCUMENTO, { errorMap: () => ({ message: "Elegí qué documento es" }) });
+const tipoDocumento = z.enum(TIPOS_DOCUMENTO, { error: "Elegí qué documento es" });
 
 export const tipoDocumentoSchema = z.object({ tipo: tipoDocumento });
 
